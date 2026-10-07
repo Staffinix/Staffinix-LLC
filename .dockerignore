@@ -1,0 +1,13 @@
+.git
+.github
+.output
+.wrangler
+node_modules
+coverage
+dist
+*.log
+.env
+.env.*
+!.env.example
+supabase/.branches
+supabase/.temp

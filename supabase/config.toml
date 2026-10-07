@@ -1,0 +1,18 @@
+project_id = "bzrzembwquwubfljfqnq"
+
+# Keep this checkout's local stack isolated from the sibling Staffinix checkout.
+[api]
+port = 55321
+
+[db]
+port = 55322
+shadow_port = 55320
+
+[studio]
+port = 55323
+
+[local_smtp]
+port = 55324
+
+[analytics]
+port = 55327
