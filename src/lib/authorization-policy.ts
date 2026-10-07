@@ -77,7 +77,14 @@ export function assertCanManageUser(input: {
   if (input.actorId === input.targetId) {
     throw new ForbiddenError("You cannot modify your own authorization state.");
   }
-  if (!input.actor.tenantId || input.targetTenantId !== input.actor.tenantId) {
+  const canOnboardUnassignedUser =
+    input.targetTenantId === null &&
+    input.assignedRole !== undefined &&
+    input.actor.platformRole === "platform_owner";
+  if (
+    !input.actor.tenantId ||
+    (!canOnboardUnassignedUser && input.targetTenantId !== input.actor.tenantId)
+  ) {
     throw new ForbiddenError("The target user is outside your tenant.");
   }
   if (

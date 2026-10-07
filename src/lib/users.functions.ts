@@ -11,43 +11,44 @@ const AppRoleSchema = z.enum(APP_ROLES);
 async function requireAdminContext(context: SupabaseAuthContext) {
   const { requireAdmin } = await import("@/lib/rbac.server");
   const roles = await requireAdmin(context.supabase, context.userId);
-  const { data: caller, error } = await context.supabase
-    .from("profiles")
-    .select("tenant_id")
-    .eq("id", context.userId)
-    .maybeSingle();
-  if (error) throw new Error("Unable to resolve administrator tenant.");
+  const [{ data: caller, error }, { data: platform, error: platformError }] = await Promise.all([
+    context.supabase.from("profiles").select("tenant_id").eq("id", context.userId).maybeSingle(),
+    context.supabase
+      .from("platform_admins")
+      .select("role")
+      .eq("user_id", context.userId)
+      .maybeSingle(),
+  ]);
+  if (error || platformError) throw new Error("Unable to resolve administrator context.");
   if (!caller?.tenant_id) throw new Error("Administrator is not assigned to a tenant.");
-  return { roles, tenantId: caller.tenant_id };
+  return { roles, tenantId: caller.tenant_id, platformRole: platform?.role ?? null };
 }
 
-async function targetIsSameTenant(
-  context: SupabaseAuthContext,
-  targetUserId: string,
-  tenantId: string,
-) {
+async function resolveTargetTenant(context: SupabaseAuthContext, targetUserId: string) {
   const { data, error } = await context.supabase
     .from("profiles")
     .select("id, tenant_id")
     .eq("id", targetUserId)
     .maybeSingle();
   if (error) throw new Error("Unable to resolve target user.");
-  if (!data || data.tenant_id !== tenantId) {
-    const { ForbiddenError } = await import("@/lib/authorization-policy");
-    throw new ForbiddenError("The target user is outside your tenant.");
-  }
+  if (!data) throw new Error("Unable to resolve target user.");
   return data.tenant_id;
 }
 
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireUsersAccess])
   .handler(async ({ context }) => {
-    await requireAdminContext(context);
-    const { data: profiles, error } = await context.supabase
+    const { tenantId, platformRole } = await requireAdminContext(context);
+    let profilesQuery = context.supabase
       .from("profiles")
       .select("id, email, full_name, phone, avatar_url, is_active, created_at, tenant_id")
       .order("created_at", { ascending: false })
       .limit(100);
+    profilesQuery =
+      platformRole === "platform_owner"
+        ? profilesQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        : profilesQuery.eq("tenant_id", tenantId);
+    const { data: profiles, error } = await profilesQuery;
     if (error) throw new Error("Failed to load users.");
 
     const ids = (profiles ?? []).map((p) => p.id);
@@ -114,11 +115,11 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .middleware([requireUsersAccess])
   .validator((input: unknown) => UpdateRoleSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { roles, tenantId } = await requireAdminContext(context);
-    const targetTenantId = await targetIsSameTenant(context, data.user_id, tenantId);
+    const { roles, tenantId, platformRole } = await requireAdminContext(context);
+    const targetTenantId = await resolveTargetTenant(context, data.user_id);
     const { assertCanManageUser } = await import("@/lib/authorization-policy");
     assertCanManageUser({
-      actor: { active: true, tenantId, roles, platformRole: null },
+      actor: { active: true, tenantId, roles, platformRole },
       actorId: context.userId,
       targetId: data.user_id,
       targetTenantId,
@@ -139,11 +140,11 @@ export const setUserActive = createServerFn({ method: "POST" })
   .middleware([requireUsersAccess])
   .validator((input: unknown) => SetActiveSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { tenantId, roles } = await requireAdminContext(context);
-    const targetTenantId = await targetIsSameTenant(context, data.user_id, tenantId);
+    const { tenantId, roles, platformRole } = await requireAdminContext(context);
+    const targetTenantId = await resolveTargetTenant(context, data.user_id);
     const { assertCanManageUser } = await import("@/lib/authorization-policy");
     assertCanManageUser({
-      actor: { active: true, tenantId, roles, platformRole: null },
+      actor: { active: true, tenantId, roles, platformRole },
       actorId: context.userId,
       targetId: data.user_id,
       targetTenantId,

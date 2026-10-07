@@ -127,3 +127,43 @@ test("super admin may manage another user only inside the same tenant", () => {
     }),
   );
 });
+
+test("platform owner super admin may onboard an unassigned user while assigning a role", () => {
+  assert.doesNotThrow(() =>
+    assertCanManageUser({
+      actor: snapshot(["super_admin"], { platformRole: "platform_owner" }),
+      actorId: "platform-owner",
+      targetId: "unassigned-user",
+      targetTenantId: null,
+      assignedRole: "recruiter",
+    }),
+  );
+});
+
+test("company super admin cannot claim an unassigned user", () => {
+  assert.throws(
+    () =>
+      assertCanManageUser({
+        actor: snapshot(["super_admin"]),
+        actorId: "company-admin",
+        targetId: "unassigned-user",
+        targetTenantId: null,
+        assignedRole: "recruiter",
+      }),
+    ForbiddenError,
+  );
+});
+
+test("platform owner cannot use company role assignment across existing tenants", () => {
+  assert.throws(
+    () =>
+      assertCanManageUser({
+        actor: snapshot(["super_admin"], { platformRole: "platform_owner" }),
+        actorId: "platform-owner",
+        targetId: "other-company-user",
+        targetTenantId: "tenant-b",
+        assignedRole: "recruiter",
+      }),
+    ForbiddenError,
+  );
+});
