@@ -86,8 +86,8 @@
     "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.101.1",
-    "@tanstack/react-router": "^1.170.16",
-    "@tanstack/react-start": "^1.168.26",
+    "@tanstack/react-router": "^1.170.41",
+    "@tanstack/react-start": "^1.168.60",
     "@tanstack/router-plugin": "^1.168.18",
     "@vercel/analytics": "^2.0.1",
     "class-variance-authority": "^0.7.1",
@@ -98,7 +98,7 @@
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.575.0",
-    "mammoth": "1.12.1",
+    "mammoth": "^1.13.0",
     "motion": "^13.4.4",
     "postgres": "^3.4.9",
     "react": "^19.2.0",
@@ -140,3 +140,4 @@
     "undici": "7.29.1"
   }
 }
+
