@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -27,10 +27,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  getMyAccessRequest,
   listAccessRequests,
   reviewAccessRequest,
   requestPlatformAccess,
 } from "@/lib/access-requests.functions";
+import {
+  ACCESS_REQUEST_REASON_MAX_LENGTH,
+  ACCESS_REQUEST_REASON_MIN_LENGTH,
+  ACCESS_TIER_OPTIONS,
+  getAccessTierLabel,
+  isRequestableAccessTier,
+  type RequestableAccessTier,
+} from "@/lib/access-request-tiers";
 import { useProfile } from "@/hooks/use-profile";
 import { useSession } from "@/hooks/use-session";
 
@@ -173,7 +182,7 @@ function ApproverTable() {
                         variant="outline"
                         className="text-[10px] font-mono border-primary/30 text-primary"
                       >
-                        {r.requested_role ?? "L4 Recruiter"}
+                        {getAccessTierLabel(r.requested_tier)}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate py-3 text-xs text-muted-foreground">
@@ -240,39 +249,93 @@ function ApproverTable() {
 
 function RecruiterRequestForm() {
   const { data: profile } = useProfile();
-  const [role, setRole] = useState("platform_support");
+  const { isAuthenticated } = useSession();
+  const queryClient = useQueryClient();
+  const getMyRequestFn = useServerFn(getMyAccessRequest);
+  const [tier, setTier] = useState<RequestableAccessTier | undefined>();
   const [reason, setReason] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
 
   const senderEmail = profile?.email || profile?.profile?.email || "Signed-in account";
   const senderName = profile?.profile?.full_name || "Current user";
 
   const requestFn = useServerFn(requestPlatformAccess);
 
-  function handleSubmit() {
-    if (!reason.trim()) {
-      toast.error("Reason required!");
+  const { data: requestState, isPending: isLoadingRequest } = useQuery({
+    queryKey: ["my-access-request"],
+    queryFn: () => getMyRequestFn(),
+    enabled: isAuthenticated,
+    retry: 2,
+  });
+
+  const pendingRequest = requestState?.requests.find((request) => request.status === "pending");
+
+  async function handleSubmit() {
+    if (!tier) {
+      toast.error("Please select a valid access tier.");
       return;
     }
-    requestFn({ data: { requestedRole: role, reason } })
-      .then(() => {
-        toast.success("Request sent!");
-        setSubmitted(true);
-      })
-      .catch((e) => toast.error(e.message));
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < ACCESS_REQUEST_REASON_MIN_LENGTH) {
+      toast.error(`Please provide at least ${ACCESS_REQUEST_REASON_MIN_LENGTH} characters.`);
+      return;
+    }
+
+    if (submissionInFlight.current || pendingRequest) return;
+    submissionInFlight.current = true;
+    setIsSubmitting(true);
+    try {
+      const result = await requestFn({ data: { requestedTier: tier, reason: normalizedReason } });
+      toast.success(
+        result.alreadyPending
+          ? "Your access request is already pending approval."
+          : "Access request submitted for approval.",
+      );
+      await queryClient.invalidateQueries({ queryKey: ["my-access-request"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to submit your request.");
+    } finally {
+      submissionInFlight.current = false;
+      setIsSubmitting(false);
+    }
   }
 
-  if (submitted) {
+  if (isLoadingRequest) {
     return (
-      <Card className="border-emerald-500/30 bg-card max-w-2xl mx-auto">
+      <Card className="border-border bg-card max-w-2xl mx-auto">
+        <CardContent className="p-8 text-center text-xs text-muted-foreground">
+          Loading your access request…
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (pendingRequest) {
+    return (
+      <Card className="border-amber-500/30 bg-card max-w-2xl mx-auto">
         <CardContent className="flex flex-col items-center justify-center p-8 text-center space-y-3">
-          <ShieldCheck className="h-10 w-10 text-emerald-500" />
-          <h3 className="text-base font-semibold text-foreground">Access Request Submitted</h3>
-          <p className="text-xs text-muted-foreground max-w-md">
-            Your request for <span className="font-semibold text-foreground">{role}</span> has been
-            submitted securely for review by a platform administrator.
-          </p>
+          <ShieldCheck className="h-10 w-10 text-amber-500" />
+          <h3 className="text-base font-semibold text-foreground">
+            Your access request is already pending approval.
+          </h3>
+          <div className="grid w-full max-w-md gap-2 rounded-md border border-border bg-muted/30 p-4 text-left text-xs sm:grid-cols-2">
+            <span className="text-muted-foreground">Requested tier</span>
+            <span className="font-semibold text-foreground sm:text-right">
+              {getAccessTierLabel(pendingRequest.requested_tier)}
+            </span>
+            <span className="text-muted-foreground">Submitted</span>
+            <span className="font-semibold text-foreground sm:text-right">
+              {new Date(pendingRequest.created_at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <span className="text-muted-foreground">Current status</span>
+            <span className="font-semibold text-amber-500 sm:text-right">Pending approval</span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -299,13 +362,21 @@ function RecruiterRequestForm() {
 
         <div className="space-y-2">
           <Label className="text-xs">Requested Access Tier</Label>
-          <Select value={role} onValueChange={setRole}>
+          <Select
+            value={tier}
+            onValueChange={(value) => {
+              if (isRequestableAccessTier(value)) setTier(value);
+            }}
+          >
             <SelectTrigger className="text-xs">
-              <SelectValue />
+              <SelectValue placeholder="Select access tier" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="platform_support">Platform Support</SelectItem>
-              <SelectItem value="platform_admin">Platform Administrator</SelectItem>
+              {ACCESS_TIER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -316,6 +387,7 @@ function RecruiterRequestForm() {
             rows={4}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            maxLength={ACCESS_REQUEST_REASON_MAX_LENGTH}
             placeholder="e.g. Assigned to manage candidate bench and client requirements for FinTech & AI projects."
             className="text-xs"
           />
@@ -362,7 +434,7 @@ function RecruiterRequestForm() {
               <p>
                 <span className="font-medium text-foreground">Subject:</span>{" "}
                 <span className="text-primary font-semibold">
-                  Platform Authorization Request — {role}
+                  Platform Authorization Request — {tier ? getAccessTierLabel(tier) : "Access tier"}
                 </span>
               </p>
             </div>
@@ -370,8 +442,9 @@ function RecruiterRequestForm() {
               <p>Dear Administrator,</p>
               <p>
                 I am writing to formally request elevated access to the Staffinix platform under the{" "}
-                <strong>{role}</strong> tier. This authorization is required to effectively carry
-                out my responsibilities within the recruitment operations team.
+                <strong>{tier ? getAccessTierLabel(tier) : "selected access"}</strong> tier. This
+                authorization is required to effectively carry out my responsibilities within the
+                recruitment operations team.
               </p>
               <p>
                 <strong>Justification:</strong> {reason.trim()}
@@ -396,8 +469,16 @@ function RecruiterRequestForm() {
           </div>
         )}
 
-        <Button size="sm" onClick={handleSubmit} className="text-xs">
-          <Mail className="h-3.5 w-3.5 mr-1.5" /> Submit Access Request
+        <Button
+          size="sm"
+          onClick={handleSubmit}
+          className="text-xs"
+          disabled={
+            isSubmitting || !tier || reason.trim().length < ACCESS_REQUEST_REASON_MIN_LENGTH
+          }
+        >
+          <Mail className="h-3.5 w-3.5 mr-1.5" />
+          {isSubmitting ? "Submitting…" : "Submit Access Request"}
         </Button>
       </CardContent>
     </Card>

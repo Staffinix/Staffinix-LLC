@@ -6,8 +6,9 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -36,12 +37,16 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
+  const normalizedError = useMemo(
+    () => (error instanceof Error ? error : new Error("Unexpected application error")),
+    [error],
+  );
+  console.error(normalizedError);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+    reportLovableError(normalizedError, { boundary: "tanstack_root_error_component" });
+  }, [normalizedError]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -49,7 +54,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="text-xs font-mono uppercase tracking-widest text-destructive">Error</p>
         <h1 className="mt-3 text-2xl font-semibold text-foreground">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {error.message || "Please try again or return home."}
+          {normalizedError.message || "Please try again or return home."}
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <button

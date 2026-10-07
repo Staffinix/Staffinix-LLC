@@ -15,6 +15,7 @@
     "test:safe-urls": "node --test --experimental-strip-types src/lib/safe-url.test.ts src/lib/server-service-url.test.ts src/lib/profile-avatar.test.ts",
     "security:request-body-limit": "node scripts/check-request-body-limit.mjs",
     "test:error-taxonomy": "node --test --experimental-strip-types src/lib/application-error.test.ts",
+    "test:access-requests": "node --test --experimental-strip-types src/lib/access-request-tiers.test.ts",
     "test:observability": "node --test --experimental-strip-types src/lib/request-observability.test.ts",
     "test:candidate-search": "node scripts/check-candidate-search-plan.mjs",
     "test:candidate-updates": "node --test --experimental-strip-types src/lib/candidate-child-updates.test.ts",
@@ -46,7 +47,7 @@
     "security:production-fallbacks": "node scripts/check-production-fallbacks.mjs",
     "security:service-role": "node scripts/check-service-role-boundary.mjs",
     "security:service-role-bundle": "node scripts/check-service-role-boundary.mjs --bundle",
-    "test:unit": "npm run test:auth && npm run test:input-validation && npm run test:security-headers && npm run test:safe-urls && npm run test:error-taxonomy && npm run test:observability && npm run test:rbac && npm run test:candidate-updates && npm run test:candidate-form && npm run test:vendor-csv && npm run test:resume-paths && npm run test:document-worker && npm run test:ai-gateway && npm run test:ai-usage && npm run test:email && npm run test:rag",
+    "test:unit": "npm run test:auth && npm run test:input-validation && npm run test:security-headers && npm run test:safe-urls && npm run test:error-taxonomy && npm run test:access-requests && npm run test:observability && npm run test:rbac && npm run test:candidate-updates && npm run test:candidate-form && npm run test:vendor-csv && npm run test:resume-paths && npm run test:document-worker && npm run test:ai-gateway && npm run test:ai-usage && npm run test:email && npm run test:rag",
     "security:static": "npm run security:request-body-limit && npm run security:document-ai && npm run security:dashboard-aggregation && npm run security:explicit-selects && npm run test:list-bounds && npm run security:server-auth && npm run security:auth-bypass && npm run security:production-fallbacks && npm run security:service-role && npm run test:interactive-controls",
     "lint": "eslint .",
     "format": "prettier --write ."
@@ -140,4 +141,3 @@
     "undici": "7.29.1"
   }
 }
-

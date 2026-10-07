@@ -1272,7 +1272,8 @@ export type Database = {
           created_at: string;
           id: string;
           reason: string | null;
-          requested_role: Database["public"]["Enums"]["platform_role"];
+          requested_role: Database["public"]["Enums"]["platform_role"] | null;
+          requested_tier: Database["public"]["Enums"]["requestable_access_tier"];
           review_note: string | null;
           reviewed_at: string | null;
           reviewed_by: string | null;
@@ -1286,7 +1287,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           reason?: string | null;
-          requested_role?: Database["public"]["Enums"]["platform_role"];
+          requested_role?: Database["public"]["Enums"]["platform_role"] | null;
+          requested_tier: Database["public"]["Enums"]["requestable_access_tier"];
           review_note?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
@@ -1300,7 +1302,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           reason?: string | null;
-          requested_role?: Database["public"]["Enums"]["platform_role"];
+          requested_role?: Database["public"]["Enums"]["platform_role"] | null;
+          requested_tier?: Database["public"]["Enums"]["requestable_access_tier"];
           review_note?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
@@ -2369,6 +2372,14 @@ export type Database = {
         };
         Returns: undefined;
       };
+      review_platform_access_request: {
+        Args: { _approve: boolean; _note?: string | null; _request_id: string };
+        Returns: {
+          id: string;
+          reviewed_at: string;
+          status: Database["public"]["Enums"]["access_request_status"];
+        }[];
+      };
       show_limit: { Args: never; Returns: number };
       show_trgm: { Args: { "": string }; Returns: string[] };
     };
@@ -2392,6 +2403,7 @@ export type Database = {
         "screen" | "l1" | "l2" | "manager" | "client" | "technical" | "final" | "other";
       placement_status: "active" | "ended" | "terminated" | "extended";
       platform_role: "platform_owner" | "platform_admin" | "platform_support";
+      requestable_access_tier: "l2_admin" | "l3_developer" | "l4_recruiter";
       requirement_priority: "low" | "medium" | "high" | "urgent";
       requirement_rate_type: "hourly" | "annual" | "monthly";
       requirement_source: "manual" | "paste" | "pdf" | "docx" | "email";
@@ -2571,6 +2583,7 @@ export const Constants = {
       interview_round: ["screen", "l1", "l2", "manager", "client", "technical", "final", "other"],
       placement_status: ["active", "ended", "terminated", "extended"],
       platform_role: ["platform_owner", "platform_admin", "platform_support"],
+      requestable_access_tier: ["l2_admin", "l3_developer", "l4_recruiter"],
       requirement_priority: ["low", "medium", "high", "urgent"],
       requirement_rate_type: ["hourly", "annual", "monthly"],
       requirement_source: ["manual", "paste", "pdf", "docx", "email"],
