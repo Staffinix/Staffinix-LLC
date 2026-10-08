@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { shouldAdvanceCandidateFormOnEnter } from "./candidate-form-keyboard.ts";
@@ -65,3 +66,15 @@ test("marketing types support multiple selections and deselection", () => {
   assert.deepEqual(selected, ["W2"]);
   assert.deepEqual(MARKETING_TYPES, ["C2C", "W2", "Full-Time", "1099"]);
 });
+
+test("candidate edit renders as a sibling instead of a hidden detail child", () => {
+  const routeTree = readFileSync(new URL("../routeTree.gen.ts", import.meta.url), "utf8");
+  const editRoute = routeTree.match(
+    /const AuthenticatedCandidatesIdEditRoute =[\s\S]*?\n\s*\}\s+as any\)/,
+  );
+
+  assert.ok(editRoute, "generated candidate edit route was not found");
+  assert.match(editRoute[0], /getParentRoute: \(\) => AuthenticatedRouteRoute/);
+  assert.doesNotMatch(editRoute[0], /getParentRoute: \(\) => AuthenticatedCandidatesIdRoute/);
+});
+

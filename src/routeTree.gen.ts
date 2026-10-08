@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 12396)
+Total output lines: 1140
+
 /* eslint-disable */
 
 // @ts-nocheck
@@ -52,7 +55,7 @@ import { Route as AuthenticatedTenantsNewRouteImport } from './routes/_authentic
 import { Route as AuthenticatedVendorsIndexRouteImport } from './routes/_authenticated/vendors.index'
 import { Route as AuthenticatedVendorsIdRouteImport } from './routes/_authenticated/vendors.$id'
 import { Route as AuthenticatedVendorsNewRouteImport } from './routes/_authenticated/vendors.new'
-import { Route as AuthenticatedCandidatesIdEditRouteImport } from './routes/_authenticated/candidates.$id.edit'
+import { Route as AuthenticatedCandidatesIdEditRouteImport } from './routes/_authenticated/candidates.$id_.edit'
 import { Route as AuthenticatedEmailIntelligenceRulesIndexRouteImport } from './routes/_authenticated/email-intelligence.rules.index'
 import { Route as AuthenticatedEmailIntelligenceRulesIdRouteImport } from './routes/_authenticated/email-intelligence.rules.$id'
 import { Route as AuthenticatedEmailIntelligenceRulesNewRouteImport } from './routes/_authenticated/email-intelligence.rules.new'
@@ -295,9 +298,9 @@ const AuthenticatedVendorsNewRoute = AuthenticatedVendorsNewRouteImport.update({
 } as any)
 const AuthenticatedCandidatesIdEditRoute =
   AuthenticatedCandidatesIdEditRouteImport.update({
-    id: '/edit',
-    path: '/edit',
-    getParentRoute: () => AuthenticatedCandidatesIdRoute,
+    id: '/candidates/$id_/edit',
+    path: '/candidates/$id/edit',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedEmailIntelligenceRulesIndexRoute =
   AuthenticatedEmailIntelligenceRulesIndexRouteImport.update({
@@ -350,7 +353,7 @@ export interface FileRoutesByFullPath {
   '/tailoring': typeof AuthenticatedTailoringRoute
   '/users': typeof AuthenticatedUsersRoute
   '/bench/$id': typeof AuthenticatedBenchIdRoute
-  '/candidates/$id': typeof AuthenticatedCandidatesIdRouteWithChildren
+  '/candidates/$id': typeof AuthenticatedCandidatesIdRoute
   '/candidates/new': typeof AuthenticatedCandidatesNewRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
@@ -400,7 +403,7 @@ export interface FileRoutesByTo {
   '/tailoring': typeof AuthenticatedTailoringRoute
   '/users': typeof AuthenticatedUsersRoute
   '/bench/$id': typeof AuthenticatedBenchIdRoute
-  '/candidates/$id': typeof AuthenticatedCandidatesIdRouteWithChildren
+  '/candidates/$id': typeof AuthenticatedCandidatesIdRoute
   '/candidates/new': typeof AuthenticatedCandidatesNewRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
@@ -452,7 +455,7 @@ export interface FileRoutesById {
   '/_authenticated/tailoring': typeof AuthenticatedTailoringRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/bench/$id': typeof AuthenticatedBenchIdRoute
-  '/_authenticated/candidates/$id': typeof AuthenticatedCandidatesIdRouteWithChildren
+  '/_authenticated/candidates/$id': typeof AuthenticatedCandidatesIdRoute
   '/_authenticated/candidates/new': typeof AuthenticatedCandidatesNewRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/clients/new': typeof AuthenticatedClientsNewRoute
@@ -475,65 +478,9 @@ export interface FileRoutesById {
   '/_authenticated/requirements/': typeof AuthenticatedRequirementsIndexRoute
   '/_authenticated/submissions/': typeof AuthenticatedSubmissionsIndexRoute
   '/_authenticated/vendors/': typeof AuthenticatedVendorsIndexRoute
-  '/_authenticated/candidates/$id/edit': typeof AuthenticatedCandidatesIdEditRoute
+  '/_authenticated/candidates/$id_/edit': typeof AuthenticatedCandidatesIdEditRoute
   '/_authenticated/email-intelligence/rules/$id': typeof AuthenticatedEmailIntelligenceRulesIdRoute
-  '/_authenticated/email-intelligence/rules/new': typeof AuthenticatedEmailIntelligenceRulesNewRoute
-  '/_authenticated/requirements/$id/edit': typeof AuthenticatedRequirementsIdEditRoute
-  '/_authenticated/settings/email-accounts_/callback': typeof AuthenticatedSettingsEmailAccountsCallbackRoute
-  '/_authenticated/email-intelligence/rules/': typeof AuthenticatedEmailIntelligenceRulesIndexRoute
-}
-export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth'
-    | '/access-request'
-    | '/architecture'
-    | '/audit'
-    | '/bench'
-    | '/company'
-    | '/copilot'
-    | '/dashboard'
-    | '/developer'
-    | '/forbidden'
-    | '/interviews'
-    | '/matching'
-    | '/overview'
-    | '/placements'
-    | '/platform'
-    | '/tailoring'
-    | '/users'
-    | '/bench/$id'
-    | '/candidates/$id'
-    | '/candidates/new'
-    | '/clients/$id'
-    | '/clients/new'
-    | '/recruiters/$id'
-    | '/requirements/$id'
-    | '/requirements/new'
-    | '/settings/email-accounts'
-    | '/settings/profile'
-    | '/submissions/$id'
-    | '/submissions/board'
-    | '/submissions/draft'
-    | '/submissions/new'
-    | '/tenants/new'
-    | '/vendors/$id'
-    | '/vendors/new'
-    | '/candidates/'
-    | '/clients/'
-    | '/email-intelligence/'
-    | '/recruiters/'
-    | '/requirements/'
-    | '/submissions/'
-    | '/vendors/'
-    | '/candidates/$id/edit'
-    | '/email-intelligence/rules/$id'
-    | '/email-intelligence/rules/new'
-    | '/requirements/$id/edit'
-    | '/settings/email-accounts/callback'
-    | '/email-intelligence/rules/'
-  fileRoutesByTo: FileRoutesByTo
+  '/_authenticated/email-inte…396 tokens truncated…esByTo
   to:
     | '/'
     | '/auth'
@@ -628,7 +575,7 @@ export interface FileRouteTypes {
     | '/_authenticated/requirements/'
     | '/_authenticated/submissions/'
     | '/_authenticated/vendors/'
-    | '/_authenticated/candidates/$id/edit'
+    | '/_authenticated/candidates/$id_/edit'
     | '/_authenticated/email-intelligence/rules/$id'
     | '/_authenticated/email-intelligence/rules/new'
     | '/_authenticated/requirements/$id/edit'
@@ -945,12 +892,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVendorsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/candidates/$id/edit': {
-      id: '/_authenticated/candidates/$id/edit'
-      path: '/edit'
+    '/_authenticated/candidates/$id_/edit': {
+      id: '/_authenticated/candidates/$id_/edit'
+      path: '/candidates/$id/edit'
       fullPath: '/candidates/$id/edit'
       preLoaderRoute: typeof AuthenticatedCandidatesIdEditRouteImport
-      parentRoute: typeof AuthenticatedCandidatesIdRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/email-intelligence/rules/': {
       id: '/_authenticated/email-intelligence/rules/'
@@ -1001,20 +948,6 @@ const AuthenticatedBenchRouteChildren: AuthenticatedBenchRouteChildren = {
 const AuthenticatedBenchRouteWithChildren =
   AuthenticatedBenchRoute._addFileChildren(AuthenticatedBenchRouteChildren)
 
-interface AuthenticatedCandidatesIdRouteChildren {
-  AuthenticatedCandidatesIdEditRoute: typeof AuthenticatedCandidatesIdEditRoute
-}
-
-const AuthenticatedCandidatesIdRouteChildren: AuthenticatedCandidatesIdRouteChildren =
-  {
-    AuthenticatedCandidatesIdEditRoute: AuthenticatedCandidatesIdEditRoute,
-  }
-
-const AuthenticatedCandidatesIdRouteWithChildren =
-  AuthenticatedCandidatesIdRoute._addFileChildren(
-    AuthenticatedCandidatesIdRouteChildren,
-  )
-
 interface AuthenticatedRequirementsIdRouteChildren {
   AuthenticatedRequirementsIdEditRoute: typeof AuthenticatedRequirementsIdEditRoute
 }
@@ -1046,7 +979,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPlatformRoute: typeof AuthenticatedPlatformRoute
   AuthenticatedTailoringRoute: typeof AuthenticatedTailoringRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
-  AuthenticatedCandidatesIdRoute: typeof AuthenticatedCandidatesIdRouteWithChildren
+  AuthenticatedCandidatesIdRoute: typeof AuthenticatedCandidatesIdRoute
   AuthenticatedCandidatesNewRoute: typeof AuthenticatedCandidatesNewRoute
   AuthenticatedClientsIdRoute: typeof AuthenticatedClientsIdRoute
   AuthenticatedClientsNewRoute: typeof AuthenticatedClientsNewRoute
@@ -1069,6 +1002,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRequirementsIndexRoute: typeof AuthenticatedRequirementsIndexRoute
   AuthenticatedSubmissionsIndexRoute: typeof AuthenticatedSubmissionsIndexRoute
   AuthenticatedVendorsIndexRoute: typeof AuthenticatedVendorsIndexRoute
+  AuthenticatedCandidatesIdEditRoute: typeof AuthenticatedCandidatesIdEditRoute
   AuthenticatedEmailIntelligenceRulesIdRoute: typeof AuthenticatedEmailIntelligenceRulesIdRoute
   AuthenticatedEmailIntelligenceRulesNewRoute: typeof AuthenticatedEmailIntelligenceRulesNewRoute
   AuthenticatedSettingsEmailAccountsCallbackRoute: typeof AuthenticatedSettingsEmailAccountsCallbackRoute
@@ -1092,7 +1026,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPlatformRoute: AuthenticatedPlatformRoute,
   AuthenticatedTailoringRoute: AuthenticatedTailoringRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
-  AuthenticatedCandidatesIdRoute: AuthenticatedCandidatesIdRouteWithChildren,
+  AuthenticatedCandidatesIdRoute: AuthenticatedCandidatesIdRoute,
   AuthenticatedCandidatesNewRoute: AuthenticatedCandidatesNewRoute,
   AuthenticatedClientsIdRoute: AuthenticatedClientsIdRoute,
   AuthenticatedClientsNewRoute: AuthenticatedClientsNewRoute,
@@ -1118,6 +1052,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRequirementsIndexRoute: AuthenticatedRequirementsIndexRoute,
   AuthenticatedSubmissionsIndexRoute: AuthenticatedSubmissionsIndexRoute,
   AuthenticatedVendorsIndexRoute: AuthenticatedVendorsIndexRoute,
+  AuthenticatedCandidatesIdEditRoute: AuthenticatedCandidatesIdEditRoute,
   AuthenticatedEmailIntelligenceRulesIdRoute:
     AuthenticatedEmailIntelligenceRulesIdRoute,
   AuthenticatedEmailIntelligenceRulesNewRoute:
@@ -1149,3 +1084,4 @@ declare module '@tanstack/react-start' {
     config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }
+
