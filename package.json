@@ -26,7 +26,7 @@
     "test:document-worker": "node --test workers/document-processor/document-job.test.mjs",
     "test:ai-gateway": "node --test --experimental-strip-types src/lib/ai-gateway.server.test.ts",
     "test:ai-usage": "node --test --experimental-strip-types src/lib/ai-usage.server.test.ts",
-    "test:email": "node --test --experimental-strip-types src/lib/email/connection-health.test.ts src/lib/email/filter-engine.test.ts src/lib/email/providers.server.test.ts src/lib/email/token-crypto.server.test.ts",
+    "test:email": "node --test --experimental-strip-types src/lib/email/connection-health.test.ts src/lib/email/filter-engine.test.ts src/lib/email/providers.server.test.ts src/lib/email/rule-form-validation.test.ts src/lib/email/token-crypto.server.test.ts",
     "test:rag": "node --test --experimental-strip-types src/lib/rag.server.test.ts",
     "test:rag:integration": "node --experimental-strip-types scripts/smoke-rag.mts",
     "test:e2e:roles": "node scripts/e2e-role-smoke.mjs",
@@ -141,3 +141,4 @@
     "undici": "7.29.1"
   }
 }
+

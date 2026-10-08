@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { FlaskConical, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import {
   testEmailRule,
   type EmailRuleInput,
 } from "@/lib/email-intelligence.functions";
+import { getRuleFormErrorMessage, validateRuleName } from "@/lib/email/rule-form-validation";
 
 type RuleValues = EmailRuleInput;
 
@@ -40,6 +41,8 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
   const saveFn = useServerFn(saveEmailRule);
   const testFn = useServerFn(testEmailRule);
   const accounts = useQuery({ queryKey: ["email-accounts"], queryFn: () => accountsFn() });
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [values, setValues] = useState<RuleValues>({
     id: initial?.id,
     email_account_id: initial?.email_account_id ?? "",
@@ -67,23 +70,39 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
     attachment_names: ["resume.pdf"],
   });
   const save = useMutation({
-    mutationFn: () => saveFn({ data: values }),
+    mutationFn: (rule: RuleValues) => saveFn({ data: rule }),
     onSuccess: () => {
       toast.success("Filter rule saved.");
       void navigate({ to: "/email-intelligence/rules" });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to save rule"),
+    onError: (error) => toast.error(getRuleFormErrorMessage(error, "Unable to save rule")),
   });
   const testRule = useMutation({
-    mutationFn: () => testFn({ data: { rule: values, email: sample } }),
+    mutationFn: (rule: RuleValues) => testFn({ data: { rule, email: sample } }),
     onSuccess: (result) =>
       toast[result.relevant ? "success" : "error"](
         `${result.relevant ? "Matched" : "Not matched"} · ${Math.round(result.score * 100)}% · ${result.reasons.join("; ") || "No conditions matched"}`,
       ),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to test rule"),
+    onError: (error) => toast.error(getRuleFormErrorMessage(error, "Unable to test rule")),
   });
   const update = <K extends keyof RuleValues>(key: K, value: RuleValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
+  const submitRule = (action: "save" | "test") => {
+    const validation = validateRuleName(values.name);
+    if (validation.error) {
+      setNameError(validation.error);
+      toast.error(validation.error);
+      nameInputRef.current?.focus();
+      return;
+    }
+
+    setNameError(null);
+    const normalizedValues = { ...values, name: validation.name };
+    if (normalizedValues.name !== values.name) setValues(normalizedValues);
+
+    if (action === "save") save.mutate(normalizedValues);
+    else testRule.mutate(normalizedValues);
+  };
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -92,11 +111,19 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
           <CardTitle>Rule criteria</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-5 md:grid-cols-2">
-          <Field label="Rule name">
+          <Field label="Rule name" required error={nameError} errorId="rule-name-error">
             <Input
+              ref={nameInputRef}
               value={values.name}
-              onChange={(event) => update("name", event.target.value)}
-              placeholder="Job applications"
+              onChange={(event) => {
+                update("name", event.target.value);
+                if (nameError) setNameError(null);
+              }}
+              placeholder="e.g. Job applications"
+              minLength={2}
+              maxLength={120}
+              aria-invalid={Boolean(nameError)}
+              aria-describedby={nameError ? "rule-name-error" : undefined}
             />
           </Field>
           <Field label="Email account">
@@ -224,7 +251,7 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
           )}
           <div className="flex gap-2 md:col-span-2">
             <Button
-              onClick={() => save.mutate()}
+              onClick={() => submitRule("save")}
               disabled={save.isPending || !values.email_account_id}
             >
               <Save className="mr-1.5 size-4" />
@@ -232,7 +259,7 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
             </Button>
             <Button
               variant="outline"
-              onClick={() => testRule.mutate()}
+              onClick={() => submitRule("test")}
               disabled={testRule.isPending || !values.email_account_id}
             >
               <FlaskConical className="mr-1.5 size-4" />
@@ -293,11 +320,35 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+  required = false,
+  error,
+  errorId,
+}: {
+  label: string;
+  children: ReactNode;
+  required?: boolean;
+  error?: string | null;
+  errorId?: string;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <Label>
+        {label}
+        {required && (
+          <span className="ml-1 text-destructive" aria-hidden="true">
+            *
+          </span>
+        )}
+      </Label>
       {children}
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -338,3 +389,4 @@ function Toggle({
     </div>
   );
 }
+
