@@ -57,7 +57,7 @@ import { Route as AuthenticatedEmailIntelligenceRulesIndexRouteImport } from './
 import { Route as AuthenticatedEmailIntelligenceRulesIdRouteImport } from './routes/_authenticated/email-intelligence.rules.$id'
 import { Route as AuthenticatedEmailIntelligenceRulesNewRouteImport } from './routes/_authenticated/email-intelligence.rules.new'
 import { Route as AuthenticatedRequirementsIdEditRouteImport } from './routes/_authenticated/requirements.$id.edit'
-import { Route as AuthenticatedSettingsEmailAccountsCallbackRouteImport } from './routes/_authenticated/settings.email-accounts.callback'
+import { Route as AuthenticatedSettingsEmailAccountsCallbackRouteImport } from './routes/_authenticated/settings.email-accounts_.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -325,9 +325,9 @@ const AuthenticatedRequirementsIdEditRoute =
   } as any)
 const AuthenticatedSettingsEmailAccountsCallbackRoute =
   AuthenticatedSettingsEmailAccountsCallbackRouteImport.update({
-    id: '/callback',
-    path: '/callback',
-    getParentRoute: () => AuthenticatedSettingsEmailAccountsRoute,
+    id: '/settings/email-accounts_/callback',
+    path: '/settings/email-accounts/callback',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -357,7 +357,7 @@ export interface FileRoutesByFullPath {
   '/recruiters/$id': typeof AuthenticatedRecruitersIdRoute
   '/requirements/$id': typeof AuthenticatedRequirementsIdRouteWithChildren
   '/requirements/new': typeof AuthenticatedRequirementsNewRoute
-  '/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRouteWithChildren
+  '/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/submissions/$id': typeof AuthenticatedSubmissionsIdRoute
   '/submissions/board': typeof AuthenticatedSubmissionsBoardRoute
@@ -407,7 +407,7 @@ export interface FileRoutesByTo {
   '/recruiters/$id': typeof AuthenticatedRecruitersIdRoute
   '/requirements/$id': typeof AuthenticatedRequirementsIdRouteWithChildren
   '/requirements/new': typeof AuthenticatedRequirementsNewRoute
-  '/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRouteWithChildren
+  '/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRoute
   '/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/submissions/$id': typeof AuthenticatedSubmissionsIdRoute
   '/submissions/board': typeof AuthenticatedSubmissionsBoardRoute
@@ -459,7 +459,7 @@ export interface FileRoutesById {
   '/_authenticated/recruiters/$id': typeof AuthenticatedRecruitersIdRoute
   '/_authenticated/requirements/$id': typeof AuthenticatedRequirementsIdRouteWithChildren
   '/_authenticated/requirements/new': typeof AuthenticatedRequirementsNewRoute
-  '/_authenticated/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRouteWithChildren
+  '/_authenticated/settings/email-accounts': typeof AuthenticatedSettingsEmailAccountsRoute
   '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute
   '/_authenticated/submissions/$id': typeof AuthenticatedSubmissionsIdRoute
   '/_authenticated/submissions/board': typeof AuthenticatedSubmissionsBoardRoute
@@ -479,7 +479,7 @@ export interface FileRoutesById {
   '/_authenticated/email-intelligence/rules/$id': typeof AuthenticatedEmailIntelligenceRulesIdRoute
   '/_authenticated/email-intelligence/rules/new': typeof AuthenticatedEmailIntelligenceRulesNewRoute
   '/_authenticated/requirements/$id/edit': typeof AuthenticatedRequirementsIdEditRoute
-  '/_authenticated/settings/email-accounts/callback': typeof AuthenticatedSettingsEmailAccountsCallbackRoute
+  '/_authenticated/settings/email-accounts_/callback': typeof AuthenticatedSettingsEmailAccountsCallbackRoute
   '/_authenticated/email-intelligence/rules/': typeof AuthenticatedEmailIntelligenceRulesIndexRoute
 }
 export interface FileRouteTypes {
@@ -632,7 +632,7 @@ export interface FileRouteTypes {
     | '/_authenticated/email-intelligence/rules/$id'
     | '/_authenticated/email-intelligence/rules/new'
     | '/_authenticated/requirements/$id/edit'
-    | '/_authenticated/settings/email-accounts/callback'
+    | '/_authenticated/settings/email-accounts_/callback'
     | '/_authenticated/email-intelligence/rules/'
   fileRoutesById: FileRoutesById
 }
@@ -980,12 +980,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRequirementsIdEditRouteImport
       parentRoute: typeof AuthenticatedRequirementsIdRoute
     }
-    '/_authenticated/settings/email-accounts/callback': {
-      id: '/_authenticated/settings/email-accounts/callback'
-      path: '/callback'
+    '/_authenticated/settings/email-accounts_/callback': {
+      id: '/_authenticated/settings/email-accounts_/callback'
+      path: '/settings/email-accounts/callback'
       fullPath: '/settings/email-accounts/callback'
       preLoaderRoute: typeof AuthenticatedSettingsEmailAccountsCallbackRouteImport
-      parentRoute: typeof AuthenticatedSettingsEmailAccountsRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
@@ -1029,21 +1029,6 @@ const AuthenticatedRequirementsIdRouteWithChildren =
     AuthenticatedRequirementsIdRouteChildren,
   )
 
-interface AuthenticatedSettingsEmailAccountsRouteChildren {
-  AuthenticatedSettingsEmailAccountsCallbackRoute: typeof AuthenticatedSettingsEmailAccountsCallbackRoute
-}
-
-const AuthenticatedSettingsEmailAccountsRouteChildren: AuthenticatedSettingsEmailAccountsRouteChildren =
-  {
-    AuthenticatedSettingsEmailAccountsCallbackRoute:
-      AuthenticatedSettingsEmailAccountsCallbackRoute,
-  }
-
-const AuthenticatedSettingsEmailAccountsRouteWithChildren =
-  AuthenticatedSettingsEmailAccountsRoute._addFileChildren(
-    AuthenticatedSettingsEmailAccountsRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRequestRoute: typeof AuthenticatedAccessRequestRoute
   AuthenticatedArchitectureRoute: typeof AuthenticatedArchitectureRoute
@@ -1068,7 +1053,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRecruitersIdRoute: typeof AuthenticatedRecruitersIdRoute
   AuthenticatedRequirementsIdRoute: typeof AuthenticatedRequirementsIdRouteWithChildren
   AuthenticatedRequirementsNewRoute: typeof AuthenticatedRequirementsNewRoute
-  AuthenticatedSettingsEmailAccountsRoute: typeof AuthenticatedSettingsEmailAccountsRouteWithChildren
+  AuthenticatedSettingsEmailAccountsRoute: typeof AuthenticatedSettingsEmailAccountsRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
   AuthenticatedSubmissionsIdRoute: typeof AuthenticatedSubmissionsIdRoute
   AuthenticatedSubmissionsBoardRoute: typeof AuthenticatedSubmissionsBoardRoute
@@ -1086,6 +1071,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorsIndexRoute: typeof AuthenticatedVendorsIndexRoute
   AuthenticatedEmailIntelligenceRulesIdRoute: typeof AuthenticatedEmailIntelligenceRulesIdRoute
   AuthenticatedEmailIntelligenceRulesNewRoute: typeof AuthenticatedEmailIntelligenceRulesNewRoute
+  AuthenticatedSettingsEmailAccountsCallbackRoute: typeof AuthenticatedSettingsEmailAccountsCallbackRoute
   AuthenticatedEmailIntelligenceRulesIndexRoute: typeof AuthenticatedEmailIntelligenceRulesIndexRoute
 }
 
@@ -1115,7 +1101,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedRequirementsIdRouteWithChildren,
   AuthenticatedRequirementsNewRoute: AuthenticatedRequirementsNewRoute,
   AuthenticatedSettingsEmailAccountsRoute:
-    AuthenticatedSettingsEmailAccountsRouteWithChildren,
+    AuthenticatedSettingsEmailAccountsRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
   AuthenticatedSubmissionsIdRoute: AuthenticatedSubmissionsIdRoute,
   AuthenticatedSubmissionsBoardRoute: AuthenticatedSubmissionsBoardRoute,
@@ -1136,6 +1122,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedEmailIntelligenceRulesIdRoute,
   AuthenticatedEmailIntelligenceRulesNewRoute:
     AuthenticatedEmailIntelligenceRulesNewRoute,
+  AuthenticatedSettingsEmailAccountsCallbackRoute:
+    AuthenticatedSettingsEmailAccountsCallbackRoute,
   AuthenticatedEmailIntelligenceRulesIndexRoute:
     AuthenticatedEmailIntelligenceRulesIndexRoute,
 }
@@ -1161,4 +1149,3 @@ declare module '@tanstack/react-start' {
     config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }
-

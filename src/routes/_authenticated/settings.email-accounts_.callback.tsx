@@ -12,7 +12,7 @@ const SearchSchema = z.object({
   error: z.string().optional(),
 });
 
-export const Route = createFileRoute("/_authenticated/settings/email-accounts/callback")({
+export const Route = createFileRoute("/_authenticated/settings/email-accounts_/callback")({
   validateSearch: (search) => SearchSchema.parse(search),
   component: EmailOAuthCallback,
 });
@@ -23,17 +23,21 @@ function EmailOAuthCallback() {
   const navigate = useNavigate();
   const started = useRef(false);
   const [failure, setFailure] = useState<string | null>(null);
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+
     if (search.error || !search.code || !search.state) {
       setFailure("The provider did not complete authorization.");
       return;
     }
+
     void complete({ data: { provider: search.provider, code: search.code, state: search.state } })
       .then(() => navigate({ to: "/settings/email-accounts", replace: true }))
       .catch(() => setFailure("Email authorization could not be completed. Please reconnect."));
   }, [complete, navigate, search]);
+
   if (failure)
     return (
       <div className="grid min-h-screen place-items-center p-6">
@@ -43,5 +47,6 @@ function EmailOAuthCallback() {
         </div>
       </div>
     );
+
   return <LoadingOverlay label="Securing your email connection…" />;
 }
