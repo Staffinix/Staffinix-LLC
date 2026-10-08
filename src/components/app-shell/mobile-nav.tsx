@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, UserRound } from "lucide-react";
 
 import { NAV_GROUPS, type NavItem } from "@/components/app-shell/nav-config";
+import { isNavGroupVisible } from "@/components/app-shell/nav-visibility";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +23,11 @@ export function MobileNav() {
     roles: data?.roles ?? [],
     platformRole: data?.platformRole ?? null,
   };
-  const permitted = NAV_GROUPS.flatMap((group) => group.items).filter((item) =>
-    canAccessFeature(identity, item.feature),
-  );
+  const permitted = NAV_GROUPS.filter((group) =>
+    isNavGroupVisible(group.section, data?.level ?? null),
+  )
+    .flatMap((group) => group.items)
+    .filter((item) => canAccessFeature(identity, item.feature));
   const primary = PRIMARY_PATHS.map((path) => permitted.find((item) => item.to === path)).filter(
     (item): item is NavItem => Boolean(item),
   );
@@ -102,3 +105,4 @@ function MobileNavLink({ item, pathname }: { item: NavItem; pathname: string }) 
     </Link>
   );
 }
+

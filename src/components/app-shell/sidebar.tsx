@@ -7,6 +7,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useTenancy } from "@/hooks/use-tenancy";
 import { canAccessFeature, type FeatureAccessIdentity } from "@/lib/feature-access";
 import { NAV_GROUPS, type NavItem } from "@/components/app-shell/nav-config";
+import { isNavGroupVisible } from "@/components/app-shell/nav-visibility";
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -17,10 +18,12 @@ export function AppSidebar() {
     roles: data?.roles ?? [],
     platformRole: data?.platformRole ?? null,
   };
-  const currentNavGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => canAccessFeature(identity, item.feature)),
-  })).filter((group) => group.items.length > 0);
+  const currentNavGroups = NAV_GROUPS.filter((group) => isNavGroupVisible(group.section, level))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canAccessFeature(identity, item.feature)),
+    }))
+    .filter((group) => group.items.length > 0);
   const isPlatformApprover =
     data?.platformRole === "platform_owner" || data?.platformRole === "platform_admin";
   const isUnprovisioned = identity.roles.length === 0 && !identity.platformRole;
@@ -142,3 +145,4 @@ function NavGroup({
     </div>
   );
 }
+
