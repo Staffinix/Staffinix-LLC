@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(17);
+SELECT plan(23);
 
 SELECT has_table('private', 'resume_upload_grants', 'resume upload grants are private');
 SELECT ok(
@@ -19,9 +19,19 @@ SELECT has_function(
   ARRAY['jsonb', 'uuid', 'jsonb', 'jsonb', 'jsonb', 'jsonb', 'jsonb', 'text'],
   'candidate creation consumes an upload identifier'
 );
+SELECT has_function(
+  'public', 'attach_candidate_resume_from_upload', ARRAY['uuid', 'uuid', 'text'],
+  'an existing candidate can consume a replacement resume upload'
+);
 SELECT ok(
   NOT has_function_privilege('anon', 'public.issue_resume_upload(text,text,bigint)', 'EXECUTE'),
   'anonymous callers cannot issue resume uploads'
+);
+SELECT ok(
+  NOT has_function_privilege(
+    'anon', 'public.attach_candidate_resume_from_upload(uuid,uuid,text)', 'EXECUTE'
+  ),
+  'anonymous callers cannot attach candidate resumes'
 );
 
 INSERT INTO public.tenants (id, name, slug) VALUES
@@ -74,7 +84,7 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$
     SELECT * FROM public.create_candidate_graph(
-      '{"first_name":"Forged","last_name":"Path","source":"pdf"}'::jsonb,
+      '{"first_name":"Forged","last_name":"Path","source":"pdf","assigned_to":"4a000000-0000-4000-8000-000000000001"}'::jsonb,
       '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb,
       '{"file_path":"41000000-0000-4000-8000-000000000001/forged/resume.pdf","file_name":"resume.pdf","mime_type":"application/pdf"}'::jsonb
     )
@@ -87,7 +97,7 @@ SELECT throws_ok(
 CREATE TEMP TABLE created_resume AS
 SELECT *
 FROM public.create_candidate_graph_from_resume_upload(
-  '{"first_name":"Canonical","last_name":"Resume","source":"pdf"}'::jsonb,
+  '{"first_name":"Canonical","last_name":"Resume","source":"pdf","assigned_to":"4a000000-0000-4000-8000-000000000001"}'::jsonb,
   (SELECT upload_id FROM issued_upload),
   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb,
   'Verified facts'
@@ -108,6 +118,37 @@ SELECT is(
   (SELECT file_path FROM public.resumes WHERE candidate_id = (SELECT candidate_id FROM created_resume)),
   (SELECT resume_path FROM created_resume),
   'resume row stores only the canonical path'
+);
+
+CREATE TEMP TABLE replacement_upload AS
+SELECT * FROM public.issue_resume_upload('replacement.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 2048);
+GRANT SELECT ON replacement_upload TO authenticated;
+
+SELECT is((SELECT count(*) FROM replacement_upload), 1::bigint, 'replacement upload grant is issued');
+
+CREATE TEMP TABLE attached_resume AS
+SELECT *
+FROM public.attach_candidate_resume_from_upload(
+  (SELECT candidate_id FROM created_resume),
+  (SELECT upload_id FROM replacement_upload),
+  'Replacement verified facts'
+);
+GRANT SELECT ON attached_resume TO authenticated;
+
+SELECT matches(
+  (SELECT resume_path FROM attached_resume),
+  '^41000000-0000-4000-8000-000000000001/[0-9a-f-]{36}/[0-9a-f-]{36}\.docx$',
+  'replacement resume receives a canonical permanent path'
+);
+SELECT is(
+  (SELECT count(*) FROM public.resumes WHERE candidate_id = (SELECT candidate_id FROM created_resume)),
+  2::bigint,
+  'replacement preserves resume history'
+);
+SELECT is(
+  (SELECT count(*) FROM public.resumes WHERE candidate_id = (SELECT candidate_id FROM created_resume) AND is_primary),
+  1::bigint,
+  'exactly one replacement resume is primary'
 );
 SELECT throws_ok(
   format(
@@ -143,3 +184,4 @@ SELECT is(
 
 SELECT * FROM finish();
 ROLLBACK;
+

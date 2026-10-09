@@ -1,6 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { FileUp, Loader2, Save, Sparkles, User } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  FileUp,
+  GraduationCap,
+  Loader2,
+  Plus,
+  Save,
+  Sparkles,
+  Trash2,
+  User,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -25,6 +36,7 @@ import {
   toggleMarketingType,
 } from "@/lib/candidates-constants";
 import {
+  attachCandidateResume,
   createCandidate,
   createCandidateResumeUpload,
   createCandidateWithResume,
@@ -33,6 +45,54 @@ import {
 import { formatUsPhone, normalizeUsPhone, US_PHONE_ERROR } from "@/lib/us-phone";
 
 type Availability = "immediate" | "two_weeks" | "one_month" | "negotiable";
+
+type EmploymentFormItem = {
+  clientId: string;
+  company: string;
+  title: string;
+  location: string;
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+  description: string;
+};
+
+type EducationFormItem = {
+  clientId: string;
+  institution: string;
+  degree: string;
+  field: string;
+  start_year: string;
+  end_year: string;
+};
+
+function newClientId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+function emptyEmployment(): EmploymentFormItem {
+  return {
+    clientId: newClientId(),
+    company: "",
+    title: "",
+    location: "",
+    start_date: "",
+    end_date: "",
+    is_current: false,
+    description: "",
+  };
+}
+
+function emptyEducation(): EducationFormItem {
+  return {
+    clientId: newClientId(),
+    institution: "",
+    degree: "",
+    field: "",
+    start_year: "",
+    end_year: "",
+  };
+}
 
 export interface CandidateFormInitialData {
   id: string;
@@ -50,6 +110,23 @@ export interface CandidateFormInitialData {
   preferred_location: string | null;
   marketing_types: string[] | null;
   skills: Array<{ skill: string }>;
+  employment: Array<{
+    company: string;
+    title: string | null;
+    location: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    is_current: boolean;
+    description: string | null;
+  }>;
+  education: Array<{
+    institution: string;
+    degree: string | null;
+    field: string | null;
+    start_year: number | null;
+    end_year: number | null;
+  }>;
+  resumes: Array<{ id: string; file_name: string; is_primary: boolean }>;
 }
 
 interface CandidateFormProps {
@@ -93,11 +170,34 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
       MARKETING_TYPES.includes(value as MarketingType),
     ),
   );
+  const [employment, setEmployment] = useState<EmploymentFormItem[]>(
+    initialData?.employment.map((job) => ({
+      clientId: newClientId(),
+      company: job.company,
+      title: job.title ?? "",
+      location: job.location ?? "",
+      start_date: job.start_date ?? "",
+      end_date: job.end_date ?? "",
+      is_current: job.is_current,
+      description: job.description ?? "",
+    })) ?? [],
+  );
+  const [education, setEducation] = useState<EducationFormItem[]>(
+    initialData?.education.map((item) => ({
+      clientId: newClientId(),
+      institution: item.institution,
+      degree: item.degree ?? "",
+      field: item.field ?? "",
+      start_year: item.start_year?.toString() ?? "",
+      end_year: item.end_year?.toString() ?? "",
+    })) ?? [],
+  );
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createFn = useServerFn(createCandidate);
   const createWithResumeFn = useServerFn(createCandidateWithResume);
   const createUploadFn = useServerFn(createCandidateResumeUpload);
+  const attachResumeFn = useServerFn(attachCandidateResume);
   const updateFn = useServerFn(updateCandidate);
 
   const skills = useMemo(
@@ -162,6 +262,16 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
       toast.error("Enter a preferred location when the candidate is not ready to relocate.");
       return;
     }
+    const invalidEmployment = employment.find((job) => !job.company.trim());
+    if (invalidEmployment) {
+      toast.error("Company name is required for every employment entry.");
+      return;
+    }
+    const invalidEducation = education.find((item) => !item.institution.trim());
+    if (invalidEducation) {
+      toast.error("Institution is required for every education entry.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -181,10 +291,33 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
         availability,
         marketing_types: marketingTypes,
         skills: skills.map((skill, index) => ({ skill, is_primary: index === 0 })),
+        employment: employment.map(({ clientId: _clientId, ...job }) => ({
+          ...job,
+          company: job.company.trim(),
+          title: job.title.trim() || null,
+          location: job.location.trim() || null,
+          end_date: job.is_current ? null : job.end_date || null,
+          start_date: job.start_date || null,
+          description: job.description.trim() || null,
+        })),
+        education: education.map(({ clientId: _clientId, ...item }) => ({
+          ...item,
+          institution: item.institution.trim(),
+          degree: item.degree.trim() || null,
+          field: item.field.trim() || null,
+          start_year: item.start_year ? Number(item.start_year) : null,
+          end_year: item.end_year ? Number(item.end_year) : null,
+        })),
       };
 
       if (mode === "edit" && initialData) {
         await updateFn({ data: { id: initialData.id, ...common } });
+        if (resumeFile) {
+          const grant = await uploadResumeToStaging(resumeFile, createUploadFn);
+          await attachResumeFn({
+            data: { candidate_id: initialData.id, upload_id: grant.upload_id },
+          });
+        }
         toast.success("Candidate updated successfully.");
         onSaved(initialData.id);
         return;
@@ -195,30 +328,12 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
         status: "active" as const,
         source: "manual" as const,
         currency: "USD",
-        employment: [],
-        education: [],
         projects: [],
         certifications: [],
       };
       let created: { id: string };
       if (resumeFile) {
-        if (resumeFile.size < 1 || resumeFile.size > 10 * 1024 * 1024) {
-          throw new Error("Resume must be between 1 byte and 10 MiB.");
-        }
-        const lowerName = resumeFile.name.toLowerCase();
-        const mimeType = lowerName.endsWith(".pdf")
-          ? "application/pdf"
-          : lowerName.endsWith(".docx")
-            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            : null;
-        if (!mimeType) throw new Error("Resume must be a PDF or DOCX file.");
-        const grant = await createUploadFn({
-          data: { file_name: resumeFile.name, mime_type: mimeType, size_bytes: resumeFile.size },
-        });
-        const { error } = await supabase.storage
-          .from("resume-uploads")
-          .uploadToSignedUrl(grant.path, grant.token, resumeFile, { contentType: mimeType });
-        if (error) throw new Error(`Resume upload failed: ${error.message}`);
+        const grant = await uploadResumeToStaging(resumeFile, createUploadFn);
         created = await createWithResumeFn({ data: { candidate, upload_id: grant.upload_id } });
       } else {
         created = await createFn({ data: candidate });
@@ -333,23 +448,24 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
               </Field>
             )}
           </div>
-          {mode === "create" && (
-            <Field label="Upload Resume">
-              <div className="rounded-md border border-dashed border-border p-4">
-                <div className="flex items-center gap-3">
-                  <FileUp className="h-5 w-5 text-primary" />
-                  <Input
-                    type="file"
-                    accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
-                    onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  PDF or DOCX, up to 10 MiB{resumeFile ? ` · ${resumeFile.name}` : ""}.
-                </p>
+          <Field label={mode === "edit" ? "Update Resume" : "Upload Resume"}>
+            <div className="rounded-md border border-dashed border-border p-4">
+              <div className="flex items-center gap-3">
+                <FileUp className="h-5 w-5 text-primary" />
+                <Input
+                  type="file"
+                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                  onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
+                />
               </div>
-            </Field>
-          )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                {mode === "edit" && initialData?.resumes.length
+                  ? `Current: ${initialData.resumes.find((resume) => resume.is_primary)?.file_name ?? initialData.resumes[0]?.file_name}. Choose a file to replace the primary resume. `
+                  : ""}
+                PDF or DOCX, up to 10 MiB{resumeFile ? ` · Selected: ${resumeFile.name}` : ""}.
+              </p>
+            </div>
+          </Field>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Work Authorization / Visa Status" required={mode === "create"}>
               <Select value={visa} onValueChange={setVisa}>
@@ -405,6 +521,8 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
               ))}
             </div>
           </fieldset>
+          <EmploymentSection items={employment} onChange={setEmployment} />
+          <EducationSection items={education} onChange={setEducation} />
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
             <Button variant="outline" size="sm" asChild>
               {mode === "edit" && initialData ? (
@@ -429,6 +547,250 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+async function uploadResumeToStaging(
+  file: File,
+  createUpload: (options: {
+    data: { file_name: string; mime_type: string; size_bytes: number };
+  }) => Promise<{ upload_id: string; path: string; token: string }>,
+) {
+  if (file.size < 1 || file.size > 10 * 1024 * 1024) {
+    throw new Error("Resume must be between 1 byte and 10 MiB.");
+  }
+  const lowerName = file.name.toLowerCase();
+  const mimeType = lowerName.endsWith(".pdf")
+    ? "application/pdf"
+    : lowerName.endsWith(".docx")
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : null;
+  if (!mimeType) throw new Error("Resume must be a PDF or DOCX file.");
+
+  const grant = await createUpload({
+    data: { file_name: file.name, mime_type: mimeType, size_bytes: file.size },
+  });
+  const { error } = await supabase.storage
+    .from("resume-uploads")
+    .uploadToSignedUrl(grant.path, grant.token, file, { contentType: mimeType });
+  if (error) throw new Error(`Resume upload failed: ${error.message}`);
+  return grant;
+}
+
+function EmploymentSection({
+  items,
+  onChange,
+}: {
+  items: EmploymentFormItem[];
+  onChange: React.Dispatch<React.SetStateAction<EmploymentFormItem[]>>;
+}) {
+  const update = (index: number, patch: Partial<EmploymentFormItem>) =>
+    onChange((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    );
+
+  return (
+    <fieldset className="space-y-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-xs font-semibold">Employment</legend>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">Add the candidate’s work history.</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => onChange((current) => [...current, emptyEmployment()])}
+        >
+          <Plus className="h-3.5 w-3.5" /> Add Employment
+        </Button>
+      </div>
+      {items.length === 0 && (
+        <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+          No employment history added.
+        </p>
+      )}
+      {items.map((job, index) => (
+        <div
+          key={job.clientId}
+          className="space-y-4 rounded-lg border border-border bg-background/35 p-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <BriefcaseBusiness className="h-4 w-4 text-primary" /> Employment {index + 1}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove employment ${index + 1}`}
+              onClick={() =>
+                onChange((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              }
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Company" required>
+              <Input
+                value={job.company}
+                onChange={(event) => update(index, { company: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Job Title">
+              <Input
+                value={job.title}
+                onChange={(event) => update(index, { title: event.target.value })}
+              />
+            </Field>
+            <Field label="Location">
+              <Input
+                value={job.location}
+                onChange={(event) => update(index, { location: event.target.value })}
+              />
+            </Field>
+            <div className="flex items-end pb-2">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={job.is_current}
+                  onCheckedChange={(checked) =>
+                    update(index, {
+                      is_current: checked === true,
+                      end_date: checked ? "" : job.end_date,
+                    })
+                  }
+                />
+                Current employment
+              </label>
+            </div>
+            <Field label="Start Date">
+              <Input
+                type="date"
+                value={job.start_date}
+                onChange={(event) => update(index, { start_date: event.target.value })}
+              />
+            </Field>
+            <Field label="End Date">
+              <Input
+                type="date"
+                value={job.end_date}
+                disabled={job.is_current}
+                onChange={(event) => update(index, { end_date: event.target.value })}
+              />
+            </Field>
+          </div>
+          <Field label="Description">
+            <Textarea
+              value={job.description}
+              onChange={(event) => update(index, { description: event.target.value })}
+              placeholder="Responsibilities, achievements, and relevant work"
+            />
+          </Field>
+        </div>
+      ))}
+    </fieldset>
+  );
+}
+
+function EducationSection({
+  items,
+  onChange,
+}: {
+  items: EducationFormItem[];
+  onChange: React.Dispatch<React.SetStateAction<EducationFormItem[]>>;
+}) {
+  const update = (index: number, patch: Partial<EducationFormItem>) =>
+    onChange((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    );
+
+  return (
+    <fieldset className="space-y-4 rounded-lg border border-border p-4">
+      <legend className="px-1 text-xs font-semibold">Education</legend>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">Add degrees, programs, and institutions.</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => onChange((current) => [...current, emptyEducation()])}
+        >
+          <Plus className="h-3.5 w-3.5" /> Add Education
+        </Button>
+      </div>
+      {items.length === 0 && (
+        <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+          No education history added.
+        </p>
+      )}
+      {items.map((item, index) => (
+        <div
+          key={item.clientId}
+          className="space-y-4 rounded-lg border border-border bg-background/35 p-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <GraduationCap className="h-4 w-4 text-primary" /> Education {index + 1}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove education ${index + 1}`}
+              onClick={() =>
+                onChange((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              }
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Institution" required>
+              <Input
+                value={item.institution}
+                onChange={(event) => update(index, { institution: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Degree">
+              <Input
+                value={item.degree}
+                onChange={(event) => update(index, { degree: event.target.value })}
+                placeholder="B.Tech, MBA, M.S."
+              />
+            </Field>
+            <Field label="Field of Study">
+              <Input
+                value={item.field}
+                onChange={(event) => update(index, { field: event.target.value })}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Start Year">
+                <Input
+                  type="number"
+                  min="1950"
+                  max="2100"
+                  value={item.start_year}
+                  onChange={(event) => update(index, { start_year: event.target.value })}
+                />
+              </Field>
+              <Field label="End Year">
+                <Input
+                  type="number"
+                  min="1950"
+                  max="2100"
+                  value={item.end_year}
+                  onChange={(event) => update(index, { end_year: event.target.value })}
+                />
+              </Field>
+            </div>
+          </div>
+        </div>
+      ))}
+    </fieldset>
   );
 }
 
@@ -458,3 +820,4 @@ function Field({
     </div>
   );
 }
+

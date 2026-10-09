@@ -2223,6 +2223,17 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      attach_candidate_resume_from_upload: {
+        Args: {
+          _candidate_id: string;
+          _extracted_text?: string;
+          _resume_upload_id: string;
+        };
+        Returns: {
+          resume_id: string;
+          resume_path: string;
+        }[];
+      };
       assign_candidates_to_recruiter: {
         Args: { _candidate_ids: string[]; _recruiter_id: string };
         Returns: {
@@ -2618,3 +2629,4 @@ export const Constants = {
     },
   },
 } as const;
+

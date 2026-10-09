@@ -846,57 +846,71 @@ const CreateCandidateWithResumeSchema = z
   })
   .strict();
 
+const AttachCandidateResumeSchema = z
+  .object({
+    candidate_id: z.string().uuid(),
+    upload_id: z.string().uuid(),
+  })
+  .strict();
+
+async function readAndValidateResumeUpload(supabase: CandidateSupabase, uploadId: string) {
+  const { data: authorized, error: authorizeError } = await supabase
+    .rpc("authorize_resume_upload", { _upload_id: uploadId })
+    .maybeSingle();
+  if (authorizeError || !authorized) {
+    throw new Error(
+      `Resume upload is invalid or expired: ${authorizeError?.message ?? "not found"}`,
+    );
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from("resume-uploads")
+    .download(authorized.staging_path);
+  if (downloadError || !blob) {
+    throw new Error(`Failed to read uploaded resume: ${downloadError?.message ?? "not found"}`);
+  }
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  if (bytes.byteLength !== authorized.size_bytes) {
+    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
+    throw new Error("Uploaded resume size does not match its server-issued grant");
+  }
+  const isPdf =
+    authorized.mime_type === "application/pdf" &&
+    bytes.length >= 5 &&
+    String.fromCharCode(...bytes.subarray(0, 5)) === "%PDF-";
+  const isDocx =
+    authorized.mime_type ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b;
+  if (!isPdf && !isDocx) {
+    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
+    throw new Error("Uploaded file content does not match its declared resume type");
+  }
+
+  try {
+    const processedDocument = await processDocumentInIsolatedWorker({
+      bytes,
+      mimeType: authorized.mime_type,
+    });
+    return { authorized, blob, extractedText: processedDocument.extracted_text };
+  } catch (error) {
+    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
+    throw error;
+  }
+}
+
 export const createCandidateWithResume = createServerFn({ method: "POST" })
   .middleware([requireCandidatesAccess])
   .validator((input: unknown) => CreateCandidateWithResumeSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: authorized, error: authorizeError } = await supabase
-      .rpc("authorize_resume_upload", { _upload_id: data.upload_id })
-      .maybeSingle();
-    if (authorizeError || !authorized) {
-      throw new Error(
-        `Resume upload is invalid or expired: ${authorizeError?.message ?? "not found"}`,
-      );
-    }
-
-    const { data: blob, error: downloadError } = await supabase.storage
-      .from("resume-uploads")
-      .download(authorized.staging_path);
-    if (downloadError || !blob) {
-      throw new Error(`Failed to read uploaded resume: ${downloadError?.message ?? "not found"}`);
-    }
-
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    if (bytes.byteLength !== authorized.size_bytes) {
-      await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
-      throw new Error("Uploaded resume size does not match its server-issued grant");
-    }
-    const isPdf =
-      authorized.mime_type === "application/pdf" &&
-      bytes.length >= 5 &&
-      String.fromCharCode(...bytes.subarray(0, 5)) === "%PDF-";
-    const isDocx =
-      authorized.mime_type ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
-      bytes.length >= 4 &&
-      bytes[0] === 0x50 &&
-      bytes[1] === 0x4b;
-    if (!isPdf && !isDocx) {
-      await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
-      throw new Error("Uploaded file content does not match its declared resume type");
-    }
-
-    let processedDocument: Awaited<ReturnType<typeof processDocumentInIsolatedWorker>>;
-    try {
-      processedDocument = await processDocumentInIsolatedWorker({
-        bytes,
-        mimeType: authorized.mime_type,
-      });
-    } catch (error) {
-      await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
-      throw error;
-    }
+    const { authorized, blob, extractedText } = await readAndValidateResumeUpload(
+      supabase,
+      data.upload_id,
+    );
 
     const { getUserRoles } = await import("@/lib/rbac.server");
     const assignedTo = (await getUserRoles(supabase, userId)).includes("recruiter") ? userId : null;
@@ -904,7 +918,7 @@ export const createCandidateWithResume = createServerFn({ method: "POST" })
       supabase,
       data.candidate,
       data.upload_id,
-      processedDocument.extracted_text,
+      extractedText,
       assignedTo,
     );
     const { error: storeError } = await supabase.storage
@@ -919,6 +933,57 @@ export const createCandidateWithResume = createServerFn({ method: "POST" })
 
     await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
     return { id: created.candidate_id };
+  });
+
+export const attachCandidateResume = createServerFn({ method: "POST" })
+  .middleware([requireCandidatesAccess])
+  .validator((input: unknown) => AttachCandidateResumeSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    const { authorized, blob, extractedText } = await readAndValidateResumeUpload(
+      supabase,
+      data.upload_id,
+    );
+
+    const { data: attached, error: attachError } = await supabase
+      .rpc("attach_candidate_resume_from_upload", {
+        _candidate_id: data.candidate_id,
+        _resume_upload_id: data.upload_id,
+        _extracted_text: extractedText ?? undefined,
+      })
+      .maybeSingle();
+    if (attachError || !attached) {
+      throw new Error(`Failed to update resume: ${attachError?.message ?? "not found"}`);
+    }
+
+    const { error: storeError } = await supabase.storage
+      .from("resumes")
+      .upload(attached.resume_path, blob, {
+        contentType: authorized.mime_type,
+        upsert: false,
+      });
+    if (storeError) {
+      throw new Error(`Resume record was updated but file storage failed: ${storeError.message}`);
+    }
+
+    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
+
+    const { writeAudit } = await import("@/lib/audit.server");
+    await writeAudit({
+      actorId: userId,
+      actorEmail: (claims.email as string | undefined) ?? null,
+      action: "candidate.resume_updated",
+      entityType: "candidate",
+      entityId: data.candidate_id,
+      metadata: { resumeId: attached.resume_id },
+    });
+
+    await refreshCandidateEmbeddingBestEffort(async () => {
+      const { refreshCandidateEmbedding } = await import("@/lib/embedding-service.server");
+      await refreshCandidateEmbedding(supabase, data.candidate_id);
+    });
+
+    return { id: attached.resume_id };
   });
 
 export const parseAndCreateCandidate = createServerFn({ method: "POST" })
@@ -1221,3 +1286,4 @@ export const embedRequirement = createServerFn({ method: "POST" })
     );
     return { ok: true };
   });
+
