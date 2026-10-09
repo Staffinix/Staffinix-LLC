@@ -3,6 +3,8 @@ import type { EmailAddress, EmailProvider, NormalizedAttachment, NormalizedEmail
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_MESSAGES_PER_SYNC = 100;
+const MAX_PROVIDER_PAGES = 2;
 
 export interface OAuthTokenSet {
   accessToken: string;
@@ -415,57 +417,97 @@ export async function fetchProviderMessages(
     listUrl.searchParams.set("maxResults", "50");
     if (since)
       listUrl.searchParams.set("q", `after:${Math.floor(new Date(since).getTime() / 1000)}`);
-    const list = z
-      .object({ messages: z.array(z.object({ id: z.string() })).default([]) })
-      .parse(await providerFetch(listUrl, { headers: { authorization: `Bearer ${accessToken}` } }));
-    return Promise.all(
-      list.messages.map(async ({ id }) =>
-        normalizeGmailMessage(
-          await providerFetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
-            {
-              headers: { authorization: `Bearer ${accessToken}` },
-            },
+    const messageIds: string[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_PROVIDER_PAGES; page += 1) {
+      if (pageToken) listUrl.searchParams.set("pageToken", pageToken);
+      const list = z
+        .object({
+          messages: z.array(z.object({ id: z.string() })).default([]),
+          nextPageToken: z.string().optional(),
+        })
+        .parse(
+          await providerFetch(listUrl, {
+            headers: { authorization: `Bearer ${accessToken}` },
+          }),
+        );
+      messageIds.push(...list.messages.map(({ id }) => id));
+      pageToken = list.nextPageToken;
+      if (!pageToken || messageIds.length >= MAX_MESSAGES_PER_SYNC) break;
+    }
+    const output: NormalizedEmail[] = [];
+    for (let index = 0; index < messageIds.length; index += 10) {
+      const batch = messageIds.slice(index, index + 10);
+      output.push(
+        ...(await Promise.all(
+          batch.map(async (id) =>
+            normalizeGmailMessage(
+              await providerFetch(
+                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
+                { headers: { authorization: `Bearer ${accessToken}` } },
+              ),
+              accountId,
+            ),
           ),
-          accountId,
-        ),
-      ),
-    );
+        )),
+      );
+    }
+    return output;
   }
 
-  const url = new URL("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages");
-  url.searchParams.set("$top", "50");
-  url.searchParams.set("$orderby", "receivedDateTime asc");
-  url.searchParams.set(
+  const initialUrl = new URL("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages");
+  initialUrl.searchParams.set("$top", "50");
+  initialUrl.searchParams.set("$orderby", "receivedDateTime desc");
+  initialUrl.searchParams.set(
     "$select",
     "id,conversationId,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,hasAttachments",
   );
   if (since)
-    url.searchParams.set("$filter", `receivedDateTime gt ${new Date(since).toISOString()}`);
-  const list = z.object({ value: z.array(z.unknown()) }).parse(
-    await providerFetch(url, {
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        Prefer: 'outlook.body-content-type="text"',
-      },
-    }),
-  );
+    initialUrl.searchParams.set("$filter", `receivedDateTime gt ${new Date(since).toISOString()}`);
   const output: NormalizedEmail[] = [];
-  for (const raw of list.value) {
-    const base = GraphMessageSchema.omit({ attachments: true }).parse(raw);
-    let attachments: unknown[] = [];
-    if (base.hasAttachments) {
-      const response = z.object({ value: z.array(z.unknown()) }).parse(
-        await providerFetch(
-          `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(base.id)}/attachments?$select=id,name,contentType,size,isInline`,
-          {
-            headers: { authorization: `Bearer ${accessToken}` },
+  let pageUrl: URL | null = initialUrl;
+  for (let page = 0; page < MAX_PROVIDER_PAGES && pageUrl; page += 1) {
+    const list = z
+      .object({
+        value: z.array(z.unknown()),
+        "@odata.nextLink": z.string().url().optional(),
+      })
+      .parse(
+        await providerFetch(pageUrl, {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            Prefer: 'outlook.body-content-type="text"',
           },
-        ),
+        }),
       );
-      attachments = response.value;
+    for (const raw of list.value) {
+      const base = GraphMessageSchema.omit({ attachments: true }).parse(raw);
+      let attachments: unknown[] = [];
+      if (base.hasAttachments) {
+        const response = z
+          .object({ value: z.array(z.unknown()) })
+          .parse(
+            await providerFetch(
+              `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(base.id)}/attachments?$select=id,name,contentType,size,isInline`,
+              { headers: { authorization: `Bearer ${accessToken}` } },
+            ),
+          );
+        attachments = response.value;
+      }
+      output.push(normalizeMicrosoftMessage({ ...base, attachments }, accountId));
+      if (output.length >= MAX_MESSAGES_PER_SYNC) return output;
     }
-    output.push(normalizeMicrosoftMessage({ ...base, attachments }, accountId));
+    const nextLink = list["@odata.nextLink"];
+    if (!nextLink) break;
+    const nextUrl = new URL(nextLink);
+    if (
+      nextUrl.protocol !== "https:" ||
+      nextUrl.hostname !== "graph.microsoft.com" ||
+      !nextUrl.pathname.startsWith("/v1.0/me/")
+    ) {
+      throw new Error("Email provider returned an invalid pagination URL");
+    }
+    pageUrl = nextUrl;
   }
   return output;
 }

@@ -5,7 +5,8 @@ import { serverFunctionAuth } from "@/integrations/supabase/server-function-auth
 import { ApplicationError } from "@/lib/application-error";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import { GatewayEmailClassifier } from "@/lib/email/classifier.server";
-import { evaluateEmail, evaluateEmailRule } from "@/lib/email/filter-engine";
+import { evaluateEmailRule } from "@/lib/email/filter-engine";
+import { synchronizeEmailAccount } from "@/lib/email/sync-service.server";
 import {
   getEmailAccountLoadFailure,
   type EmailProviderAvailability,
@@ -14,9 +15,7 @@ import {
   createAuthorizationUrl,
   exchangeAuthorizationCode,
   fetchProviderIdentity,
-  fetchProviderMessages,
   getProviderConfigurationStatus,
-  refreshProviderToken,
 } from "@/lib/email/providers.server";
 import {
   createSecureRandomValue,
@@ -25,13 +24,8 @@ import {
   isEmailTokenEncryptionConfigured,
   sha256Base64Url,
 } from "@/lib/email/token-crypto.server";
-import type {
-  EmailClassifier,
-  EmailProvider,
-  FilterRule,
-  NormalizedEmail,
-} from "@/lib/email/types";
-import type { Database, Json } from "@/integrations/supabase/types";
+import type { EmailProvider, FilterRule, NormalizedEmail } from "@/lib/email/types";
+import type { Database } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const ProviderSchema = z.enum(["gmail", "microsoft"]);
@@ -485,201 +479,26 @@ export const testEmailRule = createServerFn({ method: "POST" })
     return evaluateEmailRule(email, rule, classifier);
   });
 
-async function fingerprintMessageId(messageId: string): Promise<string> {
-  return sha256Base64Url(messageId);
-}
-
 export const syncEmailAccount = createServerFn({ method: "POST" })
   .middleware([serverFunctionAuth, requireEmailIntelligenceAccess])
-  .validator((input: unknown) => z.object({ id: IdSchema }).strict().parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({ id: IdSchema, full_rescan: z.boolean().default(false) })
+      .strict()
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const tenantId = await getTenantId(context.supabase, context.userId);
-    const { data: account, error: accountError } = await context.supabase
-      .from("email_accounts")
-      .select(
-        "id, provider, encrypted_access_token, encrypted_refresh_token, token_expires_at, last_sync_at, status",
-      )
-      .eq("id", data.id)
-      .maybeSingle();
-    if (accountError || !account)
-      throw new ApplicationError("NOT_FOUND", { message: "Email account not found." });
-    if (account.status === "disconnected")
-      throw new ApplicationError("CONFLICT", {
-        message: "Reconnect this account before synchronizing.",
-      });
-
-    const { data: job, error: jobError } = await context.supabase
-      .from("email_sync_jobs")
-      .insert({
-        user_id: context.userId,
-        tenant_id: tenantId,
-        email_account_id: account.id,
-        status: "running",
-        attempts: 1,
-        started_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-    if (jobError || !job)
-      throw new ApplicationError("CONFLICT", {
-        message: "This account already has a synchronization in progress.",
-      });
-
     try {
-      const provider = ProviderSchema.parse(account.provider) as EmailProvider;
-      let accessToken = await decryptEmailToken(account.encrypted_access_token);
-      if (new Date(account.token_expires_at).getTime() <= Date.now() + 120_000) {
-        if (!account.encrypted_refresh_token) throw new Error("EMAIL_REAUTHORIZATION_REQUIRED");
-        let refreshed: Awaited<ReturnType<typeof refreshProviderToken>>;
-        try {
-          refreshed = await refreshProviderToken(
-            provider,
-            await decryptEmailToken(account.encrypted_refresh_token),
-          );
-        } catch {
-          throw new Error("EMAIL_REAUTHORIZATION_REQUIRED");
-        }
-        accessToken = refreshed.accessToken;
-        await context.supabase
-          .from("email_accounts")
-          .update({
-            encrypted_access_token: await encryptEmailToken(refreshed.accessToken),
-            ...(refreshed.refreshToken
-              ? { encrypted_refresh_token: await encryptEmailToken(refreshed.refreshToken) }
-              : {}),
-            token_expires_at: refreshed.expiresAt,
-            status: "connected",
-            last_sync_error_code: null,
-          })
-          .eq("id", account.id);
-      }
-
-      const { data: ruleRows, error: ruleError } = await context.supabase
-        .from("email_filter_rules")
-        .select(
-          "id, user_id, tenant_id, email_account_id, name, enabled, match_mode, sender_emails, sender_domains, subject_keywords, subject_exact, body_keywords, required_keywords, excluded_keywords, require_attachment, allowed_attachment_types, ai_enabled, ai_category, ai_prompt, minimum_relevance_score, created_at, updated_at",
-        )
-        .eq("email_account_id", account.id)
-        .eq("enabled", true);
-      if (ruleError) throw new Error("EMAIL_RULES_UNAVAILABLE");
-      const rules = (ruleRows ?? []).map(toFilterRule);
-      const messages = await fetchProviderMessages(
-        provider,
-        account.id,
-        accessToken,
-        account.last_sync_at,
-      );
-      const gateway = new GatewayEmailClassifier();
-      const classifier: EmailClassifier | undefined = process.env.LOVABLE_API_KEY?.trim()
-        ? {
-            classify: (message, rule) =>
-              runWithAiUsageGuard(context.supabase, context.userId, "match_rationale", () =>
-                gateway.classify(message, rule),
-              ),
-          }
-        : undefined;
-      let selected = 0;
-      let ignored = 0;
-      for (const message of messages) {
-        const startedAt = Date.now();
-        const result = await evaluateEmail(message, rules, classifier);
-        let status: "selected" | "ignored" | "duplicate" = result.relevant ? "selected" : "ignored";
-        if (result.relevant) {
-          const { data: stored, error } = await context.supabase
-            .from("selected_emails")
-            .upsert(
-              {
-                user_id: context.userId,
-                tenant_id: tenantId,
-                email_account_id: account.id,
-                provider_message_id: message.providerMessageId,
-                provider_thread_id: message.providerThreadId ?? null,
-                sender_name: message.from.name ?? null,
-                sender_email: message.from.email,
-                recipient_emails: message.to.map((recipient) => recipient.email),
-                subject: message.subject.slice(0, 2000),
-                preview: (message.textBody ?? message.htmlBody?.replace(/<[^>]*>/g, " ") ?? "")
-                  .replace(/\s+/g, " ")
-                  .trim()
-                  .slice(0, 1000),
-                received_at: message.receivedAt,
-                has_attachments: message.hasAttachments,
-                matched_rule_id: result.matchedRuleId ?? null,
-                relevance_score: result.score,
-                match_reasons: result.reasons,
-                match_checks: result.checks as unknown as Json,
-                ai_category: result.classification?.category ?? null,
-                ai_confidence: result.classification?.confidence ?? null,
-              },
-              { onConflict: "email_account_id,provider_message_id", ignoreDuplicates: true },
-            )
-            .select("id")
-            .maybeSingle();
-          if (error) throw new Error("EMAIL_STORE_FAILED");
-          if (!stored) status = "duplicate";
-          else {
-            selected += 1;
-            if (message.attachments.length > 0) {
-              const { error: attachmentError } = await context.supabase
-                .from("email_attachments")
-                .upsert(
-                  message.attachments.map((attachment) => ({
-                    user_id: context.userId,
-                    tenant_id: tenantId,
-                    selected_email_id: stored.id,
-                    provider_attachment_id: attachment.id,
-                    filename: attachment.filename,
-                    mime_type: attachment.mimeType,
-                    size_bytes: attachment.size ?? null,
-                  })),
-                  { onConflict: "selected_email_id,provider_attachment_id" },
-                );
-              if (attachmentError) throw new Error("EMAIL_ATTACHMENT_METADATA_FAILED");
-            }
-          }
-        } else ignored += 1;
-        await context.supabase.from("email_processing_logs").insert({
-          user_id: context.userId,
-          tenant_id: tenantId,
-          email_account_id: account.id,
-          provider,
-          provider_message_fingerprint: await fingerprintMessageId(message.providerMessageId),
-          status,
-          matched_rule_id: result.matchedRuleId ?? null,
-          processing_duration_ms: Math.min(Date.now() - startedAt, 600_000),
-        });
-      }
-      const completedAt = new Date().toISOString();
-      await Promise.all([
-        context.supabase
-          .from("email_accounts")
-          .update({ last_sync_at: completedAt, status: "connected", last_sync_error_code: null })
-          .eq("id", account.id),
-        context.supabase
-          .from("email_sync_jobs")
-          .update({ status: "completed", completed_at: completedAt })
-          .eq("id", job.id),
-      ]);
-      return { processed: messages.length, selected, ignored, completedAt };
-    } catch (error) {
-      const code =
-        error instanceof Error && /^[A-Z0-9_]{3,80}$/.test(error.message)
-          ? error.message
-          : "EMAIL_SYNC_FAILED";
-      await Promise.all([
-        context.supabase
-          .from("email_accounts")
-          .update({
-            status:
-              code === "EMAIL_REAUTHORIZATION_REQUIRED" ? "reauthorization_required" : "error",
-            last_sync_error_code: code,
-          })
-          .eq("id", account.id),
-        context.supabase
-          .from("email_sync_jobs")
-          .update({ status: "failed", completed_at: new Date().toISOString(), error_code: code })
-          .eq("id", job.id),
-      ]);
+      return await synchronizeEmailAccount({
+        supabase: context.supabase,
+        userId: context.userId,
+        tenantId,
+        accountId: data.id,
+        mode: "authenticated",
+        fullRescan: data.full_rescan,
+      });
+    } catch {
       throw new ApplicationError("DEPENDENCY_ERROR", {
         message: "Email synchronization failed. Reconnect the account if the problem continues.",
       });

@@ -47,7 +47,7 @@ function EmailAccountsPage() {
       toast.error(error instanceof Error ? error.message : "Unable to connect account"),
   });
   const sync = useMutation({
-    mutationFn: (id: string) => syncFn({ data: { id } }),
+    mutationFn: (id: string) => syncFn({ data: { id, full_rescan: true } }),
     onSuccess: (result) => {
       toast.success(`Processed ${result.processed} messages; selected ${result.selected}.`);
       void client.invalidateQueries({ queryKey: ["email-accounts"] });

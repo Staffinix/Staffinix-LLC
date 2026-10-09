@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import {
@@ -10,8 +10,11 @@ import {
   MailCheck,
   MailX,
   Paperclip,
+  RefreshCw,
   Settings2,
+  TriangleAlert,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getEmailDashboard } from "@/lib/email-intelligence.functions";
+import { getEmailDashboard, syncEmailAccount } from "@/lib/email-intelligence.functions";
 
 export const Route = createFileRoute("/_authenticated/email-intelligence/")({
   head: () => ({ meta: [{ title: "Smart Email — Staffinix" }] }),
@@ -49,6 +52,8 @@ export const Route = createFileRoute("/_authenticated/email-intelligence/")({
 
 function SmartEmailDashboard() {
   const dashboardFn = useServerFn(getEmailDashboard);
+  const syncFn = useServerFn(syncEmailAccount);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [provider, setProvider] = useState<"all" | "gmail" | "microsoft">("all");
   const [minimumScore, setMinimumScore] = useState("0");
@@ -73,6 +78,27 @@ function SmartEmailDashboard() {
   });
   const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / 20));
   const stats = query.data?.stats;
+  const connectedAccountIds = (query.data?.accounts ?? [])
+    .filter((account) => account.status === "connected")
+    .map((account) => account.id);
+  const sync = useMutation({
+    mutationFn: async () => {
+      const results = [];
+      for (const id of connectedAccountIds) {
+        results.push(await syncFn({ data: { id, full_rescan: true } }));
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      const processed = results.reduce((sum, result) => sum + result.processed, 0);
+      const selectedCount = results.reduce((sum, result) => sum + result.selected, 0);
+      toast.success(`Rechecked ${processed} recent messages; selected ${selectedCount}.`);
+      void queryClient.invalidateQueries({ queryKey: ["smart-email"] });
+      void queryClient.invalidateQueries({ queryKey: ["email-accounts"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Email synchronization failed."),
+  });
 
   return (
     <>
@@ -83,6 +109,19 @@ function SmartEmailDashboard() {
           description="Read-only Gmail and Outlook filtering for recruitment messages. Staffinix never moves, deletes, archives, or marks provider mail as read."
           actions={
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  sync.isPending ||
+                  connectedAccountIds.length === 0 ||
+                  (stats?.activeRules ?? 0) === 0
+                }
+                onClick={() => sync.mutate()}
+              >
+                <RefreshCw className={`mr-1.5 size-4 ${sync.isPending ? "animate-spin" : ""}`} />
+                {sync.isPending ? "Syncing…" : "Sync inbox"}
+              </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/email-intelligence/rules">
                   <Filter className="mr-1.5 size-4" />
@@ -98,6 +137,18 @@ function SmartEmailDashboard() {
             </div>
           }
         />
+
+        {!query.isPending && (stats?.activeRules ?? 0) === 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">
+            <TriangleAlert className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1">
+              No active Smart Email rule is saved. Mail can sync, but no message can be selected.
+            </span>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/email-intelligence/rules/new">Create rule</Link>
+            </Button>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           {[

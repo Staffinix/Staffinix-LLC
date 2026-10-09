@@ -17,6 +17,20 @@ export interface EmailSyncResult {
   completedAt: string;
 }
 
+const INITIAL_SYNC_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+const INCREMENTAL_SYNC_OVERLAP_MS = 5 * 60 * 1000;
+
+export function getEmailSyncSince(
+  lastSyncAt: string | null,
+  fullRescan: boolean,
+  now = Date.now(),
+): string {
+  if (fullRescan || !lastSyncAt) return new Date(now - INITIAL_SYNC_LOOKBACK_MS).toISOString();
+  const lastSyncTime = new Date(lastSyncAt).getTime();
+  if (!Number.isFinite(lastSyncTime)) return new Date(now - INITIAL_SYNC_LOOKBACK_MS).toISOString();
+  return new Date(lastSyncTime - INCREMENTAL_SYNC_OVERLAP_MS).toISOString();
+}
+
 export class EmailSyncError extends Error {
   constructor(
     readonly code: string,
@@ -75,8 +89,9 @@ export async function synchronizeEmailAccount(options: {
   tenantId: string;
   accountId: string;
   mode: "authenticated" | "worker";
+  fullRescan?: boolean;
 }): Promise<EmailSyncResult> {
-  const { supabase, userId, tenantId, accountId, mode } = options;
+  const { supabase, userId, tenantId, accountId, mode, fullRescan = false } = options;
   const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] =
     await Promise.all([
       supabase.from("profiles").select("id, tenant_id, is_active").eq("id", userId).maybeSingle(),
@@ -170,15 +185,19 @@ export async function synchronizeEmailAccount(options: {
       .eq("enabled", true);
     if (ruleError) throw new EmailSyncError("EMAIL_RULES_UNAVAILABLE");
     const rules = (ruleRows ?? []).map(toFilterRule);
+    // Capture the watermark before reading the provider. Messages arriving during the
+    // request are included by the overlap on the next incremental run instead of skipped.
+    const syncWatermark = new Date().toISOString();
     const messages = await fetchProviderMessages(
       provider,
       account.id,
       accessToken,
-      account.last_sync_at,
+      getEmailSyncSince(account.last_sync_at, fullRescan),
     );
     const classifier = getClassifier(supabase, userId, mode);
     let selected = 0;
     let ignored = 0;
+    const processingLogs: Database["public"]["Tables"]["email_processing_logs"]["Insert"][] = [];
 
     for (const message of messages) {
       const startedAt = Date.now();
@@ -211,7 +230,7 @@ export async function synchronizeEmailAccount(options: {
               ai_category: result.classification?.category ?? null,
               ai_confidence: result.classification?.confidence ?? null,
             },
-            { onConflict: "email_account_id,provider_message_id", ignoreDuplicates: true },
+            { onConflict: "email_account_id,provider_message_id" },
           )
           .select("id")
           .maybeSingle();
@@ -237,7 +256,7 @@ export async function synchronizeEmailAccount(options: {
         }
       } else ignored += 1;
 
-      const { error: logError } = await supabase.from("email_processing_logs").insert({
+      processingLogs.push({
         user_id: userId,
         tenant_id: tenantId,
         email_account_id: account.id,
@@ -247,6 +266,12 @@ export async function synchronizeEmailAccount(options: {
         matched_rule_id: result.matchedRuleId ?? null,
         processing_duration_ms: Math.min(Date.now() - startedAt, 600_000),
       });
+    }
+
+    if (processingLogs.length > 0) {
+      const { error: logError } = await supabase
+        .from("email_processing_logs")
+        .insert(processingLogs);
       if (logError) throw new EmailSyncError("EMAIL_PROCESSING_LOG_FAILED");
     }
 
@@ -254,7 +279,7 @@ export async function synchronizeEmailAccount(options: {
     const [accountWrite, jobWrite] = await Promise.all([
       supabase
         .from("email_accounts")
-        .update({ last_sync_at: completedAt, status: "connected", last_sync_error_code: null })
+        .update({ last_sync_at: syncWatermark, status: "connected", last_sync_error_code: null })
         .eq("id", account.id)
         .eq("user_id", userId),
       supabase

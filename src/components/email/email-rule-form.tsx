@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   listEmailAccounts,
   saveEmailRule,
+  syncEmailAccount,
   testEmailRule,
   type EmailRuleInput,
 } from "@/lib/email-intelligence.functions";
@@ -39,7 +40,9 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
   const navigate = useNavigate();
   const accountsFn = useServerFn(listEmailAccounts);
   const saveFn = useServerFn(saveEmailRule);
+  const syncFn = useServerFn(syncEmailAccount);
   const testFn = useServerFn(testEmailRule);
+  const queryClient = useQueryClient();
   const accounts = useQuery({ queryKey: ["email-accounts"], queryFn: () => accountsFn() });
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -70,9 +73,30 @@ export function EmailRuleForm({ initial }: { initial?: Partial<RuleValues> }) {
     attachment_names: ["resume.pdf"],
   });
   const save = useMutation({
-    mutationFn: (rule: RuleValues) => saveFn({ data: rule }),
-    onSuccess: () => {
-      toast.success("Filter rule saved.");
+    mutationFn: async (rule: RuleValues) => {
+      const saved = await saveFn({ data: rule });
+      try {
+        const syncResult = await syncFn({
+          data: { id: rule.email_account_id, full_rescan: true },
+        });
+        return { saved, syncResult, syncFailed: false };
+      } catch {
+        return { saved, syncResult: null, syncFailed: true };
+      }
+    },
+    onSuccess: ({ syncResult, syncFailed }) => {
+      if (syncResult) {
+        toast.success(
+          `Filter rule saved. Rechecked ${syncResult.processed} messages and selected ${syncResult.selected}.`,
+        );
+      } else if (syncFailed) {
+        toast.warning(
+          "Filter rule saved, but mail could not be rechecked. Use Sync inbox to retry.",
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ["email-rules"] });
+      void queryClient.invalidateQueries({ queryKey: ["smart-email"] });
+      void queryClient.invalidateQueries({ queryKey: ["email-accounts"] });
       void navigate({ to: "/email-intelligence/rules" });
     },
     onError: (error) => toast.error(getRuleFormErrorMessage(error, "Unable to save rule")),
@@ -389,4 +413,3 @@ function Toggle({
     </div>
   );
 }
-
