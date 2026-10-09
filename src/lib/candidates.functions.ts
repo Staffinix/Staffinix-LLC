@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
+import { refreshCandidateEmbeddingBestEffort } from "@/lib/candidate-embedding-refresh";
 import { buildCandidateSearchOrGroups } from "@/lib/candidate-search";
 import type { Json } from "@/integrations/supabase/types";
 import {
@@ -707,8 +708,10 @@ export const updateCandidate = createServerFn({ method: "POST" })
         }
       }
 
-      const { refreshCandidateEmbedding } = await import("@/lib/embedding-service.server");
-      await refreshCandidateEmbedding(supabase, id);
+      await refreshCandidateEmbeddingBestEffort(async () => {
+        const { refreshCandidateEmbedding } = await import("@/lib/embedding-service.server");
+        await refreshCandidateEmbedding(supabase, id);
+      });
     }
 
     const { writeAudit } = await import("@/lib/audit.server");
