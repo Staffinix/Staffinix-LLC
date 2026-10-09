@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
+import { buildCandidateSearchOrGroups } from "@/lib/candidate-search";
 import type { Json } from "@/integrations/supabase/types";
 import {
   requestStructuredAiOutput,
@@ -283,10 +284,9 @@ export const listCandidates = createServerFn({ method: "POST" })
       .range(from, to);
 
     if (data.search) {
-      const s = `%${data.search}%`;
-      q = q.or(
-        `first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},primary_technology.ilike.${s}`,
-      );
+      for (const searchGroup of buildCandidateSearchOrGroups(data.search)) {
+        q = q.or(searchGroup);
+      }
     }
     if (data.visa?.length) q = q.in("visa_status", data.visa);
     if (data.availability?.length) q = q.in("availability", data.availability);

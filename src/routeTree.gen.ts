@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12396)
-Total output lines: 1140
-
 /* eslint-disable */
 
 // @ts-nocheck
@@ -480,7 +477,63 @@ export interface FileRoutesById {
   '/_authenticated/vendors/': typeof AuthenticatedVendorsIndexRoute
   '/_authenticated/candidates/$id_/edit': typeof AuthenticatedCandidatesIdEditRoute
   '/_authenticated/email-intelligence/rules/$id': typeof AuthenticatedEmailIntelligenceRulesIdRoute
-  '/_authenticated/email-inte…396 tokens truncated…esByTo
+  '/_authenticated/email-intelligence/rules/new': typeof AuthenticatedEmailIntelligenceRulesNewRoute
+  '/_authenticated/requirements/$id/edit': typeof AuthenticatedRequirementsIdEditRoute
+  '/_authenticated/settings/email-accounts_/callback': typeof AuthenticatedSettingsEmailAccountsCallbackRoute
+  '/_authenticated/email-intelligence/rules/': typeof AuthenticatedEmailIntelligenceRulesIndexRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/access-request'
+    | '/architecture'
+    | '/audit'
+    | '/bench'
+    | '/company'
+    | '/copilot'
+    | '/dashboard'
+    | '/developer'
+    | '/forbidden'
+    | '/interviews'
+    | '/matching'
+    | '/overview'
+    | '/placements'
+    | '/platform'
+    | '/tailoring'
+    | '/users'
+    | '/bench/$id'
+    | '/candidates/$id'
+    | '/candidates/new'
+    | '/clients/$id'
+    | '/clients/new'
+    | '/recruiters/$id'
+    | '/requirements/$id'
+    | '/requirements/new'
+    | '/settings/email-accounts'
+    | '/settings/profile'
+    | '/submissions/$id'
+    | '/submissions/board'
+    | '/submissions/draft'
+    | '/submissions/new'
+    | '/tenants/new'
+    | '/vendors/$id'
+    | '/vendors/new'
+    | '/candidates/'
+    | '/clients/'
+    | '/email-intelligence/'
+    | '/recruiters/'
+    | '/requirements/'
+    | '/submissions/'
+    | '/vendors/'
+    | '/candidates/$id/edit'
+    | '/email-intelligence/rules/$id'
+    | '/email-intelligence/rules/new'
+    | '/requirements/$id/edit'
+    | '/settings/email-accounts/callback'
+    | '/email-intelligence/rules/'
+  fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
@@ -1084,4 +1137,3 @@ declare module '@tanstack/react-start' {
     config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }
-
