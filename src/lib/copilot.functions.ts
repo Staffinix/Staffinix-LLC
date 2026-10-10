@@ -11,6 +11,12 @@ import {
 import { writeAudit } from "@/lib/audit.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import {
+  candidateMatchesCountTerm,
+  extractCandidateCountTerm,
+  formatCandidateCountLabel,
+  type CopilotCandidateCountRow,
+} from "@/lib/copilot-candidate-count";
+import {
   answerWithRag,
   getRagHealth,
   type RagDocument,
@@ -69,6 +75,9 @@ const AiCopilotResponseSchema = z
 
 type CopilotSupabase = SupabaseClient<Database>;
 type ContextSnapshot = Awaited<ReturnType<typeof loadCopilotContext>>;
+
+const CANDIDATE_COUNT_PAGE_SIZE = 500;
+const CANDIDATE_COUNT_MAX_ROWS = 10_000;
 
 function parseStoredSources(value: Json): CopilotSource[] {
   const parsed = z.array(CopilotSourceSchema).max(8).safeParse(value);
@@ -315,6 +324,60 @@ function formatCounts(counts: Record<string, number>) {
   return entries.length ? entries.map(([name, count]) => `${name}: ${count}`).join(", ") : "none";
 }
 
+async function answerCandidateCountQuestion(
+  question: string,
+  supabase: CopilotSupabase,
+): Promise<{
+  answer: string;
+  sources: CopilotSource[];
+  mode: "local";
+} | null> {
+  const term = extractCandidateCountTerm(question);
+  if (term === null) return null;
+
+  const candidates: CopilotCandidateCountRow[] = [];
+  for (let from = 0; from < CANDIDATE_COUNT_MAX_ROWS; from += CANDIDATE_COUNT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("candidates")
+      .select(
+        "id, first_name, last_name, current_title, required_job, primary_technology, status, candidate_skills(skill)",
+      )
+      .order("id", { ascending: true })
+      .range(from, from + CANDIDATE_COUNT_PAGE_SIZE - 1);
+    if (error) throw new Error("Unable to count candidates for Copilot.");
+
+    const page = (data ?? []) as CopilotCandidateCountRow[];
+    candidates.push(...page);
+    if (page.length < CANDIDATE_COUNT_PAGE_SIZE) break;
+  }
+
+  const matches = candidates.filter((candidate) => candidateMatchesCountTerm(candidate, term));
+  const activeCount = matches.filter((candidate) => candidate.status === "active").length;
+  const label = formatCandidateCountLabel(term);
+  const sample = matches.slice(0, 5);
+  const sampleLines = sample.map((candidate) => {
+    const role = candidate.current_title || candidate.required_job || candidate.primary_technology;
+    return `- **${candidate.first_name} ${candidate.last_name}**${role ? ` — ${role}` : ""}`;
+  });
+  const scope = "among the candidates you are authorized to view";
+  const answer = term
+    ? `There ${matches.length === 1 ? "is" : "are"} **${matches.length} ${label} candidate${matches.length === 1 ? "" : "s"}** ${scope}. **${activeCount}** ${activeCount === 1 ? "is" : "are"} active.${
+        sampleLines.length ? `\n\n${sampleLines.join("\n")}` : ""
+      }`
+    : `There are **${matches.length} candidates** ${scope}. **${activeCount}** are active.`;
+
+  return {
+    answer,
+    sources: sample.map((candidate) => ({
+      key: `candidate:${candidate.id}`,
+      label: `${candidate.first_name} ${candidate.last_name}`,
+      path: `/candidates/${candidate.id}`,
+      type: "candidate" as const,
+    })),
+    mode: "local",
+  };
+}
+
 function localGroundedAnswer(question: string, snapshot: ContextSnapshot) {
   const q = question.toLowerCase();
   const catalog = sourceCatalog(snapshot);
@@ -459,62 +522,70 @@ export const askCopilot = createServerFn({ method: "POST" })
         let guardedIndexedChunks = 0;
         let guardedRagAvailable = true;
 
-        try {
-          const rag = await answerWithRag({
-            tenantId: copilotTenantScope,
-            question: data.question,
-            documents: buildRagDocuments(snapshot),
-            history: conversationHistory,
-          });
-          guardedIndexedChunks = rag.indexedChunks;
-          guardedResponse = {
-            answer: rag.answer,
-            sources: sourcesFromRagChunks(rag.chunks),
-            mode: rag.mode,
-          };
-        } catch {
-          guardedRagAvailable = false;
-          if (!process.env.LOVABLE_API_KEY?.trim()) {
-            guardedResponse = localGroundedAnswer(data.question, snapshot);
-          } else {
-            const ai = await requestStructuredAiOutput(
-              {
-                model: COPILOT_MODEL,
-                temperature: 0.2,
-                max_completion_tokens: 1_000,
-                response_format: { type: "json_object" },
-                messages: [
-                  {
-                    role: "system",
-                    content: `${UNTRUSTED_DOCUMENT_SYSTEM_RULES}
+        const candidateCountResponse = await answerCandidateCountQuestion(
+          data.question,
+          context.supabase,
+        );
+
+        if (candidateCountResponse) {
+          guardedResponse = candidateCountResponse;
+        } else
+          try {
+            const rag = await answerWithRag({
+              tenantId: copilotTenantScope,
+              question: data.question,
+              documents: buildRagDocuments(snapshot),
+              history: conversationHistory,
+            });
+            guardedIndexedChunks = rag.indexedChunks;
+            guardedResponse = {
+              answer: rag.answer,
+              sources: sourcesFromRagChunks(rag.chunks),
+              mode: rag.mode,
+            };
+          } catch {
+            guardedRagAvailable = false;
+            if (!process.env.LOVABLE_API_KEY?.trim()) {
+              guardedResponse = localGroundedAnswer(data.question, snapshot);
+            } else {
+              const ai = await requestStructuredAiOutput(
+                {
+                  model: COPILOT_MODEL,
+                  temperature: 0.2,
+                  max_completion_tokens: 1_000,
+                  response_format: { type: "json_object" },
+                  messages: [
+                    {
+                      role: "system",
+                      content: `${UNTRUSTED_DOCUMENT_SYSTEM_RULES}
 You are the read-only Staffinix recruiting operations assistant.
 Answer only from the supplied tenant-scoped context and conversation history. If evidence is insufficient, say so.
 Never claim to perform writes, send messages, change stages, approve access, or contact people.
 Never make or recommend automatic hiring/rejection decisions. Present factual comparisons for human review.
 The context records have source keys such as candidate:<uuid>. Cite only keys present in the context.
 Return JSON with exactly: {"answer": string, "source_ids": string[]}.`,
-                  },
-                  {
-                    role: "user",
-                    content: `<conversation_history>${JSON.stringify(
-                      conversationHistory,
-                    )}</conversation_history>\n<user_request>${data.question}</user_request>\n<untrusted_context>${JSON.stringify(
-                      snapshot,
-                    )}</untrusted_context>`,
-                  },
-                ],
-              },
-              AiCopilotResponseSchema,
-            );
-            guardedResponse = {
-              answer: ai.answer,
-              sources: (ai.source_ids ?? [])
-                .map((id) => catalog.get(id))
-                .filter((source): source is CopilotSource => Boolean(source)),
-              mode: "ai",
-            };
+                    },
+                    {
+                      role: "user",
+                      content: `<conversation_history>${JSON.stringify(
+                        conversationHistory,
+                      )}</conversation_history>\n<user_request>${data.question}</user_request>\n<untrusted_context>${JSON.stringify(
+                        snapshot,
+                      )}</untrusted_context>`,
+                    },
+                  ],
+                },
+                AiCopilotResponseSchema,
+              );
+              guardedResponse = {
+                answer: ai.answer,
+                sources: (ai.source_ids ?? [])
+                  .map((id) => catalog.get(id))
+                  .filter((source): source is CopilotSource => Boolean(source)),
+                mode: "ai",
+              };
+            }
           }
-        }
 
         return {
           response: guardedResponse,
