@@ -7,8 +7,16 @@ import {
 } from "@/lib/ai-gateway.server";
 import { writeAudit } from "@/lib/audit.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
+import {
+  evaluateCandidateMatch,
+  type MatchEligibility,
+  type MatchFactor,
+  type MatchLevel,
+} from "@/lib/candidate-match-engine";
 
-const MATCH_RATIONALE_MODEL = "google/gemini-3-flash-preview";
+const MATCH_RATIONALE_MODEL =
+  process.env.OPENROUTER_MATCH_MODEL?.trim() ||
+  (process.env.OPENROUTER_API_KEY?.trim() ? "openai/gpt-4o-mini" : "google/gemini-3-flash-preview");
 const MATCH_RATIONALE_PROMPT_VERSION = "match-rationale-human-review-v1";
 
 // ============ Scoring helpers ============
@@ -17,6 +25,7 @@ type SkillRow = { skill: string; is_mandatory?: boolean; is_primary?: boolean };
 
 type RequirementScoringInput = {
   title?: string | null;
+  description?: string | null;
   primary_technology?: string | null;
   location?: string | null;
   work_mode?: string | null;
@@ -28,6 +37,10 @@ type RequirementScoringInput = {
 };
 
 type CandidateScoringInput = {
+  current_title?: string | null;
+  required_job?: string | null;
+  summary?: string | null;
+  resume_text?: string | null;
   primary_technology?: string | null;
   location?: string | null;
   visa_status?: string | null;
@@ -36,11 +49,86 @@ type CandidateScoringInput = {
   skills?: Array<string | SkillRow>;
 };
 
+const STOP_WORDS = new Set([
+  "and",
+  "the",
+  "for",
+  "with",
+  "from",
+  "years",
+  "year",
+  "role",
+  "developer",
+  "engineer",
+  "required",
+  "preferred",
+]);
+
+const TECHNOLOGY_ALIASES: Record<string, string> = {
+  js: "javascript",
+  ts: "typescript",
+  node: "nodejs",
+  "node.js": "nodejs",
+  reactjs: "react",
+  postgresql: "postgres",
+  "c#": "csharp",
+  ".net": "dotnet",
+  k8s: "kubernetes",
+};
+
+function canonicalTerm(value: string) {
+  return TECHNOLOGY_ALIASES[value] ?? value;
+}
+
+function searchableTerms(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .filter((value): value is string => Boolean(value?.trim()))
+        .flatMap((value) => value.toLowerCase().split(/[^a-z0-9+#.]+/))
+        .map((value) => canonicalTerm(value.trim()))
+        .filter((value) => value.length > 1 && !STOP_WORDS.has(value)),
+    ),
+  );
+}
+
+function domainMatch(req: RequirementScoringInput, cand: CandidateScoringInput) {
+  const coreTerms = searchableTerms([
+    req.title,
+    req.primary_technology,
+    ...(req.skills ?? []).map((skill) => (typeof skill === "string" ? skill : skill.skill)),
+  ]);
+  const contextTerms = searchableTerms([req.description]).slice(0, 40);
+  if (coreTerms.length === 0 && contextTerms.length === 0) {
+    return { score: 0, matched: [] as string[] };
+  }
+
+  const candidateText = searchableTerms([
+    cand.current_title,
+    cand.required_job,
+    cand.primary_technology,
+    cand.summary,
+    cand.resume_text,
+    ...(cand.skills ?? []).map((skill) => (typeof skill === "string" ? skill : skill.skill)),
+  ]);
+  const candidateSet = new Set(candidateText);
+  const coreMatched = coreTerms.filter((term) => candidateSet.has(term));
+  const contextMatched = contextTerms.filter((term) => candidateSet.has(term));
+  const coreScore = coreTerms.length ? coreMatched.length / coreTerms.length : 0;
+  const contextScore = contextTerms.length
+    ? Math.min(1, contextMatched.length / Math.min(contextTerms.length, 8))
+    : 0;
+  const score = coreTerms.length ? coreScore * 0.85 + contextScore * 0.15 : contextScore;
+  return { score, matched: Array.from(new Set([...coreMatched, ...contextMatched])) };
+}
+
 function norm(s: string) {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9+#.]/g, "");
+  return canonicalTerm(
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9+#.]/g, ""),
+  );
 }
 
 function skillMatch(reqSkills: SkillRow[], candSkills: SkillRow[]) {
@@ -205,6 +293,7 @@ export function computeSingleMatchScore(
   );
   const vm = visaMatch(req.visa_required || req.visa_types, cand.visa_status);
   const lm = locationMatch(req.location, req.work_mode, cand.location);
+  const dm = domainMatch(req, cand);
 
   const kw =
     cand.primary_technology &&
@@ -224,7 +313,9 @@ export function computeSingleMatchScore(
   }
   if (req.visa_required || req.visa_types) components.push({ score: vm, weight: 0.13 });
   if (req.location || req.work_mode === "remote") components.push({ score: lm, weight: 0.1 });
-  if (req.primary_technology || req.title) components.push({ score: kw, weight: 0.05 });
+  if (req.primary_technology || req.title) {
+    components.push({ score: Math.max(kw, dm.score), weight: 0.15 });
+  }
   if (typeof cand.semantic_similarity === "number") {
     components.push({ score: Math.max(0, Math.min(1, cand.semantic_similarity)), weight: 0.25 });
   }
@@ -235,19 +326,32 @@ export function computeSingleMatchScore(
 
 // ============ Match candidates for a requirement ============
 
+export const listMatchingRequirements = createServerFn({ method: "GET" })
+  .middleware([requireMatchingAccess])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("requirements")
+      .select("id, title, primary_technology, location, work_mode, status")
+      .eq("status", "open")
+      .order("updated_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(`Unable to load requisitions for matching: ${error.message}`);
+    return data ?? [];
+  });
+
 export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
   .middleware([requireMatchingAccess])
   .validator((input: unknown) =>
     z
       .object({
-        requirement_id: z.string(),
-        candidate_id: z.string().optional(),
-        limit: z.number().int().min(1).max(50).default(20),
+        requirement_id: z.string().uuid(),
+        candidate_id: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(250).default(100),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId, claims } = context;
+    const { supabase } = context;
 
     const [
       { data: req, error: requirementError },
@@ -256,7 +360,7 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       supabase
         .from("requirements")
         .select(
-          "id, title, primary_technology, location, work_mode, visa_types, min_experience_years, max_experience_years",
+          "id, title, primary_technology, description, location, work_mode, visa_types, min_experience_years, max_experience_years",
         )
         .eq("id", data.requirement_id)
         .maybeSingle(),
@@ -271,51 +375,91 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       throw new Error(`Unable to load requirement skills for matching: ${skillsError.message}`);
     if (!req) throw new Error("Requirement not found or access denied");
 
-    const candidateIds: string[] = [];
     const simMap = new Map<string, number>();
 
-    const { data: matches, error: matchError } = await supabase.rpc(
-      "match_candidates_for_requirement",
-      { _requirement_id: data.requirement_id, _limit: data.limit * 3 },
-    );
-    if (matchError) throw new Error(`Unable to match candidates: ${matchError.message}`);
+    const { data: matches } = await supabase.rpc("match_candidates_for_requirement", {
+      _requirement_id: data.requirement_id,
+      _limit: data.limit * 3,
+    });
     if (matches?.length) {
       for (const m of matches) {
-        candidateIds.push(m.candidate_id);
         simMap.set(m.candidate_id, m.similarity);
       }
     }
 
-    let cands: MatchRow["candidate"][] = [];
     const candidateSkillMap = new Map<string, SkillRow[]>();
-    if (candidateIds.length) {
-      const [
-        { data: dbCands, error: candidatesError },
-        { data: candidateSkills, error: candidateSkillsError },
-      ] = await Promise.all([
-        supabase
-          .from("candidates")
-          .select(
-            "id, first_name, last_name, current_title, current_employer, primary_technology, location, visa_status, availability, experience_years, status",
-          )
-          .in("id", candidateIds),
-        supabase
-          .from("candidate_skills")
-          .select("candidate_id, skill, is_primary")
-          .in("candidate_id", candidateIds),
+    const [
+      { data: dbCands, error: candidatesError },
+      { data: candidateSkills, error: candidateSkillsError },
+      { data: resumes, error: resumesError },
+      { data: employment, error: employmentError },
+      { data: education, error: educationError },
+      { data: certifications, error: certificationsError },
+      { data: projects, error: projectsError },
+    ] = await Promise.all([
+      supabase
+        .from("candidates")
+        .select(
+          "id, first_name, last_name, current_title, current_employer, required_job, primary_technology, location, visa_status, availability, experience_years, status, summary, updated_at",
+        )
+        .neq("status", "inactive")
+        .order("updated_at", { ascending: false })
+        .limit(1000),
+      supabase.from("candidate_skills").select("candidate_id, skill, is_primary").limit(10000),
+      supabase
+        .from("resumes")
+        .select("candidate_id, extracted_text, is_primary")
+        .not("extracted_text", "is", null)
+        .limit(5000),
+      supabase.from("candidate_employment").select("candidate_id, title, description").limit(10000),
+      supabase
+        .from("candidate_education")
+        .select("candidate_id, degree, field, institution")
+        .limit(10000),
+      supabase.from("candidate_certifications").select("candidate_id, name, issuer").limit(10000),
+      supabase
+        .from("candidate_projects")
+        .select("candidate_id, name, description, technologies")
+        .limit(10000),
+    ]);
+    if (candidatesError)
+      throw new Error(`Unable to load matched candidates: ${candidatesError.message}`);
+    if (candidateSkillsError)
+      throw new Error(`Unable to load candidate skills: ${candidateSkillsError.message}`);
+    if (resumesError) throw new Error(`Unable to load candidate resumes: ${resumesError.message}`);
+    if (employmentError)
+      throw new Error(`Unable to load candidate employment: ${employmentError.message}`);
+    if (educationError)
+      throw new Error(`Unable to load candidate education: ${educationError.message}`);
+    if (certificationsError)
+      throw new Error(`Unable to load candidate certifications: ${certificationsError.message}`);
+    if (projectsError)
+      throw new Error(`Unable to load candidate projects: ${projectsError.message}`);
+    const cands = dbCands ?? [];
+    for (const skill of candidateSkills ?? []) {
+      candidateSkillMap.set(skill.candidate_id, [
+        ...(candidateSkillMap.get(skill.candidate_id) ?? []),
+        { skill: skill.skill, is_primary: skill.is_primary },
       ]);
-      if (candidatesError)
-        throw new Error(`Unable to load matched candidates: ${candidatesError.message}`);
-      if (candidateSkillsError)
-        throw new Error(`Unable to load candidate skills: ${candidateSkillsError.message}`);
-      cands = dbCands ?? [];
-      for (const skill of candidateSkills ?? []) {
-        candidateSkillMap.set(skill.candidate_id, [
-          ...(candidateSkillMap.get(skill.candidate_id) ?? []),
-          { skill: skill.skill, is_primary: skill.is_primary },
-        ]);
+    }
+    const resumeMap = new Map<string, string>();
+    for (const resume of resumes ?? []) {
+      if (resume.extracted_text && (resume.is_primary || !resumeMap.has(resume.candidate_id))) {
+        resumeMap.set(resume.candidate_id, resume.extracted_text);
       }
     }
+
+    const groupByCandidate = <T extends { candidate_id: string }>(items: T[]) => {
+      const grouped = new Map<string, T[]>();
+      for (const item of items) {
+        grouped.set(item.candidate_id, [...(grouped.get(item.candidate_id) ?? []), item]);
+      }
+      return grouped;
+    };
+    const employmentMap = groupByCandidate(employment ?? []);
+    const educationMap = groupByCandidate(education ?? []);
+    const certificationMap = groupByCandidate(certifications ?? []);
+    const projectMap = groupByCandidate(projects ?? []);
 
     const reqSkillsRows: SkillRow[] = (requirementSkills ?? []).map((skill) => ({
       skill: skill.skill,
@@ -325,59 +469,93 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       reqSkillsRows.push({ skill: req.primary_technology, is_mandatory: true });
     }
 
-    const rows: MatchRow[] = (cands ?? []).map((c) => {
+    const rows: MatchRow[] = cands.map((c) => {
       const sk = candidateSkillMap.get(c.id) ?? [];
       if (sk.length === 0 && c.primary_technology) {
         sk.push({ skill: c.primary_technology, is_primary: true });
       }
-      const candSkillList = sk.map((skill) => skill.skill);
-      const sm = skillMatch(reqSkillsRows, sk);
-      const em = experienceMatch(
-        req.min_experience_years,
-        req.max_experience_years,
-        c.experience_years,
-      );
-      const vm = visaMatch(req.visa_types, c.visa_status);
-      const lm = locationMatch(req.location, req.work_mode, c.location);
       const sem = Math.max(0, Math.min(1, simMap.get(c.id) ?? 0));
-
-      const kw =
-        c.primary_technology &&
-        req.primary_technology &&
-        norm(c.primary_technology) === norm(req.primary_technology)
-          ? 1
-          : c.primary_technology &&
-              req.title &&
-              req.title.toLowerCase().includes(c.primary_technology.toLowerCase())
-            ? 0.9
-            : 0;
-
-      const overallScore = computeSingleMatchScore(
-        { ...req, skills: reqSkillsRows },
-        { ...c, skills: sk, semantic_similarity: sem },
-      );
-      const hardConstraints = evaluateHardConstraints(req, c, reqSkillsRows, sk);
+      const resumeText = resumeMap.get(c.id) ?? null;
+      const evaluation = evaluateCandidateMatch({
+        requirement: req,
+        candidate: c,
+        requirementSkills: reqSkillsRows,
+        evidence: {
+          skills: sk,
+          resumeText,
+          employment: employmentMap.get(c.id) ?? [],
+          education: educationMap.get(c.id) ?? [],
+          certifications: certificationMap.get(c.id) ?? [],
+          projects: projectMap.get(c.id) ?? [],
+          semanticSimilarity: simMap.has(c.id) ? sem : null,
+        },
+      });
+      const factor = (key: MatchFactor["key"]) =>
+        evaluation.factors.find((item) => item.key === key)?.score ?? 0;
 
       return {
-        candidate: c,
-        hard_constraints: hardConstraints,
-        scores: {
-          overall: overallScore,
-          skill: Math.round(sm.score * 100),
-          semantic: Math.round(sem * 100),
-          experience: Math.round(em * 100),
-          visa: Math.round(vm * 100),
-          location: Math.round(lm * 100),
-          keyword: Math.round(kw * 100),
+        candidate: {
+          id: c.id,
+          first_name: c.first_name,
+          last_name: c.last_name,
+          current_title: c.current_title,
+          current_employer: c.current_employer,
+          required_job: c.required_job,
+          primary_technology: c.primary_technology,
+          location: c.location,
+          visa_status: c.visa_status,
+          availability: c.availability,
+          experience_years: c.experience_years,
+          status: c.status,
+          has_resume: Boolean(resumeText),
+          updated_at: c.updated_at,
         },
-        matched_skills: sm.matched,
-        missing_skills: sm.missing,
+        match_level: evaluation.level,
+        eligibility: evaluation.eligibility,
+        summary: evaluation.summary,
+        score_breakdown: evaluation.factors,
+        review_notes: evaluation.review_notes,
+        hard_constraints: {
+          passed: evaluation.eligibility !== "hard_constraint_not_met",
+          reasons: evaluation.hard_constraint_reasons,
+          missing_mandatory_skills: evaluation.missing_required_skills,
+        },
+        scores: {
+          overall: evaluation.overall,
+          skill: factor("required_skills"),
+          semantic: evaluation.semantic_score,
+          experience: factor("experience"),
+          visa:
+            req.visa_types?.length && c.visa_status
+              ? evaluation.hard_constraint_reasons.some((reason) =>
+                  reason.includes("work authorization"),
+                )
+                ? 0
+                : 100
+              : 0,
+          location: factor("location"),
+          keyword: factor("role_relevance"),
+          domain: factor("role_relevance"),
+        },
+        matched_skills: [
+          ...evaluation.matched_required_skills,
+          ...evaluation.matched_preferred_skills,
+        ],
+        matched_required_skills: evaluation.matched_required_skills,
+        missing_required_skills: evaluation.missing_required_skills,
+        matched_preferred_skills: evaluation.matched_preferred_skills,
+        missing_preferred_skills: evaluation.missing_preferred_skills,
+        matched_terms: evaluation.matched_preferred_skills,
+        missing_skills: [
+          ...evaluation.missing_required_skills,
+          ...evaluation.missing_preferred_skills,
+        ],
       };
     });
 
     rows.sort(
       (a, b) =>
-        Number(b.hard_constraints.passed) - Number(a.hard_constraints.passed) ||
+        eligibilityRank(a.eligibility) - eligibilityRank(b.eligibility) ||
         b.scores.overall - a.scores.overall,
     );
 
@@ -389,8 +567,19 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       if (extra) sliced.push(extra);
     }
 
-    return { rows: sliced, requirement: req };
+    return {
+      rows: sliced,
+      requirement: req,
+      total_candidates_evaluated: rows.length,
+      semantic_available: simMap.size > 0,
+    };
   });
+
+function eligibilityRank(value: MatchEligibility) {
+  if (value === "meets_minimum") return 0;
+  if (value === "needs_review") return 1;
+  return 2;
+}
 
 export type MatchRow = {
   candidate: {
@@ -399,23 +588,37 @@ export type MatchRow = {
     last_name: string;
     current_title: string | null;
     current_employer: string | null;
+    required_job: string | null;
     primary_technology: string | null;
     location: string | null;
     visa_status: string | null;
     availability: string | null;
     experience_years: number | null;
     status: string;
+    has_resume: boolean;
+    updated_at: string;
   };
+  match_level: MatchLevel;
+  eligibility: MatchEligibility;
+  summary: string;
+  score_breakdown: MatchFactor[];
+  review_notes: string[];
   scores: {
     overall: number;
     skill: number;
-    semantic: number;
+    semantic: number | null;
     experience: number;
     visa: number;
     location: number;
     keyword: number;
+    domain: number;
   };
   matched_skills: string[];
+  matched_required_skills: string[];
+  missing_required_skills: string[];
+  matched_preferred_skills: string[];
+  missing_preferred_skills: string[];
+  matched_terms: string[];
   missing_skills: string[];
   hard_constraints: {
     passed: boolean;
@@ -559,29 +762,40 @@ export const generateMatchRationale = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
 
-    const [requirementResult, candidateResult, candidateSkillsResult] = await Promise.all([
-      supabase
-        .from("requirements")
-        .select(
-          "id, title, primary_technology, location, visa_types, min_experience_years, max_experience_years",
-        )
-        .eq("id", data.requirement_id)
-        .maybeSingle(),
-      supabase
-        .from("candidates")
-        .select(
-          "id, first_name, last_name, current_title, current_employer, location, visa_status, experience_years, summary",
-        )
-        .eq("id", data.candidate_id)
-        .maybeSingle(),
-      supabase.from("candidate_skills").select("skill").eq("candidate_id", data.candidate_id),
-    ]);
+    const [requirementResult, candidateResult, candidateSkillsResult, resumeResult] =
+      await Promise.all([
+        supabase
+          .from("requirements")
+          .select(
+            "id, title, primary_technology, location, visa_types, min_experience_years, max_experience_years",
+          )
+          .eq("id", data.requirement_id)
+          .maybeSingle(),
+        supabase
+          .from("candidates")
+          .select(
+            "id, first_name, last_name, current_title, current_employer, location, visa_status, experience_years, summary",
+          )
+          .eq("id", data.candidate_id)
+          .maybeSingle(),
+        supabase.from("candidate_skills").select("skill").eq("candidate_id", data.candidate_id),
+        supabase
+          .from("resumes")
+          .select("extracted_text")
+          .eq("candidate_id", data.candidate_id)
+          .not("extracted_text", "is", null)
+          .order("is_primary", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
     if (requirementResult.error)
       throw new Error(`Unable to load requirement: ${requirementResult.error.message}`);
     if (candidateResult.error)
       throw new Error(`Unable to load candidate: ${candidateResult.error.message}`);
     if (candidateSkillsResult.error)
       throw new Error(`Unable to load candidate skills: ${candidateSkillsResult.error.message}`);
+    if (resumeResult.error)
+      throw new Error(`Unable to load candidate resume evidence: ${resumeResult.error.message}`);
     const req = requirementResult.data;
     const cand = candidateResult.data;
     if (!req || !cand) throw new Error("Requirement or candidate not found or access denied");
@@ -604,6 +818,7 @@ CANDIDATE:
 - Location: ${cand.location ?? "—"}, Visa: ${cand.visa_status ?? "—"}, Exp: ${cand.experience_years ?? "?"} yrs
 - Skills: ${(candidateSkillsResult.data ?? []).map((item) => item.skill).join(", ") || "—"}
 - Summary: ${cand.summary ?? "—"}
+- Resume evidence: ${resumeResult.data?.extracted_text?.slice(0, 12_000) ?? "No extracted resume text is available"}
 END_UNTRUSTED_CANDIDATE
 
 This is decision support for a recruiter. Do not make an automatic hiring or rejection decision.
@@ -656,3 +871,4 @@ Return ONLY JSON:
       );
     }
   });
+
