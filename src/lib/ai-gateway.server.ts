@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-const AI_GATEWAY_ORIGIN = "https://ai.gateway.lovable.dev";
+const LOVABLE_AI_GATEWAY_ORIGIN = "https://ai.gateway.lovable.dev";
+const OPENROUTER_AI_GATEWAY_ORIGIN = "https://openrouter.ai/api";
 export const AI_REQUEST_TIMEOUT_MS = 25_000;
 const MAX_AI_RESPONSE_BYTES = 512 * 1024;
 
@@ -47,17 +48,30 @@ export async function fetchAiGateway(
   body: unknown,
   timeoutMs = AI_REQUEST_TIMEOUT_MS,
 ): Promise<unknown> {
-  const apiKey = process.env.LOVABLE_API_KEY?.trim();
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  const lovableKey = process.env.LOVABLE_API_KEY?.trim();
+  const apiKey = openRouterKey || lovableKey;
   if (!apiKey) throw new Error("AI Gateway is not configured");
+
+  const origin = openRouterKey ? OPENROUTER_AI_GATEWAY_ORIGIN : LOVABLE_AI_GATEWAY_ORIGIN;
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  };
+  if (openRouterKey) {
+    const appUrl = process.env.OPENROUTER_APP_URL?.trim();
+    if (appUrl) headers["HTTP-Referer"] = appUrl;
+    headers["X-OpenRouter-Title"] = process.env.OPENROUTER_APP_NAME?.trim() || "Staffinix";
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   let responseText: string;
   try {
-    response = await fetch(new URL(path, AI_GATEWAY_ORIGIN), {
+    response = await fetch(new URL(path.replace(/^\/+/, ""), `${origin}/`), {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
