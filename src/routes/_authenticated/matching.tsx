@@ -8,6 +8,7 @@ import {
   BriefcaseBusiness,
   CircleAlert,
   CircleCheck,
+  ChevronDown,
   FileSearch,
   Loader2,
   MapPin,
@@ -24,6 +25,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +43,7 @@ import {
   listMatchingRequirements,
   matchCandidatesForRequirement,
 } from "@/lib/matching.functions";
+import { buildMatchingVisaOptions, matchesSelectedVisas } from "@/lib/matching-visa-filter";
 
 type MatchingSearch = { reqId?: string; candidateId?: string };
 type Rationale = Awaited<ReturnType<typeof generateMatchRationale>>;
@@ -54,7 +63,7 @@ function MatchingPage() {
   const [search, setSearch] = useState("");
   const [minimumScore, setMinimumScore] = useState("0");
   const [technologyFilter, setTechnologyFilter] = useState("all");
-  const [visaFilter, setVisaFilter] = useState("all");
+  const [visaFilters, setVisaFilters] = useState<string[]>([]);
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
   const [constraintFilter, setConstraintFilter] = useState("all");
   const [resumeFilter, setResumeFilter] = useState("all");
@@ -86,7 +95,7 @@ function MatchingPage() {
   const optionValues = useMemo(
     () => ({
       technologies: unique(allRows.map((row) => row.candidate.primary_technology)),
-      visas: unique(allRows.map((row) => row.candidate.visa_status)),
+      visas: buildMatchingVisaOptions(allRows.map((row) => row.candidate.visa_status)),
       availability: unique(allRows.map((row) => row.candidate.availability)),
     }),
     [allRows],
@@ -113,7 +122,7 @@ function MatchingPage() {
         (technologyFilter === "all" ||
           row.candidate.primary_technology === technologyFilter ||
           row.matched_skills.includes(technologyFilter)) &&
-        (visaFilter === "all" || row.candidate.visa_status === visaFilter) &&
+        matchesSelectedVisas(row.candidate.visa_status, visaFilters) &&
         (availabilityFilter === "all" || row.candidate.availability === availabilityFilter) &&
         (constraintFilter === "all" ||
           (constraintFilter === "met" && row.hard_constraints.passed) ||
@@ -131,7 +140,7 @@ function MatchingPage() {
     resumeFilter,
     search,
     technologyFilter,
-    visaFilter,
+    visaFilters,
   ]);
 
   async function refreshMatches() {
@@ -259,14 +268,10 @@ function MatchingPage() {
                     ...optionValues.technologies.map((value) => [value, value]),
                   ]}
                 />
-                <FilterSelect
-                  value={visaFilter}
-                  onChange={setVisaFilter}
-                  label="Visa"
-                  options={[
-                    ["all", "All visa types"],
-                    ...optionValues.visas.map((value) => [value, value]),
-                  ]}
+                <VisaMultiSelect
+                  values={visaFilters}
+                  onChange={setVisaFilters}
+                  options={optionValues.visas}
                 />
                 <FilterSelect
                   value={availabilityFilter}
@@ -486,6 +491,63 @@ function FilterSelect({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function VisaMultiSelect({
+  values,
+  onChange,
+  options,
+}: {
+  values: string[];
+  onChange: (values: string[]) => void;
+  options: string[];
+}) {
+  const label =
+    values.length === 0
+      ? "All visa types"
+      : values.length <= 2
+        ? values.join(", ")
+        : `${values.length} visa types selected`;
+
+  function toggle(value: string) {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-between px-3 font-normal"
+          aria-label="Filter by visa types"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+        <DropdownMenuCheckboxItem
+          checked={values.length === 0}
+          onCheckedChange={() => onChange([])}
+          onSelect={(event) => event.preventDefault()}
+        >
+          All visa types
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        {options.map((option) => (
+          <DropdownMenuCheckboxItem
+            key={option}
+            checked={values.includes(option)}
+            onCheckedChange={() => toggle(option)}
+            onSelect={(event) => event.preventDefault()}
+          >
+            {option}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
