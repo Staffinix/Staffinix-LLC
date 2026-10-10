@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RecruiterPicker } from "@/components/candidates/recruiter-picker";
 import {
   Loader2,
@@ -55,6 +56,8 @@ import {
   MapPin,
   Sparkles,
   Send,
+  ChevronDown,
+  UsersRound,
 } from "lucide-react";
 import { listCandidates } from "@/lib/candidates.functions";
 import {
@@ -78,6 +81,109 @@ export const Route = createFileRoute("/_authenticated/candidates/")({
 import { useProfile } from "@/hooks/use-profile";
 import { useRoleLevel } from "@/hooks/use-role-level";
 
+type L4RecruiterOption = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+function L4RecruiterFilter({
+  recruiters,
+  selectedIds,
+  loading,
+  onChange,
+}: {
+  recruiters: L4RecruiterOption[];
+  selectedIds: string[];
+  loading: boolean;
+  onChange: (ids: string[]) => void;
+}) {
+  const selectedNames = selectedIds
+    .map((id) => {
+      const recruiter = recruiters.find((item) => item.id === id);
+      return recruiter?.full_name || recruiter?.email;
+    })
+    .filter(Boolean) as string[];
+  const buttonLabel =
+    selectedNames.length === 0
+      ? "L4 recruiter names"
+      : selectedNames.length === 1
+        ? selectedNames[0]
+        : `${selectedNames.length} L4 recruiters`;
+
+  function toggleRecruiter(recruiterId: string, selected: boolean) {
+    const nextIds = selected
+      ? Array.from(new Set([...selectedIds, recruiterId]))
+      : selectedIds.filter((id) => id !== recruiterId);
+    onChange(nextIds);
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 min-w-0 justify-between gap-2 px-3 text-xs font-normal"
+          aria-label="Filter by one or more assigned L4 recruiters"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <UsersRound className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{loading ? "Loading L4 recruiters…" : buttonLabel}</span>
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 space-y-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Assigned L4 recruiters</p>
+            <p className="text-xs text-muted-foreground">Select one or multiple names.</p>
+          </div>
+          {selectedIds.length > 0 && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <div
+          className="max-h-64 space-y-1 overflow-y-auto"
+          role="group"
+          aria-label="L4 recruiter filters"
+        >
+          {recruiters.map((recruiter) => {
+            const checked = selectedIds.includes(recruiter.id);
+            const name = recruiter.full_name || recruiter.email || "Unnamed recruiter";
+            return (
+              <label
+                key={recruiter.id}
+                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted"
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={(value) => toggleRecruiter(recruiter.id, value === true)}
+                  aria-label={`Filter candidates assigned to ${name}`}
+                />
+                <span className="min-w-0 text-xs">
+                  <span className="block truncate font-medium">{name}</span>
+                  {recruiter.full_name && recruiter.email && (
+                    <span className="block truncate text-muted-foreground">{recruiter.email}</span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+          {!loading && recruiters.length === 0 && (
+            <p className="p-4 text-center text-xs text-muted-foreground">
+              No active L4 recruiters are available.
+            </p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function BenchCandidatesPage() {
   const { data: profile } = useProfile();
   const { level } = useRoleLevel();
@@ -92,7 +198,8 @@ function BenchCandidatesPage() {
   const [visa, setVisa] = useState<string>("all");
   const [tech, setTech] = useState("");
   const [status, setStatus] = useState<string>("all");
-  const [assignedRecruiter, setAssignedRecruiter] = useState("all");
+  const [assignmentState, setAssignmentState] = useState("");
+  const [assignedRecruiterIds, setAssignedRecruiterIds] = useState<string[]>([]);
   const [submissionState, setSubmissionState] = useState("all");
   const [submissionSort, setSubmissionSort] = useState("default");
   const [page, setPage] = useState(1);
@@ -126,7 +233,10 @@ function BenchCandidatesPage() {
         status !== "all"
           ? [status as "active" | "submitted" | "placed" | "on_hold" | "inactive"]
           : undefined,
-      assigned_to: assignedRecruiter !== "all" ? assignedRecruiter : undefined,
+      assignment_state: assignmentState
+        ? (assignmentState as "assigned" | "unassigned")
+        : undefined,
+      assigned_to_any: assignedRecruiterIds.length ? assignedRecruiterIds : undefined,
       submission_state:
         submissionState !== "all" ? (submissionState as "submitted" | "unsubmitted") : undefined,
       submission_sort:
@@ -141,7 +251,8 @@ function BenchCandidatesPage() {
     visa,
     tech,
     status,
-    assignedRecruiter,
+    assignmentState,
+    assignedRecruiterIds,
     submissionState,
     submissionSort,
     page,
@@ -184,7 +295,8 @@ function BenchCandidatesPage() {
     visa,
     tech,
     status,
-    assignedRecruiter,
+    assignmentState,
+    assignedRecruiterIds,
     submissionState,
     submissionSort,
   ]);
@@ -368,7 +480,7 @@ function BenchCandidatesPage() {
 
         {/* Filters Strip */}
         <Card className="border-border bg-card">
-          <CardContent className="grid gap-3 p-4 md:grid-cols-4 xl:grid-cols-8">
+          <CardContent className="grid gap-3 p-4 md:grid-cols-4 xl:grid-cols-9">
             <div className="md:col-span-2 xl:col-span-1">
               <SearchInput
                 placeholder="Search candidate name, email, skills…"
@@ -460,25 +572,42 @@ function BenchCandidatesPage() {
               </SelectContent>
             </Select>
             {isL2 && (
-              <Select
-                value={assignedRecruiter}
-                onValueChange={(value) => {
-                  setAssignedRecruiter(value);
+              <div
+                className="grid h-10 grid-cols-2 rounded-xl border border-input bg-background/55 p-1"
+                role="group"
+                aria-label="Assignment status filter"
+              >
+                {(["assigned", "unassigned"] as const).map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={assignmentState === value ? "secondary" : "ghost"}
+                    className="h-8 px-2 text-xs capitalize"
+                    aria-pressed={assignmentState === value}
+                    onClick={() => {
+                      const nextValue = assignmentState === value ? "" : value;
+                      setAssignmentState(nextValue);
+                      if (nextValue === "unassigned") setAssignedRecruiterIds([]);
+                      setPage(1);
+                    }}
+                  >
+                    {value}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {isL2 && (
+              <L4RecruiterFilter
+                recruiters={recruiters.data ?? []}
+                selectedIds={assignedRecruiterIds}
+                loading={recruiters.isLoading}
+                onChange={(ids) => {
+                  setAssignedRecruiterIds(ids);
+                  if (ids.length > 0) setAssignmentState("assigned");
                   setPage(1);
                 }}
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue placeholder="Assigned L4" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any assigned L4</SelectItem>
-                  {(recruiters.data ?? []).map((recruiter) => (
-                    <SelectItem key={recruiter.id} value={recruiter.id}>
-                      {recruiter.full_name || recruiter.email || "Unnamed recruiter"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             )}
             {isL2 && (
               <Select

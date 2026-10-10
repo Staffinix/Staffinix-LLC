@@ -247,7 +247,8 @@ const ListInputSchema = z.object({
   current_employer: z.string().trim().max(120).optional(),
   technology: z.string().trim().max(120).optional(),
   skill: z.string().trim().max(80).optional(),
-  assigned_to: z.string().uuid().optional(),
+  assignment_state: z.enum(["assigned", "unassigned"]).optional(),
+  assigned_to_any: z.array(z.string().uuid()).max(100).optional(),
   submission_state: z.enum(["submitted", "unsubmitted"]).optional(),
   submission_sort: z.enum(["asc", "desc"]).optional(),
   min_experience: z.number().min(0).max(60).optional(),
@@ -295,7 +296,9 @@ export const listCandidates = createServerFn({ method: "POST" })
     if (data.location) q = q.ilike("location", `%${data.location}%`);
     if (data.current_employer) q = q.ilike("current_employer", `%${data.current_employer}%`);
     if (data.technology) q = q.ilike("primary_technology", `%${data.technology}%`);
-    if (data.assigned_to) q = q.eq("assigned_to", data.assigned_to);
+    if (data.assignment_state === "assigned") q = q.not("assigned_to", "is", null);
+    if (data.assignment_state === "unassigned") q = q.is("assigned_to", null);
+    if (data.assigned_to_any?.length) q = q.in("assigned_to", data.assigned_to_any);
     if (data.submission_state === "submitted") q = q.not("last_submitted_at", "is", null);
     if (data.submission_state === "unsubmitted") q = q.is("last_submitted_at", null);
     if (data.min_experience != null) q = q.gte("experience_years", data.min_experience);
@@ -1286,4 +1289,3 @@ export const embedRequirement = createServerFn({ method: "POST" })
     );
     return { ok: true };
   });
-
