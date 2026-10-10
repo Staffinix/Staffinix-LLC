@@ -25,6 +25,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -66,7 +73,10 @@ function MatchingPage() {
   const [visaFilters, setVisaFilters] = useState<string[]>([]);
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
   const [constraintFilter, setConstraintFilter] = useState("all");
+  const [matchLevelFilter, setMatchLevelFilter] = useState("all");
   const [resumeFilter, setResumeFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("score_desc");
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [rationales, setRationales] = useState<Record<string, Rationale>>({});
 
   const requirementsFn = useServerFn(listMatchingRequirements);
@@ -102,7 +112,7 @@ function MatchingPage() {
   );
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return allRows.filter((row) => {
+    const filtered = allRows.filter((row) => {
       const candidateText = [
         row.candidate.first_name,
         row.candidate.last_name,
@@ -124,23 +134,34 @@ function MatchingPage() {
           row.matched_skills.includes(technologyFilter)) &&
         matchesSelectedVisas(row.candidate.visa_status, visaFilters) &&
         (availabilityFilter === "all" || row.candidate.availability === availabilityFilter) &&
-        (constraintFilter === "all" ||
-          (constraintFilter === "met" && row.hard_constraints.passed) ||
-          (constraintFilter === "review" && !row.hard_constraints.passed)) &&
+        (constraintFilter === "all" || constraintFilter === row.eligibility) &&
+        (matchLevelFilter === "all" || row.match_level === matchLevelFilter) &&
         (resumeFilter === "all" ||
           (resumeFilter === "yes" && row.candidate.has_resume) ||
           (resumeFilter === "no" && !row.candidate.has_resume))
       );
+    });
+    return filtered.sort((a, b) => {
+      if (sortOrder === "score_asc") return a.scores.overall - b.scores.overall;
+      if (sortOrder === "experience")
+        return (b.candidate.experience_years ?? -1) - (a.candidate.experience_years ?? -1);
+      if (sortOrder === "skills")
+        return (
+          b.matched_skills.length - a.matched_skills.length || b.scores.overall - a.scores.overall
+        );
+      return b.scores.overall - a.scores.overall;
     });
   }, [
     allRows,
     availabilityFilter,
     constraintFilter,
     minimumScore,
+    matchLevelFilter,
     resumeFilter,
     search,
     technologyFilter,
     visaFilters,
+    sortOrder,
   ]);
 
   async function refreshMatches() {
@@ -287,9 +308,23 @@ function MatchingPage() {
                   onChange={setConstraintFilter}
                   label="Constraints"
                   options={[
-                    ["all", "All constraint results"],
-                    ["met", "Recorded constraints met"],
-                    ["review", "Needs human review"],
+                    ["all", "All eligibility results"],
+                    ["meets_minimum", "Meets minimum"],
+                    ["needs_review", "Needs review"],
+                    ["hard_constraint_not_met", "Hard constraint not met"],
+                  ]}
+                />
+                <FilterSelect
+                  value={matchLevelFilter}
+                  onChange={setMatchLevelFilter}
+                  label="Match level"
+                  options={[
+                    ["all", "All match levels"],
+                    ["excellent", "Excellent match"],
+                    ["strong", "Strong match"],
+                    ["good", "Good match"],
+                    ["partial", "Partial match"],
+                    ["low", "Low match"],
                   ]}
                 />
                 <FilterSelect
@@ -300,6 +335,17 @@ function MatchingPage() {
                     ["all", "With or without resume"],
                     ["yes", "Resume text available"],
                     ["no", "No resume text"],
+                  ]}
+                />
+                <FilterSelect
+                  value={sortOrder}
+                  onChange={setSortOrder}
+                  label="Sort matches"
+                  options={[
+                    ["score_desc", "Highest score first"],
+                    ["score_asc", "Lowest score first"],
+                    ["experience", "Most experience"],
+                    ["skills", "Most matched skills"],
                   ]}
                 />
               </CardContent>
@@ -335,6 +381,7 @@ function MatchingPage() {
                         <Badge className="text-sm">
                           <Sparkles className="mr-1 h-3.5 w-3.5" /> {row.scores.overall}% match
                         </Badge>
+                        <Badge variant="outline">{matchLevelLabel(row.match_level)}</Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -384,14 +431,12 @@ function MatchingPage() {
                               : "border-amber-500/30 text-amber-600"
                           }
                         >
-                          {row.hard_constraints.passed ? (
+                          {row.eligibility === "meets_minimum" ? (
                             <CircleCheck className="mr-1 h-3 w-3" />
                           ) : (
                             <CircleAlert className="mr-1 h-3 w-3" />
                           )}
-                          {row.hard_constraints.passed
-                            ? "Recorded constraints met"
-                            : "Needs human review"}
+                          {eligibilityLabel(row.eligibility)}
                         </Badge>
                         {row.matched_skills.map((skill) => (
                           <Badge key={skill} variant="secondary">
@@ -410,6 +455,20 @@ function MatchingPage() {
                             </Badge>
                           ))}
                       </div>
+                      <p className="text-xs text-muted-foreground">{row.summary}</p>
+                      {(row.missing_required_skills.length > 0 ||
+                        row.missing_preferred_skills.length > 0) && (
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {row.missing_required_skills.length > 0 && (
+                            <p>
+                              Missing required evidence: {row.missing_required_skills.join(", ")}
+                            </p>
+                          )}
+                          {row.missing_preferred_skills.length > 0 && (
+                            <p>Preferred gaps: {row.missing_preferred_skills.join(", ")}</p>
+                          )}
+                        </div>
+                      )}
                       {!row.hard_constraints.passed && (
                         <p className="text-xs text-muted-foreground">
                           {row.hard_constraints.reasons.join(" · ")}
@@ -429,6 +488,13 @@ function MatchingPage() {
                         </div>
                       )}
                       <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedMatchId(row.candidate.id)}
+                        >
+                          View match details
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -453,13 +519,89 @@ function MatchingPage() {
                 );
               })}
               {rows.length === 0 && (
-                <StateCard message="No candidates match the selected filters." />
+                <StateCard
+                  message={
+                    allRows.length === 0
+                      ? "No candidate profiles are available within your current access scope."
+                      : constraintFilter === "meets_minimum"
+                        ? "No candidates currently satisfy all confirmed minimum requirements."
+                        : "No candidates match selected filters."
+                  }
+                />
               )}
             </div>
+            <MatchDetailsDialog
+              row={allRows.find((row) => row.candidate.id === selectedMatchId) ?? null}
+              open={Boolean(selectedMatchId)}
+              onOpenChange={(open) => !open && setSelectedMatchId(null)}
+            />
           </>
         )}
       </main>
     </>
+  );
+}
+
+function matchLevelLabel(level: string) {
+  return `${level.charAt(0).toUpperCase()}${level.slice(1)} match`;
+}
+
+function eligibilityLabel(value: string) {
+  if (value === "meets_minimum") return "Meets minimum";
+  if (value === "hard_constraint_not_met") return "Hard constraint not met";
+  return "Needs review";
+}
+
+function MatchDetailsDialog({
+  row,
+  open,
+  onOpenChange,
+}: {
+  row: Awaited<ReturnType<typeof matchCandidatesForRequirement>>["rows"][number] | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {row ? `${row.candidate.first_name} ${row.candidate.last_name}` : "Match details"}
+          </DialogTitle>
+          <DialogDescription>
+            Transparent score factors and the candidate evidence used for this ranking.
+          </DialogDescription>
+        </DialogHeader>
+        {row && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{row.scores.overall}% match</Badge>
+              <Badge variant="outline">{matchLevelLabel(row.match_level)}</Badge>
+              <Badge variant="outline">{eligibilityLabel(row.eligibility)}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{row.summary}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {row.score_breakdown.map((factor) => (
+                <Score key={factor.key} label={factor.label} value={factor.score} />
+              ))}
+            </div>
+            <EvidenceList title="Matched required skills" items={row.matched_required_skills} />
+            <EvidenceList title="Missing required evidence" items={row.missing_required_skills} />
+            <EvidenceList title="Matched preferred skills" items={row.matched_preferred_skills} />
+            <EvidenceList title="Preferred gaps" items={row.missing_preferred_skills} />
+            <EvidenceList title="Hard-constraint findings" items={row.hard_constraints.reasons} />
+            <EvidenceList title="Items needing verification" items={row.review_notes} />
+            <div className="flex justify-end">
+              <Button asChild>
+                <Link to="/candidates/$id" params={{ id: row.candidate.id }}>
+                  Open candidate profile
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

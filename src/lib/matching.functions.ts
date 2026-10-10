@@ -7,6 +7,12 @@ import {
 } from "@/lib/ai-gateway.server";
 import { writeAudit } from "@/lib/audit.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
+import {
+  evaluateCandidateMatch,
+  type MatchEligibility,
+  type MatchFactor,
+  type MatchLevel,
+} from "@/lib/candidate-match-engine";
 
 const MATCH_RATIONALE_MODEL =
   process.env.OPENROUTER_MATCH_MODEL?.trim() ||
@@ -338,14 +344,14 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
-        requirement_id: z.string(),
-        candidate_id: z.string().optional(),
+        requirement_id: z.string().uuid(),
+        candidate_id: z.string().uuid().optional(),
         limit: z.number().int().min(1).max(250).default(100),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId, claims } = context;
+    const { supabase } = context;
 
     const [
       { data: req, error: requirementError },
@@ -371,11 +377,10 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
 
     const simMap = new Map<string, number>();
 
-    const { data: matches, error: matchError } = await supabase.rpc(
-      "match_candidates_for_requirement",
-      { _requirement_id: data.requirement_id, _limit: data.limit * 3 },
-    );
-    if (matchError) throw new Error(`Unable to match candidates: ${matchError.message}`);
+    const { data: matches } = await supabase.rpc("match_candidates_for_requirement", {
+      _requirement_id: data.requirement_id,
+      _limit: data.limit * 3,
+    });
     if (matches?.length) {
       for (const m of matches) {
         simMap.set(m.candidate_id, m.similarity);
@@ -387,27 +392,49 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       { data: dbCands, error: candidatesError },
       { data: candidateSkills, error: candidateSkillsError },
       { data: resumes, error: resumesError },
+      { data: employment, error: employmentError },
+      { data: education, error: educationError },
+      { data: certifications, error: certificationsError },
+      { data: projects, error: projectsError },
     ] = await Promise.all([
       supabase
         .from("candidates")
         .select(
-          "id, first_name, last_name, current_title, current_employer, required_job, primary_technology, location, visa_status, availability, experience_years, status, summary",
+          "id, first_name, last_name, current_title, current_employer, required_job, primary_technology, location, visa_status, availability, experience_years, status, summary, updated_at",
         )
         .neq("status", "inactive")
         .order("updated_at", { ascending: false })
-        .limit(250),
-      supabase.from("candidate_skills").select("candidate_id, skill, is_primary").limit(2000),
+        .limit(1000),
+      supabase.from("candidate_skills").select("candidate_id, skill, is_primary").limit(10000),
       supabase
         .from("resumes")
         .select("candidate_id, extracted_text, is_primary")
         .not("extracted_text", "is", null)
-        .limit(500),
+        .limit(5000),
+      supabase.from("candidate_employment").select("candidate_id, title, description").limit(10000),
+      supabase
+        .from("candidate_education")
+        .select("candidate_id, degree, field, institution")
+        .limit(10000),
+      supabase.from("candidate_certifications").select("candidate_id, name, issuer").limit(10000),
+      supabase
+        .from("candidate_projects")
+        .select("candidate_id, name, description, technologies")
+        .limit(10000),
     ]);
     if (candidatesError)
       throw new Error(`Unable to load matched candidates: ${candidatesError.message}`);
     if (candidateSkillsError)
       throw new Error(`Unable to load candidate skills: ${candidateSkillsError.message}`);
     if (resumesError) throw new Error(`Unable to load candidate resumes: ${resumesError.message}`);
+    if (employmentError)
+      throw new Error(`Unable to load candidate employment: ${employmentError.message}`);
+    if (educationError)
+      throw new Error(`Unable to load candidate education: ${educationError.message}`);
+    if (certificationsError)
+      throw new Error(`Unable to load candidate certifications: ${certificationsError.message}`);
+    if (projectsError)
+      throw new Error(`Unable to load candidate projects: ${projectsError.message}`);
     const cands = dbCands ?? [];
     for (const skill of candidateSkills ?? []) {
       candidateSkillMap.set(skill.candidate_id, [
@@ -422,6 +449,18 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       }
     }
 
+    const groupByCandidate = <T extends { candidate_id: string }>(items: T[]) => {
+      const grouped = new Map<string, T[]>();
+      for (const item of items) {
+        grouped.set(item.candidate_id, [...(grouped.get(item.candidate_id) ?? []), item]);
+      }
+      return grouped;
+    };
+    const employmentMap = groupByCandidate(employment ?? []);
+    const educationMap = groupByCandidate(education ?? []);
+    const certificationMap = groupByCandidate(certifications ?? []);
+    const projectMap = groupByCandidate(projects ?? []);
+
     const reqSkillsRows: SkillRow[] = (requirementSkills ?? []).map((skill) => ({
       skill: skill.skill,
       is_mandatory: skill.is_mandatory,
@@ -435,42 +474,24 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       if (sk.length === 0 && c.primary_technology) {
         sk.push({ skill: c.primary_technology, is_primary: true });
       }
-      const sm = skillMatch(reqSkillsRows, sk);
-      const em = experienceMatch(
-        req.min_experience_years,
-        req.max_experience_years,
-        c.experience_years,
-      );
-      const vm = visaMatch(req.visa_types, c.visa_status);
-      const lm = locationMatch(req.location, req.work_mode, c.location);
       const sem = Math.max(0, Math.min(1, simMap.get(c.id) ?? 0));
       const resumeText = resumeMap.get(c.id) ?? null;
-      const domain = domainMatch(
-        { ...req, skills: reqSkillsRows },
-        { ...c, skills: sk, resume_text: resumeText },
-      );
-
-      const kw =
-        c.primary_technology &&
-        req.primary_technology &&
-        norm(c.primary_technology) === norm(req.primary_technology)
-          ? 1
-          : c.primary_technology &&
-              req.title &&
-              req.title.toLowerCase().includes(c.primary_technology.toLowerCase())
-            ? 0.9
-            : 0;
-
-      const overallScore = computeSingleMatchScore(
-        { ...req, skills: reqSkillsRows },
-        {
-          ...c,
+      const evaluation = evaluateCandidateMatch({
+        requirement: req,
+        candidate: c,
+        requirementSkills: reqSkillsRows,
+        evidence: {
           skills: sk,
-          resume_text: resumeText,
-          semantic_similarity: simMap.has(c.id) ? sem : undefined,
+          resumeText,
+          employment: employmentMap.get(c.id) ?? [],
+          education: educationMap.get(c.id) ?? [],
+          certifications: certificationMap.get(c.id) ?? [],
+          projects: projectMap.get(c.id) ?? [],
+          semanticSimilarity: simMap.has(c.id) ? sem : null,
         },
-      );
-      const hardConstraints = evaluateHardConstraints(req, c, reqSkillsRows, sk);
+      });
+      const factor = (key: MatchFactor["key"]) =>
+        evaluation.factors.find((item) => item.key === key)?.score ?? 0;
 
       return {
         candidate: {
@@ -487,27 +508,54 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
           experience_years: c.experience_years,
           status: c.status,
           has_resume: Boolean(resumeText),
+          updated_at: c.updated_at,
         },
-        hard_constraints: hardConstraints,
+        match_level: evaluation.level,
+        eligibility: evaluation.eligibility,
+        summary: evaluation.summary,
+        score_breakdown: evaluation.factors,
+        review_notes: evaluation.review_notes,
+        hard_constraints: {
+          passed: evaluation.eligibility !== "hard_constraint_not_met",
+          reasons: evaluation.hard_constraint_reasons,
+          missing_mandatory_skills: evaluation.missing_required_skills,
+        },
         scores: {
-          overall: overallScore,
-          skill: Math.round(sm.score * 100),
-          semantic: simMap.has(c.id) ? Math.round(sem * 100) : null,
-          experience: Math.round(em * 100),
-          visa: Math.round(vm * 100),
-          location: Math.round(lm * 100),
-          keyword: Math.round(kw * 100),
-          domain: Math.round(domain.score * 100),
+          overall: evaluation.overall,
+          skill: factor("required_skills"),
+          semantic: evaluation.semantic_score,
+          experience: factor("experience"),
+          visa:
+            req.visa_types?.length && c.visa_status
+              ? evaluation.hard_constraint_reasons.some((reason) =>
+                  reason.includes("work authorization"),
+                )
+                ? 0
+                : 100
+              : 0,
+          location: factor("location"),
+          keyword: factor("role_relevance"),
+          domain: factor("role_relevance"),
         },
-        matched_skills: sm.matched,
-        matched_terms: domain.matched,
-        missing_skills: sm.missing,
+        matched_skills: [
+          ...evaluation.matched_required_skills,
+          ...evaluation.matched_preferred_skills,
+        ],
+        matched_required_skills: evaluation.matched_required_skills,
+        missing_required_skills: evaluation.missing_required_skills,
+        matched_preferred_skills: evaluation.matched_preferred_skills,
+        missing_preferred_skills: evaluation.missing_preferred_skills,
+        matched_terms: evaluation.matched_preferred_skills,
+        missing_skills: [
+          ...evaluation.missing_required_skills,
+          ...evaluation.missing_preferred_skills,
+        ],
       };
     });
 
     rows.sort(
       (a, b) =>
-        Number(b.hard_constraints.passed) - Number(a.hard_constraints.passed) ||
+        eligibilityRank(a.eligibility) - eligibilityRank(b.eligibility) ||
         b.scores.overall - a.scores.overall,
     );
 
@@ -519,8 +567,19 @@ export const matchCandidatesForRequirement = createServerFn({ method: "POST" })
       if (extra) sliced.push(extra);
     }
 
-    return { rows: sliced, requirement: req };
+    return {
+      rows: sliced,
+      requirement: req,
+      total_candidates_evaluated: rows.length,
+      semantic_available: simMap.size > 0,
+    };
   });
+
+function eligibilityRank(value: MatchEligibility) {
+  if (value === "meets_minimum") return 0;
+  if (value === "needs_review") return 1;
+  return 2;
+}
 
 export type MatchRow = {
   candidate: {
@@ -537,7 +596,13 @@ export type MatchRow = {
     experience_years: number | null;
     status: string;
     has_resume: boolean;
+    updated_at: string;
   };
+  match_level: MatchLevel;
+  eligibility: MatchEligibility;
+  summary: string;
+  score_breakdown: MatchFactor[];
+  review_notes: string[];
   scores: {
     overall: number;
     skill: number;
@@ -549,6 +614,10 @@ export type MatchRow = {
     domain: number;
   };
   matched_skills: string[];
+  matched_required_skills: string[];
+  missing_required_skills: string[];
+  matched_preferred_skills: string[];
+  missing_preferred_skills: string[];
   matched_terms: string[];
   missing_skills: string[];
   hard_constraints: {
