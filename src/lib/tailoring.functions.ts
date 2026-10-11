@@ -6,9 +6,14 @@ import { z } from "zod";
 
 import { requireTailoringAccess } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
-import { requestStructuredAiOutput } from "@/lib/ai-gateway.server";
+import {
+  requestStructuredAiOutput,
+  UNTRUSTED_DOCUMENT_SYSTEM_RULES,
+} from "@/lib/ai-gateway.server";
 import { writeAudit } from "@/lib/audit.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
+import { validateFactSelection } from "@/lib/tailoring-selection";
+import { evaluateCandidateMatch } from "@/features/ai-matching/candidate-match-engine";
 
 type AppSupabase = SupabaseClient<Database>;
 
@@ -63,7 +68,7 @@ async function loadTailoringSource(
     supabase
       .from("candidates")
       .select(
-        "id, first_name, last_name, current_title, current_employer, location, visa_status, availability, experience_years, primary_technology, summary",
+        "id, first_name, last_name, email, phone, required_job, current_title, current_employer, location, visa_status, availability, experience_years, primary_technology, summary",
       )
       .eq("id", candidateId)
       .maybeSingle(),
@@ -179,6 +184,8 @@ async function loadTailoringSource(
 function compactFactsForSelection(source: Awaited<ReturnType<typeof loadTailoringSource>>) {
   const shorten = (value: string | null, max = 1200) => value?.slice(0, max) ?? null;
   return {
+    source_resume_text: source.sourceResume.extracted_text?.slice(0, 16000),
+    requirement_skills: source.requirement_skills,
     requirement: {
       ...source.requirement,
       description: shorten(source.requirement.description, 2500),
@@ -256,8 +263,7 @@ ${JSON.stringify(compactFactsForSelection(source))}`;
       messages: [
         {
           role: "system",
-          content:
-            "You are a constrained record selector. You may output only existing record IDs in JSON; you never generate candidate claims.",
+          content: `${UNTRUSTED_DOCUMENT_SYSTEM_RULES}\nYou are a constrained record selector. You may output only existing record IDs in JSON; you never generate candidate claims.`,
         },
         { role: "user", content: prompt },
       ],
@@ -271,36 +277,7 @@ function validateSelection(
   source: Awaited<ReturnType<typeof loadTailoringSource>>,
   selection: FactSelection,
 ) {
-  const categories = [
-    ["skill_ids", source.skills],
-    ["employment_ids", source.employment],
-    ["education_ids", source.education],
-    ["project_ids", source.projects],
-    ["certification_ids", source.certifications],
-  ] as const;
-
-  const selectedIds: string[] = [];
-  for (const [key, rows] of categories) {
-    const allowed = new Set(rows.map((row) => row.id));
-    const ids = selection[key];
-    if (new Set(ids).size !== ids.length) {
-      throw new Error(`AI returned duplicate ${key}; no draft was saved`);
-    }
-    const invalid = ids.filter((id) => !allowed.has(id));
-    if (invalid.length) {
-      throw new Error(`AI selected unsupported ${key}; no draft was saved`);
-    }
-    selectedIds.push(...ids);
-  }
-
-  return {
-    valid: true,
-    validation_mode: "existing_record_ids_only",
-    generated_claims_allowed: false,
-    claim_count: selectedIds.length,
-    selected_ids: selectedIds,
-    checked_at: new Date().toISOString(),
-  };
+  return validateFactSelection(source, selection);
 }
 
 function inSelectedOrder<T extends { id: string }>(rows: T[], ids: string[]): T[] {
@@ -318,6 +295,8 @@ function renderFactPreservingResume(
     .filter(Boolean)
     .join(" | ");
   if (headline) lines.push(headline);
+  const contact = [candidate.email, candidate.phone].filter(Boolean).join(" | ");
+  if (contact) lines.push(contact);
   if (candidate.summary) lines.push("", "SUMMARY", candidate.summary);
 
   const skills = inSelectedOrder(source.skills, selection.skill_ids);
@@ -333,7 +312,9 @@ function renderFactPreservingResume(
     );
   }
 
-  const employment = inSelectedOrder(source.employment, selection.employment_ids);
+  const employment = inSelectedOrder(source.employment, selection.employment_ids).sort(
+    (left, right) => (right.start_date ?? "").localeCompare(left.start_date ?? ""),
+  );
   if (employment.length) {
     lines.push("", "EMPLOYMENT");
     for (const fact of employment) {
@@ -387,20 +368,20 @@ function renderFactPreservingResume(
     .trim();
 }
 
-function calculateMatchScore(
-  source: Awaited<ReturnType<typeof loadTailoringSource>>,
-  selection: FactSelection,
-) {
-  const selected = new Set(
-    inSelectedOrder(source.skills, selection.skill_ids).map((fact) => fact.skill.toLowerCase()),
-  );
-  const mandatory = source.requirement_skills
-    .filter((fact) => fact.is_mandatory)
-    .map((fact) => fact.skill.toLowerCase());
-  if (!mandatory.length) return null;
-  return Math.round(
-    (mandatory.filter((skill) => selected.has(skill)).length / mandatory.length) * 100,
-  );
+function calculateMatchScore(source: Awaited<ReturnType<typeof loadTailoringSource>>) {
+  return evaluateCandidateMatch({
+    candidate: source.candidate,
+    requirement: source.requirement,
+    requirementSkills: source.requirement_skills,
+    evidence: {
+      skills: source.skills,
+      employment: source.employment,
+      education: source.education,
+      projects: source.projects,
+      certifications: source.certifications,
+      resumeText: source.sourceResume.extracted_text,
+    },
+  }).overall;
 }
 
 export const verifyCandidateResume = createServerFn({ method: "POST" })
@@ -428,7 +409,7 @@ export const verifyCandidateResume = createServerFn({ method: "POST" })
       supabase
         .from("candidates")
         .select(
-          "id, first_name, last_name, current_title, current_employer, location, visa_status, availability, experience_years, primary_technology, summary",
+          "id, first_name, last_name, email, phone, required_job, current_title, current_employer, location, visa_status, availability, experience_years, primary_technology, summary",
         )
         .eq("id", data.candidate_id)
         .maybeSingle(),
@@ -537,13 +518,45 @@ export const verifyCandidateResume = createServerFn({ method: "POST" })
 
 export const generateFactPreservingResume = createServerFn({ method: "POST" })
   .middleware([requireTailoringAccess])
-  .validator((input: unknown) => IdPairSchema.parse(input))
+  .validator((input: unknown) =>
+    IdPairSchema.extend({
+      selection: SelectionSchema.optional(),
+      expected_source_hash: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
+      source_resume_id: z.string().uuid().optional(),
+      regenerate_section: z
+        .enum(["skill_ids", "employment_ids", "education_ids", "project_ids", "certification_ids"])
+        .optional(),
+    })
+      .strict()
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
-    const source = await loadTailoringSource(supabase, data.candidate_id, data.requirement_id);
-    const selection = await runWithAiUsageGuard(supabase, userId, "resume_tailor", () =>
-      selectRelevantFactIds(source),
+    const source = await loadTailoringSource(
+      supabase,
+      data.candidate_id,
+      data.requirement_id,
+      data.source_resume_id,
     );
+    if (data.regenerate_section && !data.selection)
+      throw new Error("Select an existing draft before regenerating a section.");
+    if (data.selection && data.expected_source_hash !== source.sourceHash) {
+      throw new Error("Source facts changed. Generate a fresh draft before saving edits.");
+    }
+    let selection = data.selection;
+    if (!selection || data.regenerate_section) {
+      const generated = await runWithAiUsageGuard(supabase, userId, "resume_tailor", () =>
+        selectRelevantFactIds(source),
+      );
+      validateSelection(source, generated);
+      selection =
+        data.regenerate_section && selection
+          ? { ...selection, [data.regenerate_section]: generated[data.regenerate_section] }
+          : generated;
+    }
     const claimValidation = validateSelection(source, selection);
     const tailoredContent = renderFactPreservingResume(source, selection);
     if (!tailoredContent) throw new Error("No verified candidate facts were available to render");
@@ -567,7 +580,7 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
         status: "draft",
         tailored_summary: source.candidate.summary,
         tailored_content: tailoredContent,
-        match_score: calculateMatchScore(source, selection),
+        match_score: calculateMatchScore(source),
         notes: "Fact-preserving ID selection; rendered only from the verified source snapshot.",
         source_facts: source.sourceFacts as unknown as Json,
         source_hash: source.sourceHash,
@@ -598,6 +611,71 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
     });
 
     return version;
+  });
+
+export const rejectTailoredResume = createServerFn({ method: "POST" })
+  .middleware([requireTailoringAccess])
+  .validator((input: unknown) => z.object({ version_id: z.string().uuid() }).strict().parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: version, error } = await context.supabase
+      .from("resume_versions")
+      .update({ status: "rejected" })
+      .eq("id", data.version_id)
+      .eq("status", "draft")
+      .select("id, candidate_id, requirement_id, status")
+      .maybeSingle();
+    if (error || !version) throw new Error("Draft could not be rejected or access was denied.");
+    await writeAudit({
+      actorId: context.userId,
+      actorEmail: (context.claims as { email?: string }).email ?? null,
+      action: "resume.tailoring_rejected",
+      entityType: "resume_version",
+      entityId: version.id,
+      metadata: { candidate_id: version.candidate_id, requirement_id: version.requirement_id },
+    });
+    return version;
+  });
+
+export const getApprovedResumeExport = createServerFn({ method: "POST" })
+  .middleware([requireTailoringAccess])
+  .validator((input: unknown) =>
+    z
+      .object({
+        version_id: z.string().uuid(),
+        format: z.enum(["pdf", "docx"]),
+        template: z.enum(["classic", "modern", "technical"]),
+      })
+      .strict()
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: version, error } = await context.supabase
+      .from("resume_versions")
+      .select("id, candidate_id, requirement_id, tailored_content, status, claim_validation")
+      .eq("id", data.version_id)
+      .maybeSingle();
+    if (
+      error ||
+      !version ||
+      version.status !== "approved" ||
+      !version.tailored_content ||
+      (version.claim_validation as { valid?: boolean } | null)?.valid !== true
+    )
+      throw new Error("An approved, validated resume is required for export.");
+    await writeAudit({
+      actorId: context.userId,
+      actorEmail: (context.claims as { email?: string }).email ?? null,
+      action: "resume.export_requested",
+      entityType: "resume_version",
+      entityId: version.id,
+      metadata: {
+        candidate_id: version.candidate_id,
+        requirement_id: version.requirement_id,
+        format: data.format,
+        template: data.template,
+      },
+    });
+    return { content: version.tailored_content };
   });
 
 export const approveFactPreservingResume = createServerFn({ method: "POST" })

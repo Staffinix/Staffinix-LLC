@@ -182,6 +182,14 @@ function SubmissionDetailPage() {
           title={`${submission.candidate?.first_name} ${submission.candidate?.last_name} → ${submission.requirement?.title}`}
           description={`Created ${formatDistanceToNow(new Date(submission.created_at), { addSuffix: true })}${submission.submitted_at ? ` · Submitted ${formatDistanceToNow(new Date(submission.submitted_at), { addSuffix: true })}` : ""}`}
         />
+        <Button asChild variant="outline" size="sm">
+          <Link
+            to="/tailoring"
+            search={{ candidateId: submission.candidate_id, reqId: submission.requirement_id }}
+          >
+            Review tailored resume history
+          </Link>
+        </Button>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* LEFT: main content */}

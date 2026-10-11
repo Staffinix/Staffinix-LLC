@@ -19,8 +19,16 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCandidate } from "@/lib/candidates.functions";
-import { getRequirement } from "@/lib/requirements.functions";
+import { getCandidate, listCandidates } from "@/lib/candidates.functions";
+import { getRequirement, listRequirements } from "@/lib/requirements.functions";
+import { Input } from "@/components/ui/input";
+import {
+  TailoringAnalysis,
+  TailoringUpload,
+  ResumeComparison,
+  ResumeDownloads,
+} from "@/components/candidates/tailoring-tools";
+import { TailoringEditor } from "@/components/candidates/tailoring-editor";
 import {
   approveFactPreservingResume,
   generateFactPreservingResume,
@@ -41,9 +49,209 @@ export const Route = createFileRoute("/_authenticated/tailoring")({
 
 function TailoringPage() {
   const { reqId, candidateId } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [jobSearch, setJobSearch] = useState("");
+  const [candidatePage, setCandidatePage] = useState(1);
+  const [jobPage, setJobPage] = useState(1);
+  const listCandidatesFn = useServerFn(listCandidates);
+  const listRequirementsFn = useServerFn(listRequirements);
+  const candidates = useQuery({
+    queryKey: ["tailoring-candidates", candidateSearch, candidatePage],
+    queryFn: () =>
+      listCandidatesFn({ data: { search: candidateSearch, page: candidatePage, page_size: 10 } }),
+  });
+  const jobs = useQuery({
+    queryKey: ["tailoring-jobs", jobSearch, jobPage],
+    queryFn: () =>
+      listRequirementsFn({
+        data: { search: jobSearch, page: jobPage, page_size: 10, status: ["open"] },
+      }),
+  });
+  return (
+    <>
+      <AppTopbar title="Resume Tailoring" />
+      <section className="space-y-4 px-6 pt-6 md:px-8" aria-label="Tailoring selection">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">AI Resume Tailoring</h1>
+            <p className="text-sm text-muted-foreground">
+              Optimize real candidate resumes for specific job requirements.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate({ search: {} })}>
+              New tailoring
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!reqId || !candidateId}
+              onClick={() =>
+                document.getElementById("tailoring-history")?.scrollIntoView({ block: "start" })
+              }
+            >
+              Tailoring history
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Candidate</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                aria-label="Search candidates"
+                placeholder="Search candidate name, email or role"
+                value={candidateSearch}
+                onChange={(event) => {
+                  setCandidateSearch(event.target.value);
+                  setCandidatePage(1);
+                }}
+              />
+              {candidates.isPending && <p role="status">Loading candidates…</p>}
+              {candidates.isError && (
+                <p role="alert">
+                  Candidates could not be loaded.{" "}
+                  <Button variant="link" onClick={() => candidates.refetch()}>
+                    Retry
+                  </Button>
+                </p>
+              )}
+              <div className="max-h-52 space-y-1 overflow-auto">
+                {candidates.data?.rows.map((candidate) => (
+                  <button
+                    type="button"
+                    key={candidate.id}
+                    aria-pressed={candidateId === candidate.id}
+                    className={`w-full rounded-lg border p-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-primary ${candidateId === candidate.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    onClick={() => navigate({ search: { reqId, candidateId: candidate.id } })}
+                  >
+                    <span className="block font-medium">
+                      {candidate.first_name} {candidate.last_name}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {candidate.current_title || "Role not recorded"} ·{" "}
+                      {candidate.experience_years ?? "Unknown"} years ·{" "}
+                      {candidate.has_resume ? "Resume available" : "Resume needed"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {candidate.top_skills.join(", ")}
+                    </span>
+                  </button>
+                ))}
+                {candidates.data?.rows.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No accessible candidates found.</p>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={candidatePage === 1 || candidates.isFetching}
+                  onClick={() => setCandidatePage(candidatePage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs">Page {candidatePage}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !candidates.data ||
+                    candidatePage * 10 >= candidates.data.total ||
+                    candidates.isFetching
+                  }
+                  onClick={() => setCandidatePage(candidatePage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Open requisition</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                aria-label="Search requisitions"
+                placeholder="Search job title"
+                value={jobSearch}
+                onChange={(event) => {
+                  setJobSearch(event.target.value);
+                  setJobPage(1);
+                }}
+              />
+              {jobs.isPending && <p role="status">Loading requisitions…</p>}
+              {jobs.isError && (
+                <p role="alert">
+                  Requisitions could not be loaded.{" "}
+                  <Button variant="link" onClick={() => jobs.refetch()}>
+                    Retry
+                  </Button>
+                </p>
+              )}
+              <div className="max-h-52 space-y-1 overflow-auto">
+                {jobs.data?.rows.map((job) => (
+                  <button
+                    type="button"
+                    key={job.id}
+                    aria-pressed={reqId === job.id}
+                    className={`w-full rounded-lg border p-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-primary ${reqId === job.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    onClick={() => navigate({ search: { candidateId, reqId: job.id } })}
+                  >
+                    <span className="block font-medium">{job.title}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {job.client_name || "Direct"} · {job.location || "Location not recorded"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {job.primary_technology || "Technology not recorded"} · {job.id}
+                    </span>
+                  </button>
+                ))}
+                {jobs.data?.rows.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No accessible open requisitions found.
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={jobPage === 1 || jobs.isFetching}
+                  onClick={() => setJobPage(jobPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs">Page {jobPage}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!jobs.data || jobPage * 10 >= jobs.data.total || jobs.isFetching}
+                  onClick={() => setJobPage(jobPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+      <TailoringWorkspace key={`${candidateId ?? "none"}:${reqId ?? "none"}`} />
+    </>
+  );
+}
+
+function TailoringWorkspace() {
+  const { reqId, candidateId } = Route.useSearch();
   const queryClient = useQueryClient();
   const [sourceConfirmed, setSourceConfirmed] = useState(false);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
+  const [historyId, setHistoryId] = useState<string>();
+  const [compareId, setCompareId] = useState<string>();
+  const [resumeId, setResumeId] = useState<string>();
   const getCandidateFn = useServerFn(getCandidate);
   const getRequirementFn = useServerFn(getRequirement);
   const verifyResumeFn = useServerFn(verifyCandidateResume);
@@ -75,20 +283,28 @@ function TailoringPage() {
       await queryClient.invalidateQueries({ queryKey: ["candidate", candidateId] });
       toast.success("Source resume verified");
     },
-    onError: (error) => toast.error((error as Error).message),
+    onError: () =>
+      toast.error(
+        "Source verification failed. Check the current profile and source resume, then retry.",
+      ),
   });
 
   const generateMutation = useMutation({
     mutationFn: () =>
       generateResumeFn({
-        data: { candidate_id: candidateId!, requirement_id: reqId! },
+        data: { candidate_id: candidateId!, requirement_id: reqId!, source_resume_id: resumeId },
       }),
     onSuccess: async () => {
+      setHistoryId(undefined);
+      approveMutation.reset();
       setApprovalConfirmed(false);
       await queryClient.invalidateQueries({ queryKey: ["candidate", candidateId] });
       toast.success("Fact-validated draft saved");
     },
-    onError: (error) => toast.error((error as Error).message),
+    onError: () =>
+      toast.error(
+        "Generation failed. Confirm the source is verified and AI is configured, then retry.",
+      ),
   });
 
   const approveMutation = useMutation({
@@ -99,14 +315,17 @@ function TailoringPage() {
       await queryClient.invalidateQueries({ queryKey: ["candidate", candidateId] });
       toast.success("Tailored resume approved");
     },
-    onError: (error) => toast.error((error as Error).message),
+    onError: () =>
+      toast.error(
+        "Approval failed. The source may have changed; generate a new draft and review it.",
+      ),
   });
 
   if (!reqId || !candidateId) {
     return (
       <TailoringState
         title="Select a candidate and requisition"
-        message="Resume tailoring requires real candidate and requisition records. Select both from the matching workspace."
+        message="Select a candidate and open requisition above to begin. Only records available to your role are shown."
       />
     );
   }
@@ -139,20 +358,32 @@ function TailoringPage() {
   const candidate = candidateQuery.data;
   const requirement = requirementQuery.data;
   const candidateName = `${candidate.first_name} ${candidate.last_name}`;
-  const verifiedResume = candidate.resumes.find(
-    (resume) => resume.verification_status === "verified" && resume.extracted_text?.trim(),
-  );
-  const reviewableResume = candidate.resumes.find((resume) => resume.extracted_text?.trim());
+  const reviewableResume = resumeId
+    ? candidate.resumes.find((resume) => resume.id === resumeId)
+    : (candidate.resumes.find(
+        (resume) => resume.verification_status === "verified" && resume.extracted_text?.trim(),
+      ) ?? candidate.resumes.find((resume) => resume.extracted_text?.trim()));
+  const verifiedResume =
+    reviewableResume?.verification_status === "verified" && reviewableResume.extracted_text?.trim()
+      ? reviewableResume
+      : undefined;
   const savedVersion = candidate.versions.find(
     (version) => version.requirement_id === requirement.id,
   );
-  const version = approveMutation.data ?? generateMutation.data ?? savedVersion;
+  const version =
+    (historyId
+      ? candidate.versions.find(
+          (item) => item.id === historyId && item.requirement_id === requirement.id,
+        )
+      : undefined) ??
+    approveMutation.data ??
+    generateMutation.data ??
+    savedVersion;
   const validation = version?.claim_validation as
     { valid?: boolean; claim_count?: number; validation_mode?: string } | undefined;
 
   return (
     <>
-      <AppTopbar title="Resume Tailoring" />
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
           <Link to="/matching" search={{ reqId: requirement.id, candidateId: candidate.id }}>
@@ -164,6 +395,105 @@ function TailoringPage() {
           title={`Resume tailoring: ${candidateName}`}
           description={`Target requisition: ${requirement.title}`}
         />
+        <TailoringAnalysis candidate={candidate} requirement={requirement} />
+        <TailoringUpload candidateId={candidate.id} />
+        {candidate.resumes.length > 0 && (
+          <label className="block space-y-2 text-sm">
+            Original resume to tailor
+            <select
+              aria-label="Original resume to tailor"
+              className="block w-full rounded-lg border bg-background p-3"
+              value={reviewableResume?.id ?? ""}
+              onChange={(event) => {
+                setResumeId(event.target.value);
+                setSourceConfirmed(false);
+                setApprovalConfirmed(false);
+              }}
+            >
+              <option value="" disabled>
+                Select a source resume
+              </option>
+              {candidate.resumes.map((resume) => (
+                <option key={resume.id} value={resume.id}>
+                  {resume.file_name} · {resume.verification_status}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <Card id="tailoring-history">
+          <CardHeader>
+            <CardTitle className="text-sm">Tailoring history</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setHistoryId(undefined);
+                generateMutation.reset();
+                approveMutation.reset();
+                setApprovalConfirmed(false);
+              }}
+            >
+              Latest draft
+            </Button>
+            {candidate.versions
+              .filter((item) => item.requirement_id === requirement.id)
+              .map((item) => (
+                <Button
+                  key={item.id}
+                  size="sm"
+                  variant={version?.id === item.id ? "default" : "outline"}
+                  onClick={() => {
+                    setHistoryId(item.id);
+                    setApprovalConfirmed(false);
+                  }}
+                >
+                  Version {item.version_no} · {item.status} ·{" "}
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Button>
+              ))}
+            {!savedVersion && (
+              <p className="text-sm text-muted-foreground">No versions for this requisition yet.</p>
+            )}
+          </CardContent>
+        </Card>
+        {version && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Compare saved versions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <select
+                aria-label="Version to compare"
+                className="w-full rounded-lg border bg-background p-3 text-sm"
+                value={compareId ?? ""}
+                onChange={(event) => setCompareId(event.target.value)}
+              >
+                <option value="">Choose an earlier version</option>
+                {candidate.versions
+                  .filter(
+                    (item) => item.requirement_id === requirement.id && item.id !== version.id,
+                  )
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      Version {item.version_no} · {item.status}
+                    </option>
+                  ))}
+              </select>
+              {compareId && (
+                <ResumeComparison
+                  originalLabel="Earlier saved version"
+                  original={
+                    candidate.versions.find((item) => item.id === compareId)?.tailored_content ?? ""
+                  }
+                  tailored={version.tailored_content ?? ""}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="border-border bg-card">
@@ -339,9 +669,23 @@ function TailoringPage() {
                     <Badge variant="outline">{version.status}</Badge>
                   </div>
                 </div>
-                <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-xs leading-5">
-                  {version.tailored_content}
-                </pre>
+                <ResumeComparison
+                  original={
+                    candidate.resumes.find((item) => item.id === version.source_resume_id)
+                      ?.extracted_text ?? ""
+                  }
+                  tailored={version.tailored_content ?? ""}
+                />
+                <ResumeDownloads version={version} />
+                <TailoringEditor
+                  key={version.id}
+                  candidate={candidate}
+                  version={version}
+                  onSaved={(id) => {
+                    setHistoryId(id);
+                    setApprovalConfirmed(false);
+                  }}
+                />
               </div>
             )}
           </CardContent>
@@ -363,7 +707,7 @@ function TailoringPage() {
                     require a new version.
                   </p>
                 </div>
-              ) : (
+              ) : version.status === "draft" ? (
                 <>
                   <label className="flex items-start gap-2 text-xs">
                     <input
@@ -383,6 +727,8 @@ function TailoringPage() {
                     Approve tailored resume
                   </Button>
                 </>
+              ) : (
+                <p>This version was rejected. Create a new draft to continue.</p>
               )}
             </CardContent>
           </Card>
@@ -405,7 +751,6 @@ function TailoringState({
 }) {
   return (
     <>
-      <AppTopbar title="Resume Tailoring" />
       <main className="flex-1 p-6 md:p-8">
         <Card role={error ? "alert" : "status"} className="border-border bg-card">
           <CardContent className="flex flex-col items-center gap-3 p-8 text-center">

@@ -516,6 +516,11 @@ function MatchingPage() {
                             View candidate
                           </Link>
                         </Button>
+                        <Button asChild size="sm" variant="outline">
+                          <Link to="/tailoring" search={{ candidateId: row.candidate.id, reqId }}>
+                            Tailor Resume for This Job
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

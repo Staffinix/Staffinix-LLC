@@ -147,6 +147,13 @@ function CandidateDetailPage() {
           actions={
             <div className="flex flex-wrap gap-2">
               {isL4 && (
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/tailoring" search={{ candidateId: id }}>
+                    Tailor Resume
+                  </Link>
+                </Button>
+              )}
+              {isL4 && (
                 <Button asChild size="sm" className="gap-1.5">
                   <Link to="/submissions/new" search={{ candidate_id: id }}>
                     <Send className="h-3.5 w-3.5" /> Submit Candidate

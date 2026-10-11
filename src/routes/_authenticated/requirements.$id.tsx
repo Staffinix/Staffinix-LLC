@@ -46,6 +46,11 @@ function RequirementDetailPage() {
               <Sparkles className="h-3.5 w-3.5" /> Run matching
             </Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/tailoring" search={{ reqId: requirement.id }}>
+              Tailor a candidate resume
+            </Link>
+          </Button>
         </div>
 
         <PageHeader
