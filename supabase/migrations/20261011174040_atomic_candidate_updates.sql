@@ -33,7 +33,7 @@ BEGIN
       RAISE EXCEPTION 'Unsupported candidate collection' USING ERRCODE = '22023';
     END IF;
     IF jsonb_array_length(_children -> child_key) >
-       CASE child_key WHEN 'skills' THEN 120 WHEN 'education' THEN 20 ELSE 40 END THEN
+       (CASE child_key WHEN 'skills' THEN 120 WHEN 'education' THEN 20 ELSE 40 END) THEN
       RAISE EXCEPTION 'Candidate collection exceeds limit' USING ERRCODE = '22023';
     END IF;
   END LOOP;

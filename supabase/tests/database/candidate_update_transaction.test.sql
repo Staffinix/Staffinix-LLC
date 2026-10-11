@@ -8,7 +8,7 @@ SELECT ok(NOT has_function_privilege('anon','public.update_candidate_graph(uuid,
 INSERT INTO public.tenants(id,name,slug) VALUES ('41000000-0000-0000-0000-000000000001','Update test','update-test');
 INSERT INTO auth.users(id,email) VALUES ('4a000000-0000-0000-0000-000000000001','update-test@example.invalid');
 UPDATE public.profiles SET tenant_id='41000000-0000-0000-0000-000000000001',is_active=true WHERE id='4a000000-0000-0000-0000-000000000001';
-INSERT INTO public.user_roles(user_id,role) VALUES ('4a000000-0000-0000-000000000001','recruiter');
+INSERT INTO public.user_roles(user_id,role) VALUES ('4a000000-0000-0000-0000-000000000001','recruiter');
 CREATE TEMP TABLE update_test_ids(id uuid);
 GRANT SELECT,INSERT ON update_test_ids TO authenticated;
 SET LOCAL ROLE authenticated;
