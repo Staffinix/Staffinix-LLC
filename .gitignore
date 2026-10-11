@@ -38,3 +38,6 @@ supabase/.branches/
 
 # Legacy local copy; the canonical application is this directory.
 My-Version/
+
+.vercel
+.env*
