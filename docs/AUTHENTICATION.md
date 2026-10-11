@@ -11,7 +11,7 @@ The server then:
 2. validates it with Supabase Auth;
 3. verifies JWT subject and authenticated user agree;
 4. loads the active application profile;
-5. enforces the configured work-email policy or an explicit provisioned role;
+5. accepts Gmail or enforces the configured work-email policy or an explicit provisioned role;
 6. creates a caller-scoped Supabase client so Postgres RLS sees the real user.
 
 There is no fallback user, browser-assigned role, automatic tenant assignment, or application-owned
@@ -32,3 +32,8 @@ domain policy checks, and database RLS.
 - Optional policy: `AUTH_ALLOWED_WORK_EMAIL_DOMAINS`, `AUTH_EMAIL_ALLOWLIST`
 
 Never configure a service-role/secret key in browser variables.
+
+Gmail (`gmail.com` and legacy `googlemail.com`) is allowed for signup and authentication,
+including when `AUTH_ALLOWED_WORK_EMAIL_DOMAINS` is configured. Other consumer providers remain
+restricted. Email eligibility does not assign roles or grant tenant access; existing profile,
+approval, feature authorization, and RLS checks still apply.

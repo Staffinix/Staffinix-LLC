@@ -261,8 +261,8 @@ async function authenticateRequest(request: Request): Promise<SupabaseAuthContex
   }
 
   // Existing members can be provisioned with an exact role assignment even when
-  // their mailbox uses a consumer domain. This keeps personal-email signups
-  // blocked while allowing explicitly provisioned member accounts to
+  // their mailbox uses another consumer domain. Gmail is allowed by policy;
+  // other personal-email signups remain blocked while provisioned members can
   // authenticate without relying on deployment-specific allowlist formatting.
   if (!hasAllowedWorkEmail) {
     const [{ data: assignedRole, error: roleError }, { data: platformRole, error: platformError }] =
@@ -272,7 +272,9 @@ async function authenticateRequest(request: Request): Promise<SupabaseAuthContex
       ]);
 
     if (roleError || platformError || (!assignedRole && !platformRole)) {
-      throw new ForbiddenError("Use an authorized work email account to access Staffinix.");
+      throw new ForbiddenError(
+        "Use a Gmail address or an authorized work email to access Staffinix.",
+      );
     }
   }
 

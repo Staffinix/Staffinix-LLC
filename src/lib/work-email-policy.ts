@@ -33,7 +33,7 @@ export function parseEmailPolicyList(value: string | undefined): string[] {
 }
 
 /**
- * Allows configured business domains and rejects common consumer mailbox
+ * Allows Gmail and configured business domains; rejects other common consumer
  * providers. Exact exceptions are server-side configuration, never browser
  * configuration, so the exception list is not disclosed to unauthenticated users.
  */
@@ -42,11 +42,15 @@ export function isAllowedWorkEmail(
   options: WorkEmailPolicyOptions = {},
 ): boolean {
   const email = value?.trim().toLowerCase() ?? "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
   const separator = email.lastIndexOf("@");
   if (separator <= 0 || separator === email.length - 1 || email.includes(" ")) return false;
 
   const domain = email.slice(separator + 1);
   if (!domain.includes(".") || domain.startsWith(".") || domain.endsWith(".")) return false;
+
+  // Gmail is an explicit product-policy exception, including its legacy domain.
+  if (domain === "gmail.com" || domain === "googlemail.com") return true;
 
   const configuredEmails = normalizeValues(options.allowedEmails);
   if (configuredEmails.has(email)) return true;

@@ -76,7 +76,7 @@ const AUTH_ERROR_MESSAGES = {
   EMAIL_NOT_CONFIRMED: "Please verify your email address before signing in.",
   TOO_MANY_REQUESTS: "Too many authentication attempts. Please wait and try again.",
   GENERIC: "Unable to complete authentication. Please try again.",
-  WORK_EMAIL_REQUIRED: "Use your authorized work email to access Staffinix.",
+  WORK_EMAIL_REQUIRED: "Use a Gmail address or your authorized work email to access Staffinix.",
 };
 
 /**
@@ -721,7 +721,7 @@ function SignUpForm({ redirect }: { redirect: string }) {
     }
 
     if (!normalizedEmail) {
-      toast.error("Please enter your work email.");
+      toast.error("Please enter your Gmail or work email.");
       return;
     }
 
@@ -842,7 +842,7 @@ function SignUpForm({ redirect }: { redirect: string }) {
 
         <div className="space-y-1.5">
           <Label htmlFor="signup-email" className="text-xs">
-            Work email
+            Gmail or work email
           </Label>
 
           <Input
