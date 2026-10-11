@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireDashboardAccess } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
+  isAiGatewayConfigured,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -545,7 +546,7 @@ export const askCopilot = createServerFn({ method: "POST" })
             };
           } catch {
             guardedRagAvailable = false;
-            if (!process.env.LOVABLE_API_KEY?.trim()) {
+            if (!isAiGatewayConfigured()) {
               guardedResponse = localGroundedAnswer(data.question, snapshot);
             } else {
               const ai = await requestStructuredAiOutput(

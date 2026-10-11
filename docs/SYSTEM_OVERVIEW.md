@@ -1,5 +1,9 @@
 # Staffinix Platform: System Documentation & Presentation Script
 
+> **Reference note:** This is presentation material and includes future-roadmap architecture. For
+> the current implementation, start with [Architecture](ARCHITECTURE.md) and the
+> [engineering documentation index](README.md).
+
 ---
 
 ## Part 1: Comprehensive System Documentation

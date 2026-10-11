@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireEmailIntelligenceAccess } from "@/integrations/supabase/auth-middleware";
 import { serverFunctionAuth } from "@/integrations/supabase/server-function-auth";
 import { ApplicationError } from "@/lib/application-error";
+import { isAiGatewayConfigured } from "@/lib/ai-gateway.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import { GatewayEmailClassifier } from "@/lib/email/classifier.server";
 import { evaluateEmailRule } from "@/lib/email/filter-engine";
@@ -468,7 +469,7 @@ export const testEmailRule = createServerFn({ method: "POST" })
       minimumRelevanceScore: data.rule.minimum_relevance_score,
     };
     const classifier =
-      rule.aiEnabled && process.env.LOVABLE_API_KEY?.trim()
+      rule.aiEnabled && isAiGatewayConfigured()
         ? {
             classify: (message: NormalizedEmail, activeRule: FilterRule) =>
               runWithAiUsageGuard(context.supabase, context.userId, "match_rationale", () =>

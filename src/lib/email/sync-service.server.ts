@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { isAiGatewayConfigured } from "@/lib/ai-gateway.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import { GatewayEmailClassifier } from "./classifier.server";
 import { evaluateEmail } from "./filter-engine";
@@ -68,7 +69,7 @@ function getClassifier(
   userId: string,
   mode: "authenticated" | "worker",
 ): EmailClassifier | undefined {
-  if (!process.env.LOVABLE_API_KEY?.trim()) return undefined;
+  if (!isAiGatewayConfigured()) return undefined;
   const gateway = new GatewayEmailClassifier();
   if (mode === "worker") {
     // Scheduled runs are globally bounded by the task account/message limits.

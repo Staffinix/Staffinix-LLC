@@ -3,7 +3,11 @@ import test from "node:test";
 
 import { z } from "zod";
 
-import { fetchAiGateway, requestStructuredAiOutput } from "./ai-gateway.server.ts";
+import {
+  fetchAiGateway,
+  isAiGatewayConfigured,
+  requestStructuredAiOutput,
+} from "./ai-gateway.server.ts";
 
 const originalFetch = globalThis.fetch;
 const originalApiKey = process.env.LOVABLE_API_KEY;
@@ -18,6 +22,19 @@ test.afterEach(() => {
   else process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
   if (originalOpenRouterUrl === undefined) delete process.env.OPENROUTER_APP_URL;
   else process.env.OPENROUTER_APP_URL = originalOpenRouterUrl;
+});
+
+test("detects either supported AI gateway provider", () => {
+  delete process.env.LOVABLE_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
+  assert.equal(isAiGatewayConfigured(), false);
+
+  process.env.OPENROUTER_API_KEY = "openrouter-test-only";
+  assert.equal(isAiGatewayConfigured(), true);
+
+  delete process.env.OPENROUTER_API_KEY;
+  process.env.LOVABLE_API_KEY = "lovable-test-only";
+  assert.equal(isAiGatewayConfigured(), true);
 });
 
 test("uses OpenRouter server credentials without exposing them in the request body", async () => {

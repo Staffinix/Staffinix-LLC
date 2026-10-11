@@ -6,6 +6,8 @@ Staffinix is a multi-tenant staffing operations platform built with React, TypeS
 Start, and Supabase. Candidate, requirement, client, vendor, submission, and tenant data is
 persistent; production routes do not fall back to fixture or process-memory business data.
 
+Engineering documentation: [docs/README.md](docs/README.md).
+
 ## Runtime architecture
 
 ```text
@@ -42,6 +44,7 @@ from the database on every protected boundary.
 ```text
 src/
   components/                 UI and feature components
+  features/                   feature-owned workflows, domain logic, and tests
   hooks/                      session, tenancy, profile, and UI hooks
   integrations/http/          request-size enforcement
   integrations/supabase/      browser/server clients and auth middleware
@@ -52,6 +55,7 @@ workers/document-processor/   isolated untrusted-document parser and malware sca
 supabase/migrations/          versioned database, RLS, storage, and RPC changes
 supabase/tests/               adversarial database and query-plan tests
 scripts/                      release-time architecture and security guards
+docs/                         architecture, development, database, API, and deployment guides
 ```
 
 ## Production invariants
@@ -90,23 +94,24 @@ scripts/                      release-time architecture and security guards
 
 For the web application:
 
-| Variable                        | Scope         | Purpose                                            |
-| ------------------------------- | ------------- | -------------------------------------------------- |
-| `VITE_SUPABASE_URL`             | Browser       | Supabase project URL                               |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser       | Supabase publishable key; never use a secret key   |
-| `SUPABASE_URL`                  | Server        | Supabase project URL                               |
-| `SUPABASE_PUBLISHABLE_KEY`      | Server        | Publishable key used with the caller's session     |
-| `AUTH_ALLOWED_WORK_EMAIL_DOMAINS` | Server      | Optional comma-separated strict work-domain list   |
-| `AUTH_EMAIL_ALLOWLIST`          | Server        | Optional comma-separated exact email exceptions    |
-| `LOVABLE_API_KEY`               | Server        | AI gateway credential                              |
-| `DOCUMENT_PROCESSOR_URL`        | Server        | Private URL for the document worker                |
-| `DOCUMENT_PROCESSOR_TOKEN`      | Server/worker | Shared secret of at least 32 random characters     |
-| `QDRANT_URL`                    | Server        | Qdrant REST URL; local default only in development |
-| `QDRANT_API_KEY`                | Server        | Optional key for a remote Qdrant deployment        |
-| `QDRANT_COLLECTION`             | Server        | Collection name; defaults to `staffinix_knowledge` |
-| `OLLAMA_URL`                    | Server        | Ollama API URL; local default only in development  |
-| `OLLAMA_EMBED_MODEL`            | Server        | Embedding model; defaults to `embeddinggemma`      |
-| `OLLAMA_CHAT_MODEL`             | Server        | Answer model; defaults to `gemma3:4b`              |
+| Variable                          | Scope         | Purpose                                            |
+| --------------------------------- | ------------- | -------------------------------------------------- |
+| `VITE_SUPABASE_URL`               | Browser       | Supabase project URL                               |
+| `VITE_SUPABASE_PUBLISHABLE_KEY`   | Browser       | Supabase publishable key; never use a secret key   |
+| `SUPABASE_URL`                    | Server        | Supabase project URL                               |
+| `SUPABASE_PUBLISHABLE_KEY`        | Server        | Publishable key used with the caller's session     |
+| `AUTH_ALLOWED_WORK_EMAIL_DOMAINS` | Server        | Optional comma-separated strict work-domain list   |
+| `AUTH_EMAIL_ALLOWLIST`            | Server        | Optional comma-separated exact email exceptions    |
+| `OPENROUTER_API_KEY`              | Server        | Preferred AI gateway credential                    |
+| `LOVABLE_API_KEY`                 | Server        | Optional legacy AI gateway credential              |
+| `DOCUMENT_PROCESSOR_URL`          | Server        | Private URL for the document worker                |
+| `DOCUMENT_PROCESSOR_TOKEN`        | Server/worker | Shared secret of at least 32 random characters     |
+| `QDRANT_URL`                      | Server        | Qdrant REST URL; local default only in development |
+| `QDRANT_API_KEY`                  | Server        | Optional key for a remote Qdrant deployment        |
+| `QDRANT_COLLECTION`               | Server        | Collection name; defaults to `staffinix_knowledge` |
+| `OLLAMA_URL`                      | Server        | Ollama API URL; local default only in development  |
+| `OLLAMA_EMBED_MODEL`              | Server        | Embedding model; defaults to `embeddinggemma`      |
+| `OLLAMA_CHAT_MODEL`               | Server        | Answer model; defaults to `gemma3:4b`              |
 
 Copy `.env.example` to a local ignored environment file and replace placeholders through your
 secret manager. Production Qdrant, Ollama, and document-worker endpoints must use HTTPS; local
@@ -152,7 +157,7 @@ Run the main application checks with:
 ```sh
 npm run lint
 npm run typecheck
-npm run test:unit
+npm test
 npm run security:static
 npm run build
 npm run test:auth

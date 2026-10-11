@@ -16,4 +16,3 @@ test("tenant roles continue to see Talent Operations", () => {
     assert.equal(isNavGroupVisible("Talent Operations", level), true);
   }
 });
-

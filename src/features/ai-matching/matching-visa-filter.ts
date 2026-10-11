@@ -1,4 +1,4 @@
-import { VISA_OPTIONS } from "./candidates-constants.ts";
+import { VISA_OPTIONS } from "../../lib/candidates-constants.ts";
 
 const VISA_ALIASES: Record<string, string> = {
   "GREEN CARD": "GC",

@@ -43,7 +43,7 @@ assert.doesNotMatch(
 const productionFiles = [
   "src/lib/candidates.functions.ts",
   "src/lib/requirements.functions.ts",
-  "src/lib/matching.functions.ts",
+  "src/features/ai-matching/matching.functions.ts",
   "src/lib/tailoring.functions.ts",
   "src/lib/embedding-service.server.ts",
   "src/lib/copilot.functions.ts",

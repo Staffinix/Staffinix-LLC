@@ -31,4 +31,3 @@ export function getRuleFormErrorMessage(error: unknown, fallback: string): strin
 
   return error.message;
 }
-

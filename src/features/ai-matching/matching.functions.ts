@@ -12,7 +12,7 @@ import {
   type MatchEligibility,
   type MatchFactor,
   type MatchLevel,
-} from "@/lib/candidate-match-engine";
+} from "@/features/ai-matching/candidate-match-engine";
 
 const MATCH_RATIONALE_MODEL =
   process.env.OPENROUTER_MATCH_MODEL?.trim() ||

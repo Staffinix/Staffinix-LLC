@@ -6,7 +6,7 @@ const checks = [
   ["src/lib/clients.functions.ts", "listClients", /\.range\(/],
   ["src/lib/clients.functions.ts", "listClientsLite", /\.limit\(200\)/],
   ["src/lib/requirements.functions.ts", "listRequirements", /\.range\(/],
-  ["src/lib/access-requests.functions.ts", "getMyAccessRequest", /\.limit\(100\)/],
+  ["src/lib/access-requests.functions.ts", "getMyAccessRequest", /\.limit\((?:[1-9]\d?|100)\)/],
   ["src/lib/access-requests.functions.ts", "listAccessRequests", /\.limit\(100\)/],
   ["src/lib/users.functions.ts", "listUsers", /\.limit\(100\)/],
   ["src/lib/dashboard.functions.ts", "getRecentActivity", /\.limit\(15\)/],

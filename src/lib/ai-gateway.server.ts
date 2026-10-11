@@ -5,6 +5,10 @@ const OPENROUTER_AI_GATEWAY_ORIGIN = "https://openrouter.ai/api";
 export const AI_REQUEST_TIMEOUT_MS = 25_000;
 const MAX_AI_RESPONSE_BYTES = 512 * 1024;
 
+export function isAiGatewayConfigured(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY?.trim() || process.env.LOVABLE_API_KEY?.trim());
+}
+
 const ChatEnvelopeSchema = z
   .object({
     choices: z

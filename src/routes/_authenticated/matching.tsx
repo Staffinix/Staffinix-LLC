@@ -49,8 +49,11 @@ import {
   generateMatchRationale,
   listMatchingRequirements,
   matchCandidatesForRequirement,
-} from "@/lib/matching.functions";
-import { buildMatchingVisaOptions, matchesSelectedVisas } from "@/lib/matching-visa-filter";
+} from "@/features/ai-matching/matching.functions";
+import {
+  buildMatchingVisaOptions,
+  matchesSelectedVisas,
+} from "@/features/ai-matching/matching-visa-filter";
 
 type MatchingSearch = { reqId?: string; candidateId?: string };
 type Rationale = Awaited<ReturnType<typeof generateMatchRationale>>;

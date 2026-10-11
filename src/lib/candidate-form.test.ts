@@ -77,4 +77,3 @@ test("candidate edit renders as a sibling instead of a hidden detail child", () 
   assert.match(editRoute[0], /getParentRoute: \(\) => AuthenticatedRouteRoute/);
   assert.doesNotMatch(editRoute[0], /getParentRoute: \(\) => AuthenticatedCandidatesIdRoute/);
 });
-
