@@ -49,6 +49,7 @@ import {
   markSubmissionEmailSent,
   deleteSubmission,
   updateSubmission,
+  listApprovedSubmissionResumes,
 } from "@/lib/submissions.functions";
 import { scheduleInterview, updateInterview, deleteInterview } from "@/lib/interviews.functions";
 import { updatePlacement } from "@/lib/placements.functions";
@@ -86,6 +87,21 @@ function SubmissionDetailPage() {
   const emailSentFn = useServerFn(markSubmissionEmailSent);
   const delFn = useServerFn(deleteSubmission);
   const updateFn = useServerFn(updateSubmission);
+  const approvedResumesFn = useServerFn(listApprovedSubmissionResumes);
+  const approvedResumes = useQuery({
+    queryKey: ["submission-approved-resumes", id],
+    queryFn: () => approvedResumesFn({ data: { id } }),
+  });
+  const attachResumeMutation = useMutation({
+    mutationFn: (versionId: string) =>
+      updateFn({ data: { id, values: { resume_version_id: versionId } } }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["submission", id] });
+      await qc.invalidateQueries({ queryKey: ["submissions"] });
+      toast.success("Approved resume attached. You can now update the stage.");
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const scheduleFn = useServerFn(scheduleInterview);
   const updateIntFn = useServerFn(updateInterview);
   const deleteIntFn = useServerFn(deleteInterview);
@@ -159,6 +175,7 @@ function SubmissionDetailPage() {
             </Badge>
             <Select
               value=""
+              disabled={stageMutation.isPending || attachResumeMutation.isPending}
               onValueChange={(v) => stageMutation.mutate({ to_stage: v as SubmissionStage })}
             >
               <SelectTrigger className="w-44">
@@ -190,6 +207,42 @@ function SubmissionDetailPage() {
             Review tailored resume history
           </Link>
         </Button>
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <Label htmlFor="submission-resume">Approved resume for this submission</Label>
+            <Select
+              value={submission.resume_version_id ?? ""}
+              disabled={
+                approvedResumes.isPending ||
+                attachResumeMutation.isPending ||
+                stageMutation.isPending
+              }
+              onValueChange={(versionId) => attachResumeMutation.mutate(versionId)}
+            >
+              <SelectTrigger id="submission-resume">
+                <SelectValue placeholder="Select an approved resume to attach" />
+              </SelectTrigger>
+              <SelectContent>
+                {(approvedResumes.data ?? []).map((version) => (
+                  <SelectItem key={version.id} value={version.id}>
+                    Approved version {version.version_no}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {approvedResumes.isError ? (
+              <p role="alert" className="text-sm text-destructive">
+                Unable to load approved resumes. Refresh to retry.
+              </p>
+            ) : !approvedResumes.isPending && !approvedResumes.data?.length ? (
+              <p className="text-sm text-muted-foreground">
+                No approved resume is available. Use Review tailored resume history above to
+                generate and approve one, then return here to attach it before moving the draft
+                forward.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* LEFT: main content */}

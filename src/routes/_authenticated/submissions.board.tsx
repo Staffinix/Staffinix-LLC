@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -68,7 +68,8 @@ function PipelineTrackerPage() {
       await refresh();
       toast.success("Submission stage updated");
     },
-    onError: () => toast.error("Submission stage could not be updated"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Submission stage could not be updated"),
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteFn({ data: { id } }),
@@ -91,6 +92,10 @@ function PipelineTrackerPage() {
           title="Pipeline Tracker"
           description="Live submission records for the authenticated tenant."
         />
+        <p className="text-sm text-muted-foreground">
+          Before moving a draft forward, approve and attach a tailored resume for its candidate and
+          requisition. Open the submission to review its resume.
+        </p>
 
         <Card className="border-border bg-card">
           <CardContent className="p-0">
@@ -180,6 +185,11 @@ function PipelineTrackerPage() {
                       {row.updated_at ? new Date(row.updated_at).toLocaleString() : "Not recorded"}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/submissions/$id" params={{ id: row.id }}>
+                          Review submission
+                        </Link>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

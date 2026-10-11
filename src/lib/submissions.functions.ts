@@ -4,6 +4,7 @@ import { requireSubmissionsAccess } from "@/integrations/supabase/auth-middlewar
 import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 import { writeAudit } from "./audit.server";
+import { hasValidSubmissionResumeEvidence } from "./submission-resume-evidence";
 
 const STAGES = [
   "draft",
@@ -37,8 +38,7 @@ async function requireApprovedResumeVersion(
   if (!version || version.status !== "approved") {
     throw new Error("An approved tailored resume for this candidate and requirement is required");
   }
-  const validation = version.claim_validation as { valid?: boolean } | null;
-  if (validation?.valid !== true || !version.source_hash) {
+  if (!hasValidSubmissionResumeEvidence(version)) {
     throw new Error("The selected resume version does not have valid source evidence");
   }
   return version;
@@ -286,6 +286,32 @@ export const updateSubmission = createServerFn({ method: "POST" })
   });
 
 // ------- change stage -------
+export const listApprovedSubmissionResumes = createServerFn({ method: "POST" })
+  .middleware([requireSubmissionsAccess])
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: submission, error } = await supabase
+      .from("submissions")
+      .select("candidate_id, requirement_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!submission) throw new Error("Submission not found");
+    const { data: versions, error: versionsError } = await supabase
+      .from("resume_versions")
+      .select("id, version_no, source_hash, claim_validation")
+      .eq("candidate_id", submission.candidate_id)
+      .eq("requirement_id", submission.requirement_id)
+      .eq("status", "approved")
+      .order("version_no", { ascending: false })
+      .limit(100);
+    if (versionsError) throw new Error(versionsError.message);
+    return (versions ?? [])
+      .filter(hasValidSubmissionResumeEvidence)
+      .map(({ id, version_no }) => ({ id, version_no }));
+  });
+
 export const changeSubmissionStage = createServerFn({ method: "POST" })
   .middleware([requireSubmissionsAccess])
   .validator((i: unknown) =>
