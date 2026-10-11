@@ -55,6 +55,17 @@ INSERT INTO public.requirements (id, title, tenant_id, created_by) VALUES (
   'ca100000-0000-0000-0000-000000000001'
 );
 
+-- Submission fixtures include approved evidence; approval checks stay enabled.
+INSERT INTO public.resumes(id,candidate_id,tenant_id,file_path,file_name,uploaded_by)
+SELECT c.id,c.id,c.tenant_id,'inline://' || c.id::text,'fixture.txt',c.created_by
+FROM public.candidates c WHERE c.tenant_id='ca000000-0000-0000-0000-000000000001';
+INSERT INTO public.resume_versions(id,candidate_id,requirement_id,source_resume_id,source_hash,claim_validation,created_by)
+SELECT c.id,c.id,'ca130000-0000-0000-0000-000000000003',c.id,'fixture-hash','{"valid":true}',c.created_by
+FROM public.candidates c WHERE c.tenant_id='ca000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.sub" = 'ca100000-0000-0000-0000-000000000001';
+UPDATE public.resume_versions SET status='approved'
+WHERE requirement_id='ca130000-0000-0000-0000-000000000003';
+
 SELECT has_table(
   'public', 'candidate_assignment_history',
   'candidate assignment history table exists'
@@ -149,7 +160,7 @@ SELECT throws_ok(
 SELECT lives_ok(
   $$INSERT INTO public.submissions (
       id, requirement_id, candidate_id, tenant_id, created_by, stage,
-      submitted_by, submitted_at
+      submitted_by, submitted_at, resume_version_id
     ) VALUES (
       'ca140000-0000-0000-0000-000000000004',
       'ca130000-0000-0000-0000-000000000003',
@@ -158,7 +169,8 @@ SELECT lives_ok(
       'ca200000-0000-0000-0000-000000000002',
       'submitted',
       'ca300000-0000-0000-0000-000000000003',
-      '2000-01-01T00:00:00Z'
+      '2000-01-01T00:00:00Z',
+      'ca110000-0000-0000-0000-000000000001'
     )$$,
   'L4 can submit only a candidate currently assigned to them'
 ); -- 15
@@ -183,14 +195,15 @@ SELECT is(
 );
 SELECT lives_ok(
   $$INSERT INTO public.submissions (
-      id, requirement_id, candidate_id, tenant_id, created_by, stage
+      id, requirement_id, candidate_id, tenant_id, created_by, stage, resume_version_id
     ) VALUES (
       'ca150000-0000-0000-0000-000000000005',
       'ca130000-0000-0000-0000-000000000003',
       'ca120000-0000-0000-0000-000000000002',
       'ca000000-0000-0000-0000-000000000001',
       'ca200000-0000-0000-0000-000000000002',
-      'hired'
+      'hired',
+      'ca120000-0000-0000-0000-000000000002'
     )$$,
   'L4 can create a hired submission for an assigned candidate'
 );

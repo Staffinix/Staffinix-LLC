@@ -50,10 +50,13 @@ SELECT results_eq(
     ORDER BY p.proname
   $$,
   $$ VALUES
+    ('assign_candidates_to_recruiter'::name),
+    ('mark_candidate_placed_from_submission'::name),
     ('match_candidates_for_requirement'::name),
     ('match_requirements_for_candidate'::name),
     ('reserve_ai_usage'::name),
-    ('search_candidates_semantic'::name)
+    ('search_candidates_semantic'::name),
+    ('update_candidate_status'::name)
   $$,
   'authenticated can execute only the reviewed public SECURITY DEFINER RPCs'
 );
@@ -159,7 +162,8 @@ SELECT is(
         'is_l4_recruiter',
         'is_platform_admin',
         'is_platform_owner',
-        'set_user_role'
+        'set_user_role',
+        'review_platform_access_request'
       )
   ),
   0::bigint,

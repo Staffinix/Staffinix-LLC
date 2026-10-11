@@ -37,10 +37,11 @@ INSERT INTO public.user_roles (user_id, role) VALUES
 INSERT INTO public.platform_admins (user_id, role) VALUES
   ('cccccccc-0000-0000-0000-000000000003', 'platform_admin');
 
-INSERT INTO public.platform_access_requests (user_id, user_email, reason) VALUES
+INSERT INTO public.platform_access_requests (user_id, user_email, requested_tier, reason) VALUES
   (
     'cccccccc-0000-0000-0000-000000000003',
     'rls-inactive@example.invalid',
+    'l4_recruiter',
     'Inactive-profile access probe'
   );
 
@@ -67,7 +68,7 @@ INSERT INTO public.resume_versions (candidate_id, version_no, file_path, created
   ('a1000000-0000-0000-0000-000000000001', 1, 'a/v1.pdf', 'aaaaaaaa-0000-0000-0000-000000000001'),
   ('b2000000-0000-0000-0000-000000000002', 1, 'b/v1.pdf', 'bbbbbbbb-0000-0000-0000-000000000002');
 INSERT INTO public.candidate_embeddings (candidate_id, embedding, model) VALUES
-  ('a1000000-0000-0000-0000-000000000001', array_fill(0::real, ARRAY[3072])::vector, 'rls-test'),
+  ('a1000000-0000-0000-0000-000000000001', array_fill(0.5::real, ARRAY[3072])::vector, 'rls-test'),
   ('b2000000-0000-0000-0000-000000000002', array_fill(1::real, ARRAY[3072])::vector, 'rls-test');
 
 SET LOCAL ROLE authenticated;
@@ -93,7 +94,7 @@ SELECT results_eq($$SELECT count(*) FROM public.resume_versions WHERE candidate_
 SELECT results_eq($$SELECT count(*) FROM public.candidate_embeddings WHERE candidate_id='b2000000-0000-0000-0000-000000000002'$$, ARRAY[0::bigint], 'A1 cannot read tenant B embeddings');
 SELECT results_eq($$UPDATE public.candidates SET summary='A1 allowed' WHERE id='a1000000-0000-0000-0000-000000000001' RETURNING 1$$, ARRAY[1], 'A1 can update its tenant A candidate');
 SELECT results_eq($$UPDATE public.candidates SET summary='hacked' WHERE id='b2000000-0000-0000-0000-000000000002' RETURNING 1$$, $$SELECT 1 WHERE false$$, 'cross-tenant candidate update is a no-op');
-SELECT throws_ok($$UPDATE public.candidates SET tenant_id='20000000-0000-0000-0000-000000000002' WHERE id='a1000000-0000-0000-0000-000000000001'$$, 'P0001', 'Changing tenant ownership is not permitted', 'A1 cannot mutate candidate ownership to tenant B');
+SELECT throws_ok($$UPDATE public.candidates SET tenant_id='20000000-0000-0000-0000-000000000002' WHERE id='a1000000-0000-0000-0000-000000000001'$$, '42501', 'permission denied for table candidates', 'A1 cannot mutate candidate ownership to tenant B');
 SELECT results_eq($$DELETE FROM public.candidate_skills WHERE candidate_id='b2000000-0000-0000-0000-000000000002' RETURNING 1$$, $$SELECT 1 WHERE false$$, 'cross-tenant child delete is a no-op');
 SELECT throws_ok($$INSERT INTO public.candidates (first_name,last_name,tenant_id,created_by) VALUES ('Forged','Tenant','20000000-0000-0000-0000-000000000002','aaaaaaaa-0000-0000-0000-000000000001')$$, '42501', 'Invalid tenant ownership', 'tenant A cannot insert a tenant B candidate');
 SELECT throws_ok($$INSERT INTO public.candidate_skills (candidate_id,skill) VALUES ('b2000000-0000-0000-0000-000000000002','forged')$$, '42501', 'new row violates row-level security policy for table "candidate_skills"', 'tenant A cannot insert a child under tenant B candidate');
@@ -104,19 +105,22 @@ SELECT throws_ok($$INSERT INTO public.candidate_certifications (candidate_id,nam
 SELECT throws_ok($$INSERT INTO public.resume_versions (candidate_id,version_no,file_path,created_by) VALUES ('b2000000-0000-0000-0000-000000000002',99,'forged.pdf','aaaaaaaa-0000-0000-0000-000000000001')$$, '42501', 'new row violates row-level security policy for table "resume_versions"', 'tenant A cannot insert resume version under tenant B candidate');
 SELECT throws_ok($$INSERT INTO public.candidate_embeddings (candidate_id,embedding,model) VALUES ('b2000000-0000-0000-0000-000000000003',array_fill(2::real, ARRAY[3072])::vector,'forged')$$, '42501', 'permission denied for table candidate_embeddings', 'tenant A cannot insert embedding under tenant B candidate');
 SELECT throws_ok($$INSERT INTO public.resumes (candidate_id,tenant_id,file_path,file_name,uploaded_by) VALUES ('b2000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','forged','forged.pdf','aaaaaaaa-0000-0000-0000-000000000001')$$, '42501', 'Resume storage path was not issued by the server', 'tenant A cannot forge resume parent ownership');
-SELECT results_eq($$SELECT count(*) FROM public.search_candidates_semantic(array_fill(0::real, ARRAY[3072])::vector, 50)$$, ARRAY[1::bigint], 'semantic candidate search cannot leak tenant B');
+SELECT results_eq($$SELECT count(*) FROM public.search_candidates_semantic(array_fill(0.5::real, ARRAY[3072])::vector, 50)$$, ARRAY[1::bigint], 'semantic candidate search cannot leak tenant B');
 SELECT results_eq($$SELECT count(*) FROM public.match_requirements_for_candidate('b2000000-0000-0000-0000-000000000002', 50)$$, ARRAY[0::bigint], 'candidate-to-requirement RPC rejects a foreign candidate');
-SELECT throws_ok(
-  $$INSERT INTO public.platform_access_requests (user_id, tenant_id, reason) VALUES ('aaaaaaaa-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000002', 'forged tenant')$$,
-  '42501',
-  'new row violates row-level security policy for table "platform_access_requests"',
-  'tenant A cannot forge tenant B on a platform access request'
+SELECT results_eq(
+  $$INSERT INTO public.platform_access_requests (user_id, tenant_id, requested_tier, reason)
+    VALUES ('aaaaaaaa-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000002','l4_recruiter','forged tenant') RETURNING tenant_id$$,
+  ARRAY['10000000-0000-0000-0000-000000000001'::uuid],
+  'forged access-request tenant is rebound to the authenticated tenant'
 );
-SELECT throws_ok(
-  $$INSERT INTO public.platform_access_requests (user_id, tenant_id, status, reason) VALUES ('aaaaaaaa-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'approved', 'self approved')$$,
-  '42501',
-  'new row violates row-level security policy for table "platform_access_requests"',
-  'a caller cannot create a pre-approved platform access request'
+RESET ROLE;
+DELETE FROM public.platform_access_requests WHERE user_id='aaaaaaaa-0000-0000-0000-000000000001';
+SET LOCAL ROLE authenticated;
+SELECT results_eq(
+  $$INSERT INTO public.platform_access_requests (user_id, tenant_id, requested_tier, status, reason)
+    VALUES ('aaaaaaaa-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','l4_recruiter','approved','self approved') RETURNING status::text$$,
+  ARRAY['pending'::text],
+  'client-supplied approval is reset to pending'
 );
 
 SET LOCAL "request.jwt.claim.sub" = 'bbbbbbbb-0000-0000-0000-000000000002';
@@ -162,7 +166,7 @@ SELECT is((SELECT private.has_role('admin'::public.app_role)), false, 'inactive 
 SELECT throws_ok(
   $$INSERT INTO public.platform_access_requests (user_id, reason, status) VALUES ('cccccccc-0000-0000-0000-000000000003', 'forged', 'denied')$$,
   '42501',
-  'new row violates row-level security policy for table "platform_access_requests"',
+  'Active authentication is required',
   'inactive user cannot create a platform access request directly'
 );
 

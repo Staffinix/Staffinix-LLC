@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(8);
+SELECT plan(9);
 
 SELECT has_column('public', 'candidates', 'marketing_types', 'candidate marketing types are persisted');
 
@@ -40,6 +40,8 @@ SELECT is(
   ARRAY['C2C', 'W2']::text[],
   'multiple marketing types are stored without flattening'
 );
+
+UPDATE public.candidates SET assigned_to = created_by;
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claim.role" = 'authenticated';

@@ -63,6 +63,7 @@ INSERT INTO created_candidate_ids (id)
 SELECT candidate_id
 FROM public.create_candidate_graph(
   '{
+    "assigned_to": "3a000000-0000-0000-0000-000000000001",
     "first_name": "Atomic",
     "last_name": "Candidate",
     "email": "atomic@example.invalid",
@@ -149,7 +150,7 @@ SELECT is(
 SELECT throws_ok(
   $$
     SELECT * FROM public.create_candidate_graph(
-      '{"first_name":"Must","last_name":"Rollback"}'::jsonb,
+      '{"first_name":"Must","last_name":"Rollback","assigned_to":"3a000000-0000-0000-0000-000000000001"}'::jsonb,
       '[{"skill":"Duplicate"},{"skill":"Duplicate"}]'::jsonb
     )
   $$,
