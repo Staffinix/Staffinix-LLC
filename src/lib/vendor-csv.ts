@@ -163,7 +163,12 @@ export function parseVendorCsv(csv: string): VendorCsvRow[] {
 }
 
 const escapeCell = (value: unknown) => {
-  const text = value == null ? "" : String(value);
+  let text = value == null ? "" : String(value);
+  // CSV quoting does not stop spreadsheet formula execution. Preserve numeric
+  // values and phone numbers, but render executable cell prefixes as text.
+  if (/^\s*[=+@-]/u.test(text) && !/^[+-]?\d[\d\s().-]*$/u.test(text)) {
+    text = `'${text}`;
+  }
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 

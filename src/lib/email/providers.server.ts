@@ -411,14 +411,15 @@ export async function fetchProviderMessages(
   accountId: string,
   accessToken: string,
   since?: string | null,
-): Promise<NormalizedEmail[]> {
+  cursor?: string | null,
+): Promise<{ messages: NormalizedEmail[]; nextCursor: string | null }> {
   if (provider === "gmail") {
     const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
     listUrl.searchParams.set("maxResults", "50");
     if (since)
       listUrl.searchParams.set("q", `after:${Math.floor(new Date(since).getTime() / 1000)}`);
     const messageIds: string[] = [];
-    let pageToken: string | undefined;
+    let pageToken: string | undefined = cursor ?? undefined;
     for (let page = 0; page < MAX_PROVIDER_PAGES; page += 1) {
       if (pageToken) listUrl.searchParams.set("pageToken", pageToken);
       const list = z
@@ -452,7 +453,7 @@ export async function fetchProviderMessages(
         )),
       );
     }
-    return output;
+    return { messages: output, nextCursor: pageToken ?? null };
   }
 
   const initialUrl = new URL("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages");
@@ -465,7 +466,15 @@ export async function fetchProviderMessages(
   if (since)
     initialUrl.searchParams.set("$filter", `receivedDateTime gt ${new Date(since).toISOString()}`);
   const output: NormalizedEmail[] = [];
-  let pageUrl: URL | null = initialUrl;
+  let pageUrl: URL | null = cursor ? new URL(cursor) : initialUrl;
+  if (
+    pageUrl.protocol !== "https:" ||
+    pageUrl.hostname !== "graph.microsoft.com" ||
+    !pageUrl.pathname.startsWith("/v1.0/me/") ||
+    pageUrl.username ||
+    pageUrl.password
+  )
+    throw new Error("Email provider returned an invalid pagination URL");
   for (let page = 0; page < MAX_PROVIDER_PAGES && pageUrl; page += 1) {
     const list = z
       .object({
@@ -495,10 +504,12 @@ export async function fetchProviderMessages(
         attachments = response.value;
       }
       output.push(normalizeMicrosoftMessage({ ...base, attachments }, accountId));
-      if (output.length >= MAX_MESSAGES_PER_SYNC) return output;
     }
     const nextLink = list["@odata.nextLink"];
-    if (!nextLink) break;
+    if (!nextLink) {
+      pageUrl = null;
+      break;
+    }
     const nextUrl = new URL(nextLink);
     if (
       nextUrl.protocol !== "https:" ||
@@ -508,6 +519,7 @@ export async function fetchProviderMessages(
       throw new Error("Email provider returned an invalid pagination URL");
     }
     pageUrl = nextUrl;
+    if (output.length >= MAX_MESSAGES_PER_SYNC) break;
   }
-  return output;
+  return { messages: output, nextCursor: pageUrl?.toString() ?? null };
 }

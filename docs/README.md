@@ -16,6 +16,7 @@ Use this index as the starting point for the codebase.
 - [Project context](PROJECT_CONTEXT.md) — verified handover context and non-negotiable constraints
 - [Development status](DEVELOPMENT_STATUS.md) — latest validation evidence, blockers, and runtime gaps
 - [Next steps](NEXT_STEPS.md) — prioritized continuation work and acceptance criteria
+- [Issue register](ISSUE_REGISTER.md) — audit evidence, local fixes, and unresolved defects
 
 The source code, migrations, and tests are authoritative. Presentation material may describe
 future work and is labeled accordingly.

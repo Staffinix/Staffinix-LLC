@@ -1,10 +1,74 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  fetchProviderMessages,
   getProviderConfigurationStatus,
   normalizeGmailMessage,
   normalizeMicrosoftMessage,
 } from "./providers.server.ts";
+
+test("Gmail returns a continuation token and resumes beyond the page limit", async () => {
+  const originalFetch = globalThis.fetch;
+  const seenTokens: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    const token = url.searchParams.get("pageToken") ?? "page-1";
+    seenTokens.push(token);
+    const page = Number(token.split("-")[1]);
+    return Response.json({
+      messages: [],
+      ...(page < 3 ? { nextPageToken: `page-${page + 1}` } : {}),
+    });
+  };
+  try {
+    const batch = await fetchProviderMessages(
+      "gmail",
+      "account",
+      "test-only",
+      "2026-01-01T00:00:00Z",
+    );
+    assert.equal(batch.nextCursor, "page-3");
+    const finalBatch = await fetchProviderMessages(
+      "gmail",
+      "account",
+      "test-only",
+      "2026-01-01T00:00:00Z",
+      batch.nextCursor,
+    );
+    assert.equal(finalBatch.nextCursor, null);
+    assert.deepEqual(seenTokens, ["page-1", "page-2", "page-3"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Outlook returns continuation and rejects untrusted resume URLs before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  const nextLink = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$skip=100";
+  globalThis.fetch = async () => {
+    calls += 1;
+    return Response.json({ value: [], "@odata.nextLink": nextLink });
+  };
+  try {
+    const batch = await fetchProviderMessages("microsoft", "account", "test-only");
+    assert.equal(batch.nextCursor, nextLink);
+    assert.equal(calls, 2);
+    await assert.rejects(
+      fetchProviderMessages(
+        "microsoft",
+        "account",
+        "test-only",
+        null,
+        "https://attacker.example/v1.0/me/messages",
+      ),
+      /invalid pagination URL/,
+    );
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("reports provider OAuth readiness without exposing credential values", () => {
   assert.deepEqual(getProviderConfigurationStatus("gmail", {}), {

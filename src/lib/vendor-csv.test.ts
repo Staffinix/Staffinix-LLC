@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createVendorCsv, parseVendorCsv } from "./vendor-csv.ts";
 
+test("vendor CSV neutralizes spreadsheet formulas, including leading whitespace", () => {
+  for (const value of ["=1+1", "+1+1", "-1+1", "@SUM(1)", "  =1+1", "\t=1+1"]) {
+    const csv = createVendorCsv([{ name: value }]);
+    assert.ok(csv.split("\r\n")[1].startsWith("'"), value);
+  }
+});
+
 test("vendor CSV round-trips the requested contact fields", () => {
   const csv = createVendorCsv([
     {

@@ -462,99 +462,6 @@ type CandidateSupabase = import("@supabase/supabase-js").SupabaseClient<
   import("@/integrations/supabase/types").Database
 >;
 
-async function deleteCandidateChildRows(
-  supabase: CandidateSupabase,
-  table:
-    | "candidate_skills"
-    | "candidate_employment"
-    | "candidate_education"
-    | "candidate_projects"
-    | "candidate_certifications",
-  candidateId: string,
-) {
-  const { error } = await supabase.from(table).delete().eq("candidate_id", candidateId);
-  if (error) throw new Error(`Failed to replace candidate ${table}: ${error.message}`);
-}
-
-async function replaceCandidateSkills(
-  supabase: CandidateSupabase,
-  candidateId: string,
-  skills: CandidateInput["skills"],
-) {
-  await deleteCandidateChildRows(supabase, "candidate_skills", candidateId);
-  if (!skills.length) return;
-  const { error } = await supabase.from("candidate_skills").insert(
-    skills.map((skill) => ({
-      ...skill,
-      candidate_id: candidateId,
-      years: skill.years ?? null,
-    })),
-  );
-  if (error) throw new Error(`Failed to save candidate skills: ${error.message}`);
-}
-
-async function replaceCandidateEmployment(
-  supabase: CandidateSupabase,
-  candidateId: string,
-  employment: CandidateInput["employment"],
-) {
-  await deleteCandidateChildRows(supabase, "candidate_employment", candidateId);
-  if (!employment.length) return;
-  const { error } = await supabase.from("candidate_employment").insert(
-    employment.map((job) => ({
-      ...job,
-      candidate_id: candidateId,
-      start_date: job.start_date || null,
-      end_date: job.end_date || null,
-    })),
-  );
-  if (error) throw new Error(`Failed to save candidate employment: ${error.message}`);
-}
-
-async function replaceCandidateEducation(
-  supabase: CandidateSupabase,
-  candidateId: string,
-  education: CandidateInput["education"],
-) {
-  await deleteCandidateChildRows(supabase, "candidate_education", candidateId);
-  if (!education.length) return;
-  const { error } = await supabase
-    .from("candidate_education")
-    .insert(education.map((item) => ({ ...item, candidate_id: candidateId })));
-  if (error) throw new Error(`Failed to save candidate education: ${error.message}`);
-}
-
-async function replaceCandidateProjects(
-  supabase: CandidateSupabase,
-  candidateId: string,
-  projects: CandidateInput["projects"],
-) {
-  await deleteCandidateChildRows(supabase, "candidate_projects", candidateId);
-  if (!projects.length) return;
-  const { error } = await supabase
-    .from("candidate_projects")
-    .insert(projects.map((project) => ({ ...project, candidate_id: candidateId })));
-  if (error) throw new Error(`Failed to save candidate projects: ${error.message}`);
-}
-
-async function replaceCandidateCertifications(
-  supabase: CandidateSupabase,
-  candidateId: string,
-  certifications: CandidateInput["certifications"],
-) {
-  await deleteCandidateChildRows(supabase, "candidate_certifications", candidateId);
-  if (!certifications.length) return;
-  const { error } = await supabase.from("candidate_certifications").insert(
-    certifications.map((certification) => ({
-      ...certification,
-      candidate_id: candidateId,
-      issued_date: certification.issued_date || null,
-      expires_date: certification.expires_date || null,
-    })),
-  );
-  if (error) throw new Error(`Failed to save candidate certifications: ${error.message}`);
-}
-
 type CandidateResumeInsert = {
   file_name: string;
   mime_type: string | null;
@@ -651,66 +558,20 @@ export const updateCandidate = createServerFn({ method: "POST" })
 
     const { id, skills, employment, education, projects, certifications, ...fields } = data;
 
-    /*
-     * Do not add tenant_id from the request here.
-     * RLS must decide whether the authenticated user can update this row.
-     */
-    const patch = fields;
-
+    const collections = { skills, employment, education, projects, certifications };
+    const childFieldsChanged = providedCandidateChildKeys(collections);
+    const children = Object.fromEntries(childFieldsChanged.map((key) => [key, collections[key]]));
     const { data: updated, error } = await supabase
-      .from("candidates")
-      .update(patch)
-      .eq("id", id)
-      .select("id")
+      .rpc("update_candidate_graph", {
+        _candidate_id: id,
+        _candidate: fields as unknown as Json,
+        _children: children as unknown as Json,
+      })
       .maybeSingle();
+    if (error) throw new Error(`Failed to update candidate: ${error.message}`);
+    if (!updated) throw new Error("Candidate not found or access denied");
 
-    if (error) {
-      throw new Error(`Failed to update candidate: ${error.message}`);
-    }
-
-    /*
-     * With RLS, a candidate from another tenant is invisible to UPDATE.
-     * Therefore an empty result is treated as not found/unauthorized.
-     */
-    if (!updated) {
-      throw new Error("Candidate not found or access denied");
-    }
-
-    const childFieldsChanged = providedCandidateChildKeys({
-      skills,
-      employment,
-      education,
-      projects,
-      certifications,
-    });
-    const hasChildChanges = childFieldsChanged.length > 0;
-
-    if (hasChildChanges) {
-      /*
-       * Omitted collections are not touched. An explicit [] is the only way
-       * to clear a collection. Each helper deletes and replaces one table,
-       * and child-table RLS independently validates candidate ownership.
-       */
-      for (const childField of childFieldsChanged) {
-        switch (childField) {
-          case "skills":
-            await replaceCandidateSkills(supabase, id, skills!);
-            break;
-          case "employment":
-            await replaceCandidateEmployment(supabase, id, employment!);
-            break;
-          case "education":
-            await replaceCandidateEducation(supabase, id, education!);
-            break;
-          case "projects":
-            await replaceCandidateProjects(supabase, id, projects!);
-            break;
-          case "certifications":
-            await replaceCandidateCertifications(supabase, id, certifications!);
-            break;
-        }
-      }
-
+    if (childFieldsChanged.length > 0) {
       await refreshCandidateEmbeddingBestEffort(async () => {
         const { refreshCandidateEmbedding } = await import("@/lib/embedding-service.server");
         await refreshCandidateEmbedding(supabase, id);

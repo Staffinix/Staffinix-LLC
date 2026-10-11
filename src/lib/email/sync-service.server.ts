@@ -7,6 +7,7 @@ import { evaluateEmail } from "./filter-engine";
 import { fetchProviderMessages, refreshProviderToken } from "./providers.server";
 import { decryptEmailToken, encryptEmailToken, sha256Base64Url } from "./token-crypto.server";
 import type { EmailClassifier, EmailProvider, FilterRule } from "./types";
+import { parseEmailSyncCursor } from "./sync-cursor";
 
 type EmailClient = SupabaseClient<Database>;
 type RuleRow = Database["public"]["Tables"]["email_filter_rules"]["Row"];
@@ -110,7 +111,7 @@ export async function synchronizeEmailAccount(options: {
   const { data: account, error: accountError } = await supabase
     .from("email_accounts")
     .select(
-      "id, provider, encrypted_access_token, encrypted_refresh_token, token_expires_at, last_sync_at, status",
+      "id, provider, encrypted_access_token, encrypted_refresh_token, token_expires_at, last_sync_at, sync_cursor, status",
     )
     .eq("id", accountId)
     .eq("user_id", userId)
@@ -188,12 +189,15 @@ export async function synchronizeEmailAccount(options: {
     const rules = (ruleRows ?? []).map(toFilterRule);
     // Capture the watermark before reading the provider. Messages arriving during the
     // request are included by the overlap on the next incremental run instead of skipped.
-    const syncWatermark = new Date().toISOString();
-    const messages = await fetchProviderMessages(
+    const continuation = fullRescan ? null : parseEmailSyncCursor(account.sync_cursor, provider);
+    const syncWatermark = continuation?.watermark ?? new Date().toISOString();
+    const since = continuation?.since ?? getEmailSyncSince(account.last_sync_at, fullRescan);
+    const { messages, nextCursor } = await fetchProviderMessages(
       provider,
       account.id,
       accessToken,
-      getEmailSyncSince(account.last_sync_at, fullRescan),
+      since,
+      continuation?.nextCursor,
     );
     const classifier = getClassifier(supabase, userId, mode);
     let selected = 0;
@@ -280,7 +284,14 @@ export async function synchronizeEmailAccount(options: {
     const [accountWrite, jobWrite] = await Promise.all([
       supabase
         .from("email_accounts")
-        .update({ last_sync_at: syncWatermark, status: "connected", last_sync_error_code: null })
+        .update({
+          last_sync_at: nextCursor ? account.last_sync_at : syncWatermark,
+          sync_cursor: nextCursor
+            ? JSON.stringify({ provider, since, watermark: syncWatermark, nextCursor })
+            : null,
+          status: "connected",
+          last_sync_error_code: null,
+        })
         .eq("id", account.id)
         .eq("user_id", userId),
       supabase

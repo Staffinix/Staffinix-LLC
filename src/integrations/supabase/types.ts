@@ -2266,6 +2266,10 @@ export type Database = {
         Args: { _job_id: string };
         Returns: undefined;
       };
+      update_candidate_graph: {
+        Args: { _candidate_id: string; _candidate: Json; _children?: Json };
+        Returns: { candidate_id: string }[];
+      };
       create_candidate_graph: {
         Args: {
           _candidate: Json;

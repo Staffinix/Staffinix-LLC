@@ -1,5 +1,25 @@
 # Development status
 
+## Latest audit follow-up
+
+The 2026-10-11 audit made local fixes for exact-subject email filtering, spreadsheet-safe vendor
+CSV exports, bounded email sync continuation, and inclusion of candidate-search regression tests.
+The issue register records reproduction cases and limitations. These changes are not committed
+or deployed. A candidate child-update atomicity defect remains open (AUD-005); Docker's Linux
+daemon is unavailable, preventing local Supabase database validation.
+
+Executed after the local fixes: `npm run lint`, `npm run typecheck`, `npm test`,
+`npm run security:static`, `npm run build`, `npm run security:auth-bypass-bundle`,
+`npm run security:service-role-bundle`, and `npm run test:candidate-search` all passed.
+`npm run audit:dependencies` passed with its documented moderate advisory exception chain.
+`git diff --check` passed. The two targeted exact-subject/CSV regression tests were observed
+failing before their fixes, then passing afterward.
+
+GitHub main was subsequently verified at `e666479`. The user supplied Vercel CLI output showing
+`staffinixllc/staffinix-llc` deployed Ready at `https://staffinix-llc.vercel.app`. This is supplied
+deployment evidence, not independent browser verification. Earlier access blockers below describe
+the previous audit state and should not be used as the current release status.
+
 ## Last verified state
 
 Audit performed on 2026-10-11 against `chore/codebase-organization` at commit `5067367`.

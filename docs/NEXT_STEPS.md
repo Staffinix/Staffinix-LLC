@@ -2,6 +2,13 @@
 
 This is an ordered continuation list based on the verified repository state on 2026-10-11.
 
+Latest update: GitHub publication completed and the user supplied a successful Vercel deployment.
+The release-access task below is historical. The next engineering priority is AUD-005 in
+`ISSUE_REGISTER.md`: transactional candidate parent/child updates, tested with rollback and
+tenant-isolation cases on a local Supabase stack. Start Docker Desktop's Linux engine to enable
+that validation. Then verify the locally fixed email continuation with a test mailbox exceeding
+100 messages and the existing `sync_cursor` field; do not use production data for failure tests.
+
 | Priority | Task | Business reason | Relevant areas | Status / dependency | Acceptance criteria and validation |
 | --- | --- | --- | --- | --- | --- |
 | P0 | Restore Staffinix GitHub and Vercel release access | The verified release cannot reach users while GitHub push and Vercel deployment permissions are denied. | Git remote `origin`, Vercel project `staffinix/my-version` | Blocked on Staffinix account administrator. | Push succeeds without force; Vercel production deployment reaches Ready; production smoke test completes. |

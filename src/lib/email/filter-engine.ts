@@ -65,7 +65,7 @@ export async function evaluateEmailRule(
   const subjectCheck =
     !hasSubjectCriteria ||
     (Boolean(rule.subjectExact?.trim()) && subject === rule.subjectExact?.trim().toLowerCase()) ||
-    includesAny(subject, subjectKeywords);
+    (subjectKeywords.length > 0 && includesAny(subject, subjectKeywords));
   const keywordCheck =
     includesAny(body, bodyKeywords) &&
     includesAll(searchable, requiredKeywords) &&

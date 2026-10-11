@@ -32,6 +32,18 @@ const rule: FilterRule = {
   minimumRelevanceScore: 0.7,
 };
 
+test("exact subject alone rejects unrelated messages and normalizes case", async () => {
+  const exactRule = { ...rule, subjectExact: "New developer application", subjectKeywords: [] };
+  const unrelated = await evaluateEmailRule({ ...email, subject: "Newsletter" }, exactRule);
+  assert.equal(unrelated.relevant, false);
+  assert.equal(unrelated.checks.subject, false);
+  const matching = await evaluateEmailRule(
+    { ...email, subject: "  NEW DEVELOPER APPLICATION  " },
+    exactRule,
+  );
+  assert.equal(matching.relevant, true);
+});
+
 test("matches sender domain, subject, keywords, and attachment metadata", async () => {
   const result = await evaluateEmailRule(email, rule);
   assert.equal(result.relevant, true);
