@@ -306,8 +306,26 @@ def test_generated_questions_require_company_approval(client, monkeypatch):
     assert deselected.json()["approved"] is False
     approved = client.post(f"/api/v1/questions/{question['id']}/approve", headers=headers)
     assert approved.status_code == 200
+    bulk_deselected = client.post(
+        f"/api/v1/interviews/{interview.json()['id']}/questions/approval",
+        json={"approved": False},
+        headers=headers,
+    )
+    assert bulk_deselected.status_code == 200
+    assert bulk_deselected.json() == {"approved": False, "count": 1}
+    bulk_approved = client.post(
+        f"/api/v1/interviews/{interview.json()['id']}/questions/approval",
+        json={"approved": True},
+        headers=headers,
+    )
+    assert bulk_approved.status_code == 200
     assert client.post(f"/api/v1/interviews/{interview.json()['id']}/publish", headers=headers).status_code == 200
     assert client.post(f"/api/v1/questions/{question['id']}/deselect", headers=headers).status_code == 409
+    assert client.post(
+        f"/api/v1/interviews/{interview.json()['id']}/questions/approval",
+        json={"approved": False},
+        headers=headers,
+    ).status_code == 409
     templates = client.get(f"/api/v1/interviews?job_id={job['id']}", headers=headers)
     assert interview.json()["id"] in {item["id"] for item in templates.json()}
     questions = client.get(f"/api/v1/interviews/{interview.json()['id']}/questions", headers=headers)

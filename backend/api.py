@@ -36,6 +36,7 @@ from backend.schemas import (
     InvitationRead,
     JobCreate,
     JobRead,
+    QuestionBulkApprovalRequest,
     QuestionCreate,
     QuestionGenerationRequest,
     QuestionImportRequest,
@@ -317,6 +318,24 @@ def deselect_question(
     audit(db, context.company_id, context.principal.user_id, "question.deselect", question)
     db.commit()
     return {"id": question.id, "approved": False}
+
+
+@router.post("/interviews/{template_id}/questions/approval")
+def set_all_question_approvals(
+    template_id: str,
+    body: QuestionBulkApprovalRequest,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    template = tenant_template(db, template_id, context.company_id, lock=True)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    for question in template.questions:
+        if question.approved != body.approved:
+            question.approved = body.approved
+            audit(db, context.company_id, context.principal.user_id, "question.approval.bulk", question)
+    db.commit()
+    return {"approved": body.approved, "count": len(template.questions)}
 
 
 @router.post("/interviews/{template_id}/publish", response_model=TemplateRead)

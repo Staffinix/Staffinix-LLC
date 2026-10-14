@@ -64,6 +64,10 @@ class QuestionGenerationRequest(StrictModel):
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
 
 
+class QuestionBulkApprovalRequest(StrictModel):
+    approved: bool
+
+
 class QuestionImportRequest(StrictModel):
     questions: list[str] = Field(min_length=1, max_length=200)
     time_limit_seconds: int = Field(default=180, ge=30, le=3600)
