@@ -33,6 +33,8 @@ from backend.schemas import (
     CompanyRead,
     InvitationAccept,
     InvitationCreate,
+    InvitationExpiryRead,
+    InvitationExpiryUpdate,
     InvitationRead,
     JobCreate,
     JobRead,
@@ -371,7 +373,7 @@ def create_invitation(body: InvitationCreate, context: CompanyContext = Depends(
         candidate_id=candidate.id,
         job_id=body.job_id,
         template_id=body.template_id,
-        expires_at=now() + timedelta(hours=get_settings().invitation_ttl_hours),
+        expires_at=body.expires_at or now() + timedelta(hours=get_settings().invitation_ttl_hours),
     )
     db.add(invitation)
     db.flush()
@@ -418,6 +420,28 @@ def create_invitation(body: InvitationCreate, context: CompanyContext = Depends(
         delivery_status=notification.status,
         token=raw_token if console else None,
     )
+
+
+@router.patch("/invitations/{invitation_id}", response_model=InvitationExpiryRead)
+def update_invitation_expiry(
+    invitation_id: str,
+    body: InvitationExpiryUpdate,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    invitation = db.scalar(
+        select(Invitation)
+        .where(Invitation.id == invitation_id, Invitation.company_id == context.company_id)
+        .with_for_update()
+    )
+    if invitation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Invitation not found")
+    if invitation.accepted_at or invitation.revoked_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Invitation is no longer editable")
+    invitation.expires_at = body.expires_at
+    audit(db, context.company_id, context.principal.user_id, "invitation.expiry.update", invitation)
+    db.commit()
+    return InvitationExpiryRead(id=invitation.id, expires_at=invitation.expires_at)
 
 
 @router.post("/invitations/accept", response_model=AssignmentRead)

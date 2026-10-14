@@ -124,11 +124,29 @@ def test_company_isolation_hides_other_tenant_jobs(client):
 
 def test_invitation_is_email_bound_and_single_use(client):
     headers, _, job, interview = bootstrap(client, "admin", "admin@example.com", "Acme")
-    invitation = client.post(
+    requested_expiry = (datetime.now(timezone.utc) + timedelta(days=4)).replace(microsecond=0)
+    invitation_response = client.post(
         "/api/v1/invitations",
-        json={"email": "right@example.com", "job_id": job["id"], "template_id": interview["id"]},
+        json={"email": "right@example.com", "job_id": job["id"], "template_id": interview["id"], "expires_at": requested_expiry.isoformat()},
         headers=headers,
-    ).json()
+    )
+    assert invitation_response.status_code == 201, invitation_response.text
+    invitation = invitation_response.json()
+    assert datetime.fromisoformat(invitation["expires_at"]) == requested_expiry
+    updated_expiry = (requested_expiry + timedelta(days=2)).isoformat()
+    updated = client.patch(
+        f"/api/v1/invitations/{invitation['id']}",
+        json={"expires_at": updated_expiry},
+        headers=headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert datetime.fromisoformat(updated.json()["expires_at"]) == datetime.fromisoformat(updated_expiry)
+    other_headers, _, _, _ = bootstrap(client, "other-admin", "other@example.com", "Other")
+    assert client.patch(
+        f"/api/v1/invitations/{invitation['id']}",
+        json={"expires_at": updated_expiry},
+        headers=other_headers,
+    ).status_code == 404
     wrong = client.post(
         "/api/v1/invitations/accept",
         json={"token": invitation["token"]},
@@ -141,6 +159,11 @@ def test_invitation_is_email_bound_and_single_use(client):
         headers=auth("candidate-right", "right@example.com"),
     )
     assert first.status_code == 200
+    assert client.patch(
+        f"/api/v1/invitations/{invitation['id']}",
+        json={"expires_at": updated_expiry},
+        headers=headers,
+    ).status_code == 409
     reused = client.post(
         "/api/v1/invitations/accept",
         json={"token": invitation["token"]},

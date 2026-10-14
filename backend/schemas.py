@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -10,6 +10,17 @@ class StrictModel(BaseModel):
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+
+def validate_invitation_expiry(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("expires_at must include a timezone")
+    current = datetime.now(timezone.utc)
+    if value <= current:
+        raise ValueError("expires_at must be in the future")
+    if value > current + timedelta(days=365):
+        raise ValueError("expires_at must be within one year")
+    return value
 
 
 class CompanyCreate(StrictModel):
@@ -126,6 +137,12 @@ class InvitationCreate(StrictModel):
     name: str | None = Field(default=None, max_length=160)
     job_id: str
     template_id: str
+    expires_at: datetime | None = None
+
+    @field_validator("expires_at")
+    @classmethod
+    def valid_expiry(cls, value: datetime | None) -> datetime | None:
+        return validate_invitation_expiry(value) if value else None
 
 
 class InvitationRead(BaseModel):
@@ -133,6 +150,20 @@ class InvitationRead(BaseModel):
     expires_at: datetime
     delivery_status: str
     token: str | None = None
+
+
+class InvitationExpiryUpdate(StrictModel):
+    expires_at: datetime
+
+    @field_validator("expires_at")
+    @classmethod
+    def valid_expiry(cls, value: datetime) -> datetime:
+        return validate_invitation_expiry(value)
+
+
+class InvitationExpiryRead(StrictModel):
+    id: str
+    expires_at: datetime
 
 
 class InvitationAccept(StrictModel):

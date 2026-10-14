@@ -17,6 +17,10 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Request failed";
 }
 
+function toLocalDateTimeInput(value: Date) {
+  return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return <div className="min-h-screen"><header className="border-b border-slate-800"><div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"><Link to="/" className="text-xl font-bold tracking-tight">Interview<span className="text-cyan-400">OS</span></Link><button className="text-sm text-slate-300 hover:text-white" onClick={() => supabase.auth.signOut()}>Sign out</button></div></header><main className="mx-auto max-w-6xl px-6 py-10">{children}</main></div>;
 }
@@ -132,12 +136,16 @@ function Company() {
   const [questionCount, setQuestionCount] = useState(3);
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
+  const [invitationMinimum] = useState(() => new Date());
+  const [invitationExpiry, setInvitationExpiry] = useState(() => toLocalDateTimeInput(new Date(Date.now() + 72 * 60 * 60 * 1000)));
+  const [sentInvitation, setSentInvitation] = useState<Invitation | null>(null);
   const company = useQuery({ queryKey: ["company"], queryFn: () => api<{ id: string; name: string }>("/api/v1/companies/me"), retry: false });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api<Job[]>("/api/v1/jobs"), enabled: company.isSuccess });
   const interviews = useQuery({ queryKey: ["interviews"], queryFn: () => api<Interview[]>("/api/v1/interviews"), enabled: company.isSuccess });
   const activeTemplateJobId = templateJobId || jobs.data?.[0]?.id || "";
   const activeTemplateId = selectedTemplateId || interviews.data?.[0]?.id || "";
   const selectedInterview = interviews.data?.find((interview) => interview.id === activeTemplateId);
+  const expiryIsFuture = new Date(invitationExpiry).getTime() > invitationMinimum.getTime();
   const questions = useQuery({
     queryKey: ["questions", activeTemplateId],
     queryFn: () => api<Question[]>(`/api/v1/interviews/${activeTemplateId}/questions`),
@@ -173,8 +181,12 @@ function Company() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["interviews"] }),
   });
   const invite = useMutation({
-    mutationFn: () => api<Invitation>("/api/v1/invitations", { method: "POST", body: JSON.stringify({ email: candidateEmail, name: candidateName || null, job_id: selectedInterview?.job_id, template_id: activeTemplateId }) }),
-    onSuccess: () => { setCandidateName(""); setCandidateEmail(""); },
+    mutationFn: () => api<Invitation>("/api/v1/invitations", { method: "POST", body: JSON.stringify({ email: candidateEmail, name: candidateName || null, job_id: selectedInterview?.job_id, template_id: activeTemplateId, expires_at: new Date(invitationExpiry).toISOString() }) }),
+    onSuccess: (invitation) => { setCandidateName(""); setCandidateEmail(""); setSentInvitation(invitation); setInvitationExpiry(toLocalDateTimeInput(new Date(invitation.expires_at))); },
+  });
+  const updateExpiry = useMutation({
+    mutationFn: () => api<{ id: string; expires_at: string }>(`/api/v1/invitations/${sentInvitation?.id}`, { method: "PATCH", body: JSON.stringify({ expires_at: new Date(invitationExpiry).toISOString() }) }),
+    onSuccess: (updated) => setSentInvitation((current) => current ? { ...current, expires_at: updated.expires_at } : current),
   });
   if (company.isError) return <Shell><div className="mb-8"><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Company portal</p><h1 className="mt-2 text-4xl font-bold">Set up your workspace</h1></div><section className="card max-w-lg"><h2 className="text-xl font-semibold">Create your company</h2><p className="my-3 text-sm text-slate-400">The signed-in user becomes the first administrator.</p><form onSubmit={(event) => { event.preventDefault(); bootstrap.mutate(); }} className="flex gap-3"><label className="sr-only" htmlFor="company-name">Company name</label><input id="company-name" className="input" value={name} onChange={(event) => setName(event.target.value)} minLength={2} required placeholder="Company name" /><button className="button" disabled={bootstrap.isPending}>Create</button></form>{bootstrap.error && <p className="mt-3 text-rose-400">{errorMessage(bootstrap.error)}</p>}</section></Shell>;
 
@@ -196,7 +208,7 @@ function Company() {
       {(approve.error || deselect.error || bulkApproval.error) && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(approve.error || deselect.error || bulkApproval.error)}</p>}
       {activeTemplateId && !selectedInterview?.published && <button className="button mt-5" onClick={() => publish.mutate()} disabled={publish.isPending || !questions.data?.some((question) => question.approved)}>{publish.isPending ? "Publishing…" : "Publish interview"}</button>}{publish.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(publish.error)}</p>}
     </section>
-    <section className="card mt-6"><h2 className="text-xl font-semibold">4. Invite a candidate</h2><p className="mt-2 text-sm text-slate-400">Invitations are available after the selected interview is published.</p><form className="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); invite.mutate(); }}><label><span className="label">Candidate name</span><input className="input" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /></label><label><span className="label">Candidate email</span><input className="input" type="email" value={candidateEmail} onChange={(event) => setCandidateEmail(event.target.value)} required /></label><button className="button self-end" disabled={!selectedInterview?.published || invite.isPending}>{invite.isPending ? "Sending…" : "Send invitation"}</button></form>{invite.data && <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">Invitation {invite.data.delivery_status}. It expires {new Date(invite.data.expires_at).toLocaleString()}.</p>}{invite.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(invite.error)}</p>}</section>
+    <section id="invitations" className="card mt-6"><h2 className="text-xl font-semibold">4. Invite a candidate</h2><p className="mt-2 text-sm text-slate-400">Invitations are available after the selected interview is published.</p><form className="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); invite.mutate(); }}><label><span className="label">Candidate name</span><input className="input" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /></label><label><span className="label">Candidate email</span><input className="input" type="email" value={candidateEmail} onChange={(event) => setCandidateEmail(event.target.value)} required /></label><label><span className="label">Invitation expires</span><input className="input" type="datetime-local" value={invitationExpiry} min={toLocalDateTimeInput(invitationMinimum)} onChange={(event) => setInvitationExpiry(event.target.value)} required /></label><button className="button self-end" disabled={!selectedInterview?.published || !expiryIsFuture || invite.isPending}>{invite.isPending ? "Sending…" : "Send invitation"}</button></form>{sentInvitation && <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300"><p>Invitation {sentInvitation.delivery_status}. It expires {new Date(sentInvitation.expires_at).toLocaleString()}.</p><button className="button mt-3" type="button" onClick={() => updateExpiry.mutate()} disabled={!expiryIsFuture || updateExpiry.isPending}>{updateExpiry.isPending ? "Updating…" : "Update expiry"}</button>{updateExpiry.isSuccess && <p className="mt-2 text-sm">Expiry updated. The existing invitation link remains valid.</p>}</div>}{invite.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(invite.error)}</p>}{updateExpiry.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(updateExpiry.error)}</p>}</section>
   </Shell>;
 }
 
