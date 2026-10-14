@@ -1,0 +1,33 @@
+# Implementation status
+
+Last updated: 2026-10-13
+
+## Completed
+
+- Repository and Git-state inspection; pre-existing deletions were preserved.
+- Phase 1 modular backend foundation with JWT authentication, company memberships, tenant-scoped jobs/candidates/templates, invitation lifecycle, assignments, attempts, answers, completion, reattempt authorization, and audit logging.
+- Database constraints for tenant uniqueness, single-use invitation acceptance, assignment uniqueness, attempt numbering, and answer idempotency.
+- Backend-authoritative attempt expiry and role checks.
+- Health/readiness endpoints, request correlation IDs, CORS configuration, environment template, Docker assets, and initial migration.
+- Automated tests for company isolation, invitation reuse/expiry, candidate isolation, duplicate active attempts, answer idempotency, and company-controlled reattempts.
+- React/TypeScript company and candidate portal shell wired to real API endpoints.
+
+## Test results
+
+- `python -m pytest`: **5 passed** in 3.55s. Python 3.14 emitted 81 upstream FastAPI/Starlette deprecation warnings; no test failed.
+- `python -m compileall -q backend`: **passed**.
+- `python -m alembic upgrade head` followed by `downgrade base` against a fresh SQLite database: **passed**.
+- `npm run build`: **passed**; TypeScript checked and Vite produced the production bundle.
+- `npm audit --audit-level=high`: **0 vulnerabilities**.
+
+## Remaining
+
+- Supabase email verification UI and production JWKS rotation/caching validation.
+- Document storage, parsing, versioning, Qdrant indexing, hybrid retrieval, and question generation.
+- Voice upload/transcription, rubric evaluation, reports, monitoring, workers, and SSE.
+- PostgreSQL RLS policies, provider integration tests, Playwright coverage, rate limiting, retention/deletion, and production deployment validation.
+
+## Known limitations
+
+This is the highest-priority functional slice, not the complete six-phase platform. External services are intentionally not claimed as verified without credentials. Local console invitation delivery is development-only.
+
