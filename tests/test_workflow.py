@@ -197,8 +197,10 @@ def test_attempt_answer_and_company_controlled_reattempt(client):
     started = client.post(f"/api/v1/sessions/{assignment['id']}/attempts", headers=candidate_headers)
     assert started.status_code == 200
     attempt = started.json()
+    assert attempt["answered_question_ids"] == []
     resumed = client.post(f"/api/v1/sessions/{assignment['id']}/attempts", headers=candidate_headers)
     assert resumed.json()["id"] == attempt["id"]
+    assert client.post(f"/api/v1/sessions/{attempt['id']}/complete", headers=candidate_headers).status_code == 409
     question_id = attempt["configuration_snapshot"]["questions"][0]["id"]
     answer = client.post(
         f"/api/v1/sessions/{attempt['id']}/answers",
@@ -206,6 +208,8 @@ def test_attempt_answer_and_company_controlled_reattempt(client):
         headers=candidate_headers,
     )
     assert answer.status_code == 201
+    resumed = client.post(f"/api/v1/sessions/{assignment['id']}/attempts", headers=candidate_headers)
+    assert resumed.json()["answered_question_ids"] == [question_id]
     duplicate = client.post(
         f"/api/v1/sessions/{attempt['id']}/answers",
         json={"question_id": question_id, "transcript": "Duplicate"},

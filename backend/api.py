@@ -29,6 +29,7 @@ from backend.schemas import (
     AnswerCreate,
     AssignmentRead,
     AttemptRead,
+    CandidateAttemptRead,
     CompanyCreate,
     CompanyRead,
     InvitationAccept,
@@ -528,10 +529,19 @@ def candidate_sessions(principal: Principal = Depends(current_principal), db: Se
     return db.scalars(select(Assignment).join(Candidate).where(Candidate.auth_user_id == principal.user_id)).all()
 
 
-@router.post("/sessions/{assignment_id}/attempts", response_model=AttemptRead)
+def candidate_attempt_read(db: Session, attempt: Attempt) -> CandidateAttemptRead:
+    answered_question_ids = list(db.scalars(select(Answer.question_id).where(Answer.attempt_id == attempt.id)))
+    return CandidateAttemptRead(
+        **AttemptRead.model_validate(attempt).model_dump(),
+        answered_question_ids=answered_question_ids,
+    )
+
+
+@router.post("/sessions/{assignment_id}/attempts", response_model=CandidateAttemptRead)
 def begin_attempt(assignment_id: str, principal: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     assignment, template = candidate_assignment(db, assignment_id, principal.user_id)
-    return start_attempt(db, assignment, template, principal.user_id)
+    attempt = start_attempt(db, assignment, template, principal.user_id)
+    return candidate_attempt_read(db, attempt)
 
 
 def candidate_attempt(db: Session, attempt_id: str, user_id: str) -> Attempt:
@@ -575,6 +585,10 @@ def complete_attempt(attempt_id: str, principal: Principal = Depends(current_pri
     attempt = candidate_attempt(db, attempt_id, principal.user_id)
     if attempt.status != AttemptStatus.active:
         raise HTTPException(status.HTTP_409_CONFLICT, "Attempt is not active")
+    required_ids = {item["id"] for item in attempt.configuration_snapshot["questions"]}
+    answered_ids = set(db.scalars(select(Answer.question_id).where(Answer.attempt_id == attempt.id)))
+    if required_ids - answered_ids:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Answer every question before completing the interview")
     attempt.status = AttemptStatus.completed
     attempt.completed_at = now()
     assignment = db.get(Assignment, attempt.assignment_id)

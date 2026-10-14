@@ -12,6 +12,19 @@ type Job = { id: string; title: string; description: string; required_skills: st
 type Interview = { id: string; job_id: string; name: string; duration_minutes: number; attempt_limit: number; published: boolean };
 type Question = { id: string; template_id: string; text: string; position: number; time_limit_seconds: number; approved: boolean; rubric: Record<string, unknown> };
 type Invitation = { id: string; expires_at: string; delivery_status: string };
+type AttemptQuestion = { id: string; text: string; position: number; time_limit_seconds: number };
+type Attempt = { id: string; assignment_id: string; attempt_number: number; status: string; started_at: string; deadline_at: string; configuration_snapshot: { duration_minutes: number; questions: AttemptQuestion[] }; answered_question_ids: string[] };
+type SpeechResult = { isFinal: boolean; 0: { transcript: string } };
+type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechResult> };
+type SpeechRecognitionInstance = { continuous: boolean; interimResults: boolean; lang: string; onresult: ((event: SpeechRecognitionEventLike) => void) | null; onerror: (() => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(8) });
 
 function errorMessage(error: unknown) {
@@ -272,10 +285,136 @@ function Company() {
   </Shell>;
 }
 
+function DeviceCheck({ attempt, onReady }: { attempt: Attempt; onReady: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream;
+    return () => stream?.getTracks().forEach((track) => track.stop());
+  }, [stream]);
+
+  async function checkDevices() {
+    setChecking(true);
+    setError("");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera and microphone access is not supported in this browser.");
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      setStream(media);
+    } catch (deviceError) {
+      setError(deviceError instanceof Error ? deviceError.message : "Camera or microphone permission was denied.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function begin() {
+    stream?.getTracks().forEach((track) => track.stop());
+    setStream(null);
+    onReady();
+  }
+
+  return <Shell><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Device check</p><h1 className="mt-2 text-4xl font-bold">Before you begin</h1><p className="mt-3 text-slate-400">Attempt {attempt.attempt_number} has started. Its server deadline is {new Date(attempt.deadline_at).toLocaleString()}.</p><div className="mt-8 grid gap-6 lg:grid-cols-2"><section className="card"><h2 className="text-xl font-semibold">Camera and microphone</h2><p className="mt-2 text-sm text-slate-400">Access is requested only for this interview. The camera preview stays in your browser and is not uploaded.</p>{stream ? <video ref={videoRef} className="mt-5 aspect-video w-full rounded-xl bg-black object-cover" autoPlay muted playsInline /> : <div className="mt-5 grid aspect-video place-items-center rounded-xl border border-dashed border-slate-700 bg-slate-950 text-sm text-slate-500">Preview appears here after permission is granted.</div>}<button className="button mt-4" type="button" onClick={checkDevices} disabled={checking}>{checking ? "Checking devices…" : stream ? "Check again" : "Check camera and microphone"}</button>{error && <p role="alert" className="mt-3 text-sm text-rose-400">{error}</p>}</section><section className="card"><h2 className="text-xl font-semibold">Instructions and consent</h2><ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-300"><li>Answer every question before the server deadline.</li><li>You can hear a question, replay it, or mute narration without muting your microphone.</li><li>Voice transcription is available in supported browsers, with a text fallback.</li><li>Your submitted transcript is saved and cannot be edited afterward.</li></ul><label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 p-4"><input className="mt-1 size-5 accent-cyan-400" type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span className="text-sm">I consent to microphone and camera access for this interview and understand how my submitted answers are used.</span></label><button className="button mt-5 w-full" type="button" onClick={begin} disabled={!stream || !consent}>Begin interview</button></section></div></Shell>;
+}
+
+function InterviewRoom({ attempt }: { attempt: Attempt }) {
+  const questions = attempt.configuration_snapshot.questions;
+  const [answered, setAnswered] = useState(() => new Set(attempt.answered_question_ids));
+  const [questionIndex, setQuestionIndex] = useState(() => {
+    const firstUnanswered = questions.findIndex((question) => !attempt.answered_question_ids.includes(question.id));
+    return firstUnanswered < 0 ? questions.length : firstUnanswered;
+  });
+  const [answer, setAnswer] = useState("");
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const question = questions[questionIndex];
+  const secondsLeft = Math.max(0, Math.floor((new Date(attempt.deadline_at).getTime() - clock) / 1000));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!question || !narrationEnabled || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(question.text));
+    return () => window.speechSynthesis.cancel();
+  }, [question, narrationEnabled]);
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  const submitAnswer = useMutation({
+    mutationFn: () => api(`/api/v1/sessions/${attempt.id}/answers`, { method: "POST", body: JSON.stringify({ question_id: question.id, transcript: answer.trim() }) }),
+    onSuccess: () => {
+      setAnswered((current) => new Set(current).add(question.id));
+      setAnswer("");
+      setQuestionIndex((index) => index + 1);
+    },
+  });
+  const complete = useMutation({
+    mutationFn: () => api(`/api/v1/sessions/${attempt.id}/complete`, { method: "POST" }),
+    onSuccess: () => setCompleted(true),
+  });
+
+  function speakQuestion() {
+    if (!question || !("speechSynthesis" in window)) return setVoiceError("Question narration is not supported in this browser.");
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(question.text));
+  }
+
+  function toggleVoiceAnswer() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) return setVoiceError("Live voice transcription is unavailable here. Type your answer instead.");
+    setVoiceError("");
+    const recognition = new Recognition();
+    const existingAnswer = answer.trim();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    recognition.onresult = (event) => {
+      let spoken = "";
+      for (let index = 0; index < event.results.length; index += 1) spoken += `${event.results[index][0].transcript} `;
+      setAnswer([existingAnswer, spoken.trim()].filter(Boolean).join(" ").slice(0, 50_000));
+    };
+    recognition.onerror = () => { setVoiceError("Voice transcription stopped. Check microphone permission or type your answer."); setListening(false); };
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
+
+  if (completed) return <Shell><div className="card mx-auto max-w-2xl text-center"><div className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-400/15 text-2xl text-emerald-300">✓</div><h1 className="mt-5 text-3xl font-bold">Interview submitted</h1><p className="mt-3 text-slate-400">Your answers were saved successfully. You may now close this page.</p></div></Shell>;
+  if (secondsLeft <= 0) return <Shell><div className="card mx-auto max-w-2xl"><h1 className="text-3xl font-bold">Interview time ended</h1><p className="mt-3 text-slate-400">The server deadline has passed. Contact the company if a technical problem prevented completion.</p></div></Shell>;
+
+  const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
+  const seconds = (secondsLeft % 60).toString().padStart(2, "0");
+  const progress = questions.length ? Math.round((answered.size / questions.length) * 100) : 0;
+
+  return <Shell><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Interview in progress</p><h1 className="mt-2 text-3xl font-bold">Attempt {attempt.attempt_number}</h1></div><div className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-center"><p className="text-xs uppercase tracking-wide text-slate-400">Time remaining</p><p className="mt-1 font-mono text-2xl font-bold text-cyan-300" aria-live="polite">{minutes}:{seconds}</p></div></div><div className="mt-6 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-sm text-slate-400">{answered.size} of {questions.length} answers saved</p>{question ? <section className="card mt-6"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="text-sm font-semibold text-cyan-300">Question {questionIndex + 1} of {questions.length}</p><p className="mt-1 text-xs text-slate-500">Suggested answer time: {Math.ceil(question.time_limit_seconds / 60)} minute(s)</p></div><div className="flex gap-3"><button className="text-sm font-medium text-cyan-300" type="button" onClick={() => setNarrationEnabled((enabled) => !enabled)}>{narrationEnabled ? "Mute narration" : "Enable narration"}</button><button className="text-sm font-medium text-cyan-300" type="button" onClick={speakQuestion}>Replay question</button></div></div><h2 className="mt-6 text-2xl font-semibold leading-relaxed">{question.text}</h2><label className="mt-7 block"><span className="label">Your answer transcript</span><textarea className="input min-h-44 py-3" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={50_000} placeholder="Speak your answer or type it here…" disabled={submitAnswer.isPending} /></label><div className="mt-4 flex flex-wrap gap-3"><button className={`button ${listening ? "bg-rose-400 hover:bg-rose-300" : ""}`} type="button" onClick={toggleVoiceAnswer} disabled={submitAnswer.isPending}>{listening ? "Stop listening" : "Start voice answer"}</button><button className="button" type="button" onClick={() => submitAnswer.mutate()} disabled={!answer.trim() || listening || submitAnswer.isPending}>{submitAnswer.isPending ? "Saving answer…" : questionIndex === questions.length - 1 ? "Save final answer" : "Submit and continue"}</button></div><p className="mt-3 text-xs text-slate-500">Voice is transcribed in your browser. Review the transcript before submitting.</p>{voiceError && <p role="alert" className="mt-3 text-sm text-amber-300">{voiceError}</p>}{submitAnswer.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(submitAnswer.error)}</p>}</section> : <section className="card mt-6 text-center"><h2 className="text-2xl font-semibold">All answers are saved</h2><p className="mt-2 text-slate-400">Submit the interview to finish. This action cannot be undone.</p><button className="button mt-5" type="button" onClick={() => complete.mutate()} disabled={complete.isPending}>{complete.isPending ? "Submitting interview…" : "Complete interview"}</button>{complete.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(complete.error)}</p>}</section>}</Shell>;
+}
+
 function Candidate() {
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => api<Session[]>("/api/v1/sessions") });
-  const start = useMutation({ mutationFn: (id: string) => api<{ id: string; attempt_number: number }>(`/api/v1/sessions/${id}/attempts`, { method: "POST" }) });
-  return <Shell><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Candidate portal</p><h1 className="mt-2 text-4xl font-bold">Your interviews</h1><p className="mt-3 text-slate-400">Progress and deadlines are saved by the server. Refreshing never creates a new attempt.</p><div className="mt-8 grid gap-4">{sessions.data?.map((session) => <article className="card flex flex-col justify-between gap-4 sm:flex-row sm:items-center" key={session.id}><div><h2 className="font-semibold">Interview assignment</h2><p className="mt-1 text-sm text-slate-400">Available until {new Date(session.available_until).toLocaleString()}</p></div><button className="button" onClick={() => start.mutate(session.id)} disabled={start.isPending}>Start or resume</button></article>)}{sessions.isSuccess && !sessions.data.length && <div className="card text-slate-400">No interviews are assigned to this verified account.</div>}{sessions.error && <p role="alert" className="text-rose-400">{sessions.error.message}</p>}{start.data && <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">Attempt {start.data.attempt_number} is ready. Voice interview UI is scheduled for Phase 4.</p>}</div></Shell>;
+  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [devicesReady, setDevicesReady] = useState(false);
+  const start = useMutation({
+    mutationFn: (id: string) => api<Attempt>(`/api/v1/sessions/${id}/attempts`, { method: "POST" }),
+    onSuccess: (startedAttempt) => { setAttempt(startedAttempt); setDevicesReady(false); },
+  });
+  if (attempt) return devicesReady ? <InterviewRoom attempt={attempt} /> : <DeviceCheck attempt={attempt} onReady={() => setDevicesReady(true)} />;
+  return <Shell><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Candidate portal</p><h1 className="mt-2 text-4xl font-bold">Your interviews</h1><p className="mt-3 text-slate-400">Progress and deadlines are saved by the server. Refreshing never creates a new attempt.</p><div className="mt-8 grid gap-4">{sessions.data?.map((session) => <article className="card flex flex-col justify-between gap-4 sm:flex-row sm:items-center" key={session.id}><div><h2 className="font-semibold">Interview assignment</h2><p className="mt-1 text-sm text-slate-400">Available until {new Date(session.available_until).toLocaleString()}</p></div><button className="button" onClick={() => start.mutate(session.id)} disabled={start.isPending}>{start.isPending ? "Opening…" : "Start or resume"}</button></article>)}{sessions.isSuccess && !sessions.data.length && <div className="card text-slate-400">No interviews are assigned to this verified account.</div>}{sessions.error && <p role="alert" className="text-rose-400">{sessions.error.message}</p>}{start.error && <p role="alert" className="text-rose-400">{errorMessage(start.error)}</p>}</div></Shell>;
 }
 
 function AcceptInvite({ token }: { token: string | null }) {

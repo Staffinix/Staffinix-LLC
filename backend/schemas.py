@@ -196,6 +196,10 @@ class AttemptRead(ORMModel):
     configuration_snapshot: dict
 
 
+class CandidateAttemptRead(AttemptRead):
+    answered_question_ids: list[str]
+
+
 class ReattemptCreate(StrictModel):
     reason: str = Field(min_length=10, max_length=2000)
     expires_at: datetime | None = None
