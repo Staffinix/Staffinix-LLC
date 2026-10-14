@@ -33,6 +33,92 @@ function Login() {
   return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Secure access</p><h1 className="text-3xl font-bold">Welcome back</h1><p className="mt-2 text-slate-400">Use your verified company or candidate account.</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete="current-password" {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role="alert" className="text-sm text-rose-400">{message}</p>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? "Signing in…" : "Sign in"}</button></form><Link className="mt-6 block text-center text-sm text-cyan-300" to="/candidate">Candidate portal</Link></section></main>;
 }
 
+function PdfQuestionImporter({ templateId, published }: { templateId: string; published: boolean }) {
+  const queryClient = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [randomCount, setRandomCount] = useState(5);
+  const [fileError, setFileError] = useState("");
+
+  const extract = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Choose a PDF first");
+      const form = new FormData();
+      form.append("file", file);
+      return api<{ questions: string[] }>(`/api/v1/interviews/${templateId}/questions/extract-pdf`, { method: "POST", body: form });
+    },
+    onSuccess: ({ questions: extracted }) => {
+      setQuestions(extracted);
+      setSelected(new Set());
+      setRandomCount((count) => Math.min(Math.max(1, count), extracted.length, 200));
+    },
+  });
+  const importSelected = useMutation({
+    mutationFn: () => api<Question[]>(`/api/v1/interviews/${templateId}/questions/import`, {
+      method: "POST",
+      body: JSON.stringify({ questions: Array.from(selected), time_limit_seconds: 180 }),
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["questions", templateId] });
+      setQuestions((current) => current.filter((question) => !selected.has(question)));
+      setSelected(new Set());
+    },
+  });
+
+  function chooseRandom() {
+    const shuffled = [...questions];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]];
+    }
+    setSelected(new Set(shuffled.slice(0, Math.min(randomCount, shuffled.length, 200))));
+  }
+
+  function chooseFile(nextFile: File | undefined) {
+    setFileError("");
+    setQuestions([]);
+    setSelected(new Set());
+    if (!nextFile) return setFile(null);
+    if (nextFile.size > 5 * 1024 * 1024) {
+      setFile(null);
+      return setFileError("PDF must be 5 MB or smaller.");
+    }
+    if (nextFile.type && nextFile.type !== "application/pdf") {
+      setFile(null);
+      return setFileError("Choose a PDF file.");
+    }
+    setFile(nextFile);
+  }
+
+  return <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/40 p-5">
+    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div className="flex-1">
+        <h3 className="font-semibold">Import questions from PDF</h3>
+        <p className="mt-1 text-sm text-slate-400">Upload a text-based PDF up to 5 MB. The file is processed temporarily and is not stored.</p>
+        <label className="mt-4 block"><span className="label">Question bank PDF</span><input key={templateId} className="input py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-3 file:py-1.5 file:font-semibold file:text-slate-950" type="file" accept="application/pdf,.pdf" onChange={(event) => chooseFile(event.target.files?.[0])} disabled={!templateId || published || extract.isPending} /></label>
+      </div>
+      <button className="button" type="button" onClick={() => extract.mutate()} disabled={!file || !templateId || published || extract.isPending}>{extract.isPending ? "Reading PDF…" : "Read questions"}</button>
+    </div>
+    {(fileError || extract.error) && <p role="alert" className="mt-3 text-sm text-rose-400">{fileError || errorMessage(extract.error)}</p>}
+    {questions.length > 0 && <div className="mt-5">
+      <div className="flex flex-wrap items-end gap-3">
+        <label><span className="label">Random count</span><input className="input w-28" type="number" min="1" max={Math.min(questions.length, 200)} value={randomCount} onChange={(event) => setRandomCount(Math.min(200, Math.max(1, Number(event.target.value))))} /></label>
+        <button className="button" type="button" onClick={chooseRandom}>Select random</button>
+        <button className="button" type="button" onClick={() => importSelected.mutate()} disabled={!selected.size || importSelected.isPending}>{importSelected.isPending ? "Adding…" : `Add selected (${selected.size})`}</button>
+        <span className="pb-3 text-sm text-slate-400">{questions.length} extracted</span>
+      </div>
+      {importSelected.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(importSelected.error)}</p>}
+      <div className="mt-4 max-h-80 space-y-2 overflow-y-auto pr-1">
+        {questions.map((question, index) => <label key={`${index}-${question}`} className="flex cursor-pointer gap-3 rounded-lg border border-slate-800 p-3 hover:border-slate-600">
+          <input className="mt-1 size-4 accent-cyan-400" type="checkbox" checked={selected.has(question)} disabled={!selected.has(question) && selected.size >= 200} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(question)) next.delete(question); else next.add(question); return next; })} />
+          <span className="text-sm"><span className="mr-2 text-slate-500">{index + 1}.</span>{question}</span>
+        </label>)}
+      </div>
+    </div>}
+  </div>;
+}
+
 function Company() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -90,7 +176,16 @@ function Company() {
       <section className="card"><h2 className="text-xl font-semibold">1. Create a job</h2><form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); createJob.mutate(); }}><label className="block"><span className="label">Job title</span><input className="input" value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} minLength={2} required /></label><label className="block"><span className="label">Description</span><textarea className="input min-h-28 py-3" value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} minLength={10} required /></label><label className="block"><span className="label">Skills, comma separated</span><input className="input" value={jobSkills} onChange={(event) => setJobSkills(event.target.value)} placeholder="Python, PostgreSQL" /></label><button className="button" disabled={createJob.isPending}>{createJob.isPending ? "Creating…" : "Create job"}</button>{createJob.error && <p role="alert" className="text-sm text-rose-400">{errorMessage(createJob.error)}</p>}</form></section>
       <section className="card"><h2 className="text-xl font-semibold">2. Create an interview</h2><form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); createInterview.mutate(); }}><label className="block"><span className="label">Job</span><select className="input" value={activeTemplateJobId} onChange={(event) => setTemplateJobId(event.target.value)} required><option value="">Select a job</option>{jobs.data?.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select></label><label className="block"><span className="label">Interview name</span><input className="input" value={templateName} onChange={(event) => setTemplateName(event.target.value)} minLength={2} required placeholder="Technical screen" /></label><button className="button" disabled={createInterview.isPending || !jobs.data?.length}>{createInterview.isPending ? "Creating…" : "Create interview"}</button>{createInterview.error && <p role="alert" className="text-sm text-rose-400">{errorMessage(createInterview.error)}</p>}</form></section>
     </div>
-    <section className="card mt-6"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div className="flex-1"><h2 className="text-xl font-semibold">3. Generate and approve questions</h2><label className="mt-4 block"><span className="label">Interview</span><select className="input" value={activeTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}><option value="">Select an interview</option>{interviews.data?.map((interview) => <option key={interview.id} value={interview.id}>{interview.name}{interview.published ? " — published" : ""}</option>)}</select></label></div><div className="flex flex-wrap gap-3"><label><span className="label">Difficulty</span><select className="input" value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={selectedInterview?.published}><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label><label><span className="label">Count</span><input className="input w-24" type="number" min="1" max="20" value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} disabled={selectedInterview?.published} /></label><button className="button self-end" onClick={() => generate.mutate()} disabled={!activeTemplateId || selectedInterview?.published || generate.isPending}>{generate.isPending ? "Generating…" : "Generate with AI"}</button></div></div>{generate.error && <p role="alert" className="mt-4 text-sm text-rose-400">{errorMessage(generate.error)}</p>}<div className="mt-6 space-y-3">{questions.data?.map((question) => <article key={question.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">{String(question.rubric.competency ?? "Interview question")}</p><p className="mt-2">{question.text}</p><p className="mt-2 text-xs text-slate-500">{question.time_limit_seconds}s · {question.approved ? "Approved" : "Awaiting approval"}</p></div>{!question.approved && !selectedInterview?.published && <button className="button shrink-0" onClick={() => approve.mutate(question.id)} disabled={approve.isPending}>Approve</button>}</div></article>)}{questions.isSuccess && !questions.data.length && <p className="text-slate-400">Generate the first question set for this interview.</p>}</div>{activeTemplateId && !selectedInterview?.published && <button className="button mt-5" onClick={() => publish.mutate()} disabled={publish.isPending || !questions.data?.some((question) => question.approved)}>{publish.isPending ? "Publishing…" : "Publish interview"}</button>}{publish.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(publish.error)}</p>}</section>
+    <section id="questions" className="card mt-6">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="flex-1"><h2 className="text-xl font-semibold">3. Generate and approve questions</h2><label className="mt-4 block"><span className="label">Interview</span><select className="input" value={activeTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}><option value="">Select an interview</option>{interviews.data?.map((interview) => <option key={interview.id} value={interview.id}>{interview.name}{interview.published ? " — published" : ""}</option>)}</select></label></div>
+        <div className="flex flex-wrap gap-3"><label><span className="label">Difficulty</span><select className="input" value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={selectedInterview?.published}><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label><label><span className="label">Count</span><input className="input w-24" type="number" min="1" max="20" value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} disabled={selectedInterview?.published} /></label><button className="button self-end" onClick={() => generate.mutate()} disabled={!activeTemplateId || selectedInterview?.published || generate.isPending}>{generate.isPending ? "Generating…" : "Generate with AI"}</button></div>
+      </div>
+      {generate.error && <p role="alert" className="mt-4 text-sm text-rose-400">{errorMessage(generate.error)}</p>}
+      <PdfQuestionImporter key={activeTemplateId} templateId={activeTemplateId} published={Boolean(selectedInterview?.published)} />
+      <div className="mt-6 space-y-3">{questions.data?.map((question) => <article key={question.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">{String(question.rubric.competency ?? question.rubric.source ?? "Interview question")}</p><p className="mt-2">{question.text}</p><p className="mt-2 text-xs text-slate-500">{question.time_limit_seconds}s · {question.approved ? "Approved" : "Awaiting approval"}</p></div>{!question.approved && !selectedInterview?.published && <button className="button shrink-0" onClick={() => approve.mutate(question.id)} disabled={approve.isPending}>Approve</button>}</div></article>)}{questions.isSuccess && !questions.data.length && <p className="text-slate-400">Generate with AI or import questions from a PDF.</p>}</div>
+      {activeTemplateId && !selectedInterview?.published && <button className="button mt-5" onClick={() => publish.mutate()} disabled={publish.isPending || !questions.data?.some((question) => question.approved)}>{publish.isPending ? "Publishing…" : "Publish interview"}</button>}{publish.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(publish.error)}</p>}
+    </section>
     <section className="card mt-6"><h2 className="text-xl font-semibold">4. Invite a candidate</h2><p className="mt-2 text-sm text-slate-400">Invitations are available after the selected interview is published.</p><form className="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); invite.mutate(); }}><label><span className="label">Candidate name</span><input className="input" value={candidateName} onChange={(event) => setCandidateName(event.target.value)} /></label><label><span className="label">Candidate email</span><input className="input" type="email" value={candidateEmail} onChange={(event) => setCandidateEmail(event.target.value)} required /></label><button className="button self-end" disabled={!selectedInterview?.published || invite.isPending}>{invite.isPending ? "Sending…" : "Send invitation"}</button></form>{invite.data && <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">Invitation {invite.data.delivery_status}. It expires {new Date(invite.data.expires_at).toLocaleString()}.</p>}{invite.error && <p role="alert" className="mt-3 text-sm text-rose-400">{errorMessage(invite.error)}</p>}</section>
   </Shell>;
 }

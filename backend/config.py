@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     openrouter_app_name: str = "InterviewOS"
     redis_url: str = "redis://localhost:6379/0"
     max_request_bytes: int = 1_048_576
+    max_pdf_request_bytes: int = 5_500_000
     rate_limit_per_minute: int = 120
 
     @model_validator(mode="after")

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -24,6 +24,7 @@ from backend.models import (
     ReattemptPermission,
     Role,
 )
+from backend.pdf_questions import MAX_PDF_BYTES, PdfQuestionError, extract_pdf_questions
 from backend.schemas import (
     AnswerCreate,
     AssignmentRead,
@@ -37,7 +38,9 @@ from backend.schemas import (
     JobRead,
     QuestionCreate,
     QuestionGenerationRequest,
+    QuestionImportRequest,
     QuestionRead,
+    PdfQuestionExtraction,
     ReattemptCreate,
     TemplateCreate,
     TemplateRead,
@@ -155,6 +158,65 @@ def add_question(template_id: str, body: QuestionCreate, context: CompanyContext
     audit(db, context.company_id, context.principal.user_id, "question.create", question)
     db.commit()
     return {"id": question.id, "approved": question.approved}
+
+
+@router.post("/interviews/{template_id}/questions/extract-pdf", response_model=PdfQuestionExtraction)
+async def extract_questions_from_pdf(
+    template_id: str,
+    file: UploadFile = File(...),
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    template = tenant_template(db, template_id, context.company_id)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    if file.content_type not in {"application/pdf", "application/octet-stream"}:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Upload a PDF file")
+    data = await file.read(MAX_PDF_BYTES + 1)
+    await file.close()
+    try:
+        return PdfQuestionExtraction(questions=extract_pdf_questions(data))
+    except PdfQuestionError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.post("/interviews/{template_id}/questions/import", response_model=list[QuestionRead], status_code=201)
+def import_questions(
+    template_id: str,
+    body: QuestionImportRequest,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    template = tenant_template(db, template_id, context.company_id, lock=True)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    existing = {question.text.strip().casefold() for question in template.questions}
+    new_questions = [text for text in body.questions if text.casefold() not in existing]
+    if not new_questions:
+        raise HTTPException(status.HTTP_409_CONFLICT, "All selected questions already exist in this interview")
+    next_position = (db.scalar(select(func.max(Question.position)).where(Question.template_id == template.id)) or 0) + 1
+    if next_position + len(new_questions) - 1 > 200:
+        raise HTTPException(status.HTTP_409_CONFLICT, "An interview can contain at most 200 questions")
+    created = []
+    for offset, text in enumerate(new_questions):
+        question = Question(
+            template_id=template.id,
+            text=text,
+            position=next_position + offset,
+            time_limit_seconds=body.time_limit_seconds,
+            approved=True,
+            rubric={"source": "pdf"},
+        )
+        db.add(question)
+        db.flush()
+        audit(db, context.company_id, context.principal.user_id, "question.import", question)
+        created.append(question)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Questions were added concurrently; import again") from exc
+    return created
 
 
 @router.post("/interviews/{template_id}/questions/generate", status_code=201)

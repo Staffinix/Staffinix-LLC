@@ -85,11 +85,16 @@ async def security_controls(request: Request, call_next):
     supplied_request_id = request.headers.get("X-Request-ID", "")
     request_id = supplied_request_id if request_id_pattern.fullmatch(supplied_request_id) else str(uuid.uuid4())
     api_request = request.url.path.startswith("/api/")
+    request_limit = (
+        settings.max_pdf_request_bytes
+        if request.url.path.endswith("/questions/extract-pdf")
+        else settings.max_request_bytes
+    )
     content_length = request.headers.get("Content-Length")
     if content_length:
         try:
             declared_size = int(content_length)
-            too_large = declared_size < 0 or declared_size > settings.max_request_bytes
+            too_large = declared_size < 0 or declared_size > request_limit
         except ValueError:
             too_large = True
         if too_large:
@@ -100,7 +105,7 @@ async def security_controls(request: Request, call_next):
         size = 0
         async for chunk in request.stream():
             size += len(chunk)
-            if size > settings.max_request_bytes:
+            if size > request_limit:
                 response = JSONResponse({"detail": "Request body too large"}, status_code=413)
                 return apply_security_headers(response, request_id, api_request)
             chunks.append(chunk)

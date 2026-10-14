@@ -64,6 +64,25 @@ class QuestionGenerationRequest(StrictModel):
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
 
 
+class QuestionImportRequest(StrictModel):
+    questions: list[str] = Field(min_length=1, max_length=200)
+    time_limit_seconds: int = Field(default=180, ge=30, le=3600)
+
+    @field_validator("questions")
+    @classmethod
+    def clean_questions(cls, value: list[str]) -> list[str]:
+        cleaned = [" ".join(question.split()) for question in value]
+        if any(len(question) < 5 or len(question) > 5_000 for question in cleaned):
+            raise ValueError("Each question must contain 5 to 5000 characters")
+        if len(set(map(str.casefold, cleaned))) != len(cleaned):
+            raise ValueError("questions must be unique")
+        return cleaned
+
+
+class PdfQuestionExtraction(StrictModel):
+    questions: list[str]
+
+
 class GeneratedCriterion(StrictModel):
     name: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=5, max_length=500)

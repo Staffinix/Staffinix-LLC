@@ -19,6 +19,7 @@ from backend.auth import Principal, bearer, current_principal
 from backend.config import get_settings
 from backend.main import app
 from backend.models import Invitation
+from backend.pdf_questions import questions_from_text
 from backend.schemas import GeneratedCriterion, GeneratedQuestion, GeneratedQuestionBatch
 
 
@@ -305,6 +306,60 @@ def test_generated_questions_require_company_approval(client, monkeypatch):
     questions = client.get(f"/api/v1/interviews/{interview.json()['id']}/questions", headers=headers)
     assert questions.status_code == 200
     assert questions.json()[0]["approved"] is True
+
+
+def test_pdf_question_text_parser_handles_numbered_bulleted_and_wrapped_questions():
+    extracted = questions_from_text(
+        """Interview questions
+
+        1. Explain how database transactions prevent
+        concurrent writes from corrupting data?
+        • What is an idempotency key?
+        This heading is not a question
+        How would you monitor a production API?
+        """
+    )
+    assert extracted == [
+        "Explain how database transactions prevent concurrent writes from corrupting data?",
+        "What is an idempotency key?",
+        "How would you monitor a production API?",
+    ]
+
+
+def test_pdf_questions_can_be_previewed_and_selected_for_import(client, monkeypatch):
+    headers, _, job, _ = bootstrap(client, "admin", "admin@example.com", "Acme")
+    interview = client.post(
+        "/api/v1/interviews",
+        json={"job_id": job["id"], "name": "PDF screen", "duration_minutes": 30, "attempt_limit": 1},
+        headers=headers,
+    ).json()
+    extracted = ["What is transaction isolation?", "How do you make an API idempotent?"]
+    monkeypatch.setattr("backend.api.extract_pdf_questions", lambda _: extracted)
+
+    preview = client.post(
+        f"/api/v1/interviews/{interview['id']}/questions/extract-pdf",
+        files={"file": ("questions.pdf", b"%PDF-test", "application/pdf")},
+        headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["questions"] == extracted
+
+    imported = client.post(
+        f"/api/v1/interviews/{interview['id']}/questions/import",
+        json={"questions": [extracted[1]], "time_limit_seconds": 240},
+        headers=headers,
+    )
+    assert imported.status_code == 201, imported.text
+    assert imported.json()[0]["text"] == extracted[1]
+    assert imported.json()[0]["approved"] is True
+    assert imported.json()[0]["rubric"] == {"source": "pdf"}
+
+    duplicate = client.post(
+        f"/api/v1/interviews/{interview['id']}/questions/import",
+        json={"questions": [extracted[1]]},
+        headers=headers,
+    )
+    assert duplicate.status_code == 409
 
 
 def test_requests_reject_unknown_fields_and_return_security_headers(client):
