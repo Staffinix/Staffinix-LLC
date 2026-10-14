@@ -43,6 +43,7 @@ from backend.schemas import (
     QuestionGenerationRequest,
     QuestionImportRequest,
     QuestionRead,
+    QuestionUpdate,
     PdfQuestionExtraction,
     ReattemptCreate,
     TemplateCreate,
@@ -120,6 +121,37 @@ def list_templates(
     if job_id:
         statement = statement.where(InterviewTemplate.job_id == job_id)
     return db.scalars(statement.order_by(InterviewTemplate.created_at)).all()
+
+
+@router.post("/interviews/{template_id}/revise", response_model=TemplateRead, status_code=201)
+def revise_template(template_id: str, context: CompanyContext = Depends(manager), db: Session = Depends(get_db)):
+    source = tenant_template(db, template_id, context.company_id, lock=True)
+    if not source.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only published interviews need a revision")
+    revision = InterviewTemplate(
+        company_id=source.company_id,
+        job_id=source.job_id,
+        name=f"{source.name[:149]} (revision)",
+        duration_minutes=source.duration_minutes,
+        attempt_limit=source.attempt_limit,
+        published=False,
+    )
+    db.add(revision)
+    db.flush()
+    db.add_all([
+        Question(
+            template_id=revision.id,
+            text=question.text,
+            position=question.position,
+            time_limit_seconds=question.time_limit_seconds,
+            approved=question.approved,
+            rubric=dict(question.rubric),
+        )
+        for question in source.questions
+    ])
+    audit(db, context.company_id, context.principal.user_id, "interview.revise", revision)
+    db.commit()
+    return revision
 
 
 def tenant_template(db: Session, template_id: str, company_id: str, *, lock: bool = False) -> InterviewTemplate:
@@ -298,6 +330,32 @@ def approve_question(
     audit(db, context.company_id, context.principal.user_id, "question.approve", question)
     db.commit()
     return {"id": question.id, "approved": True}
+
+
+@router.patch("/questions/{question_id}", response_model=QuestionRead)
+def update_question(
+    question_id: str,
+    body: QuestionUpdate,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    question = db.scalar(
+        select(Question)
+        .join(InterviewTemplate)
+        .where(Question.id == question_id, InterviewTemplate.company_id == context.company_id)
+        .with_for_update()
+    )
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+    template = db.get(InterviewTemplate, question.template_id)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    question.text = " ".join(body.text.split())
+    question.time_limit_seconds = body.time_limit_seconds
+    question.approved = False
+    audit(db, context.company_id, context.principal.user_id, "question.update", question)
+    db.commit()
+    return question
 
 
 @router.post("/questions/{question_id}/deselect")

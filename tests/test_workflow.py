@@ -356,6 +356,67 @@ def test_generated_questions_require_company_approval(client, monkeypatch):
     assert questions.json()[0]["approved"] is True
 
 
+def test_published_interview_revision_preserves_assignments_and_is_editable(client, monkeypatch):
+    headers, _, job, interview = bootstrap(client, "admin", "admin@example.com", "Acme")
+    _, assignment, _ = invite_and_accept(client, headers, job, interview)
+
+    revision_response = client.post(f"/api/v1/interviews/{interview['id']}/revise", headers=headers)
+    assert revision_response.status_code == 201, revision_response.text
+    revision = revision_response.json()
+    assert revision["id"] != interview["id"]
+    assert revision["published"] is False
+    assert assignment["template_id"] == interview["id"]
+
+    original_questions = client.get(f"/api/v1/interviews/{interview['id']}/questions", headers=headers).json()
+    revision_questions = client.get(f"/api/v1/interviews/{revision['id']}/questions", headers=headers).json()
+    assert revision_questions[0]["id"] != original_questions[0]["id"]
+    assert revision_questions[0]["text"] == original_questions[0]["text"]
+    assert client.patch(
+        f"/api/v1/questions/{original_questions[0]['id']}",
+        json={"text": "This published question must stay unchanged.", "time_limit_seconds": 180},
+        headers=headers,
+    ).status_code == 409
+
+    updated = client.patch(
+        f"/api/v1/questions/{revision_questions[0]['id']}",
+        json={"text": "How would you use transactions and row locks to prevent races?", "time_limit_seconds": 240},
+        headers=headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["approved"] is False
+    assert updated.json()["time_limit_seconds"] == 240
+    assert client.get(f"/api/v1/interviews/{interview['id']}/questions", headers=headers).json()[0]["text"] == original_questions[0]["text"]
+
+    monkeypatch.setattr(
+        "backend.api.OpenRouterQuestionProvider.generate",
+        lambda *args, **kwargs: GeneratedQuestionBatch(
+            questions=[
+                GeneratedQuestion(
+                    text="How would you make a background job safe to retry?",
+                    difficulty="medium",
+                    competency="Reliability",
+                    time_limit_seconds=180,
+                    criteria=[
+                        GeneratedCriterion(
+                            name="Idempotency",
+                            description="Explains idempotency keys and durable state.",
+                            max_points=10,
+                        )
+                    ],
+                )
+            ]
+        ),
+    )
+    generated = client.post(
+        f"/api/v1/interviews/{revision['id']}/questions/generate",
+        json={"count": 1, "difficulty": "medium"},
+        headers=headers,
+    )
+    assert generated.status_code == 201, generated.text
+    assert generated.json()[0]["text"] == "How would you make a background job safe to retry?"
+    assert client.post(f"/api/v1/interviews/{revision['id']}/revise", headers=headers).status_code == 409
+
+
 def test_pdf_question_text_parser_handles_numbered_bulleted_and_wrapped_questions():
     extracted = questions_from_text(
         """Interview questions

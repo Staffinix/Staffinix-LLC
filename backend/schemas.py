@@ -70,6 +70,11 @@ class QuestionRead(ORMModel):
     rubric: dict
 
 
+class QuestionUpdate(StrictModel):
+    text: str = Field(min_length=5, max_length=5000)
+    time_limit_seconds: int = Field(ge=30, le=3600)
+
+
 class QuestionGenerationRequest(StrictModel):
     count: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
