@@ -11,16 +11,19 @@ Last updated: 2026-10-14
 - Health/readiness endpoints, request correlation IDs, CORS configuration, environment template, Docker assets, and initial migration.
 - Automated tests for company isolation, invitation reuse/expiry, candidate isolation, duplicate active attempts, answer idempotency, and company-controlled reattempts.
 - React/TypeScript company and candidate portal shell wired to real API endpoints.
+- Company workflow UI for jobs, interview templates, AI generation, question approval, publication, and invitations.
 - Resend invitation delivery with delivery tracking, revoked invitations on provider failure, and server-only credentials.
 - OpenRouter structured question generation with duplicate checks, job-grounded prompts, draft storage, and explicit human approval.
 
 ## Test results
 
-- `python -m pytest`: **11 passed**. This includes Supabase Auth validation, provider request validation, question approval, and invalid-token rejection; Python 3.14 emits upstream FastAPI/Starlette deprecation warnings.
+- `python -m pytest`: **11 passed**. This includes Supabase Auth validation, provider request validation, question listing/approval, and invalid-token rejection; Python 3.14 emits upstream FastAPI/Starlette deprecation warnings.
 - `python -m compileall -q backend`: **passed**.
 - `python -m alembic upgrade head` followed by `downgrade base` against a fresh SQLite database: **passed**.
 - `npm run build`: **passed**; TypeScript checked and Vite produced the production bundle.
+- `npm run lint`: **passed** with the restored ESLint/TypeScript/React configuration.
 - `npm audit --audit-level=high`: **0 vulnerabilities**.
+- Live local E2E: browser job creation persisted to PostgreSQL; OpenRouter returned structured output; approval/publication persisted; Resend accepted the candidate invitation.
 
 ## Remaining
 

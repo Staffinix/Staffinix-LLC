@@ -9,15 +9,18 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 const apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const e2eAccessToken = import.meta.env.DEV ? import.meta.env.VITE_E2E_ACCESS_TOKEN : undefined;
+export const hasE2ESession = Boolean(e2eAccessToken);
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error("Your session expired. Sign in again.");
+  const accessToken = e2eAccessToken ?? data.session?.access_token;
+  if (!accessToken) throw new Error("Your session expired. Sign in again.");
   const response = await fetch(`${apiUrl}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${data.session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       ...init.headers,
     },
   });

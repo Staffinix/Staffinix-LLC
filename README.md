@@ -44,7 +44,7 @@ General shells use `source .venv/bin/activate`; the remaining commands are ident
 
 Create users with Supabase Auth and enable email verification. Copy the project URL and publishable key into both `.env` and `frontend/.env`. The backend validates access tokens with Supabase Auth, so no JWT secret or service-role key is required. Configure the Site URL and redirect allow-list for `http://localhost:5173/invite`.
 
-The first signed-in company user opens `/company` and creates a company. Company setup through the current UI is real; jobs, templates, questions, publication, and invitations are available through `/docs` until their management forms are added. With `EMAIL_DELIVERY_MODE=console`, the invitation endpoint returns a development token. With `EMAIL_DELIVERY_MODE=resend`, it sends the private invitation link and never returns the token.
+The first signed-in company user opens `/company` and creates a company. The company portal supports job creation, interview creation, OpenRouter question generation, human approval, publication, and candidate invitations. With `EMAIL_DELIVERY_MODE=console`, the invitation endpoint returns a development token. With `EMAIL_DELIVERY_MODE=resend`, it sends the private invitation link and never returns the token.
 
 ## Production email and AI configuration
 
@@ -65,6 +65,8 @@ OPENROUTER_MODEL=openai/gpt-4o-mini
 - Restart the API after changing `.env`.
 
 `POST /api/v1/interviews/{template_id}/questions/generate` creates draft questions through OpenRouter. Generated questions remain unapproved until a company admin calls `POST /api/v1/questions/{question_id}/approve`; an interview cannot be published with unapproved questions.
+
+For automated browser verification only, a Vite development server may receive an ephemeral `VITE_E2E_ACCESS_TOKEN`. The production build ignores this variable; never add it to an env file or deploy it.
 
 ## Environment variables
 

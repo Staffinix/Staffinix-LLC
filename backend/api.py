@@ -37,6 +37,7 @@ from backend.schemas import (
     JobRead,
     QuestionCreate,
     QuestionGenerationRequest,
+    QuestionRead,
     ReattemptCreate,
     TemplateCreate,
     TemplateRead,
@@ -99,6 +100,18 @@ def create_template(body: TemplateCreate, context: CompanyContext = Depends(mana
     return template
 
 
+@router.get("/interviews", response_model=list[TemplateRead])
+def list_templates(
+    job_id: str | None = None,
+    context: CompanyContext = Depends(company_context),
+    db: Session = Depends(get_db),
+):
+    statement = select(InterviewTemplate).where(InterviewTemplate.company_id == context.company_id)
+    if job_id:
+        statement = statement.where(InterviewTemplate.job_id == job_id)
+    return db.scalars(statement.order_by(InterviewTemplate.created_at)).all()
+
+
 def tenant_template(db: Session, template_id: str, company_id: str) -> InterviewTemplate:
     template = db.scalar(
         select(InterviewTemplate)
@@ -108,6 +121,16 @@ def tenant_template(db: Session, template_id: str, company_id: str) -> Interview
     if template is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
     return template
+
+
+@router.get("/interviews/{template_id}/questions", response_model=list[QuestionRead])
+def list_questions(
+    template_id: str,
+    context: CompanyContext = Depends(company_context),
+    db: Session = Depends(get_db),
+):
+    template = tenant_template(db, template_id, context.company_id)
+    return sorted(template.questions, key=lambda question: question.position)
 
 
 @router.post("/interviews/{template_id}/questions", status_code=201)

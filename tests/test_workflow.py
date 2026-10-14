@@ -285,4 +285,9 @@ def test_generated_questions_require_company_approval(client, monkeypatch):
     approved = client.post(f"/api/v1/questions/{question['id']}/approve", headers=headers)
     assert approved.status_code == 200
     assert approved.json()["approved"] is True
+    templates = client.get(f"/api/v1/interviews?job_id={job['id']}", headers=headers)
+    assert interview.json()["id"] in {item["id"] for item in templates.json()}
+    questions = client.get(f"/api/v1/interviews/{interview.json()['id']}/questions", headers=headers)
+    assert questions.status_code == 200
+    assert questions.json()[0]["approved"] is True
 

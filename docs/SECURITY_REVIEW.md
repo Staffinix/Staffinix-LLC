@@ -13,6 +13,7 @@
 - Resend and OpenRouter credentials remain server-only; placeholder credentials are rejected before network access.
 - Invitation email HTML is escaped, email delivery is tracked, and failed sends revoke the associated invitation.
 - AI questions use schema-validated structured output, reject duplicates, remain drafts until human approval, and instruct the model not to score protected traits or speaking style.
+- The optional browser-test token is read only by Vite development builds; production builds ignore it and no token is stored in repository env files.
 
 ## Remaining risks before production
 

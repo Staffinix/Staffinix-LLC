@@ -45,6 +45,16 @@ class QuestionCreate(BaseModel):
     rubric: dict = Field(default_factory=dict)
 
 
+class QuestionRead(ORMModel):
+    id: str
+    template_id: str
+    text: str
+    position: int
+    time_limit_seconds: int
+    approved: bool
+    rubric: dict
+
+
 class QuestionGenerationRequest(BaseModel):
     count: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
