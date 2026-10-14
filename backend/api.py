@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -63,7 +63,11 @@ def create_company(
     db.flush()
     db.add(Membership(auth_user_id=principal.user_id, company_id=company.id, role=Role.admin))
     audit(db, company.id, principal.user_id, "company.create", company)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "User already belongs to a company") from exc
     return company
 
 
@@ -112,12 +116,15 @@ def list_templates(
     return db.scalars(statement.order_by(InterviewTemplate.created_at)).all()
 
 
-def tenant_template(db: Session, template_id: str, company_id: str) -> InterviewTemplate:
-    template = db.scalar(
+def tenant_template(db: Session, template_id: str, company_id: str, *, lock: bool = False) -> InterviewTemplate:
+    statement = (
         select(InterviewTemplate)
         .options(selectinload(InterviewTemplate.questions))
         .where(InterviewTemplate.id == template_id, InterviewTemplate.company_id == company_id)
     )
+    if lock:
+        statement = statement.with_for_update()
+    template = db.scalar(statement)
     if template is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
     return template
@@ -135,12 +142,16 @@ def list_questions(
 
 @router.post("/interviews/{template_id}/questions", status_code=201)
 def add_question(template_id: str, body: QuestionCreate, context: CompanyContext = Depends(manager), db: Session = Depends(get_db)):
-    template = tenant_template(db, template_id, context.company_id)
+    template = tenant_template(db, template_id, context.company_id, lock=True)
     if template.published:
         raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
     question = Question(template_id=template.id, approved=True, **body.model_dump())
     db.add(question)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Question position already exists") from exc
     audit(db, context.company_id, context.principal.user_id, "question.create", question)
     db.commit()
     return {"id": question.id, "approved": question.approved}
@@ -168,7 +179,10 @@ def generate_questions(
         )
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
-    next_position = max((question.position for question in template.questions), default=0) + 1
+    template = tenant_template(db, template_id, context.company_id, lock=True)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    next_position = (db.scalar(select(func.max(Question.position)).where(Question.template_id == template.id)) or 0) + 1
     created = []
     for offset, generated in enumerate(batch.questions):
         rubric = {
@@ -191,7 +205,11 @@ def generate_questions(
         db.flush()
         audit(db, context.company_id, context.principal.user_id, "question.generate", question)
         created.append({"id": question.id, "text": question.text, "approved": False, "rubric": rubric})
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Questions were added concurrently; generate again") from exc
     return created
 
 
@@ -238,7 +256,11 @@ def create_invitation(body: InvitationCreate, context: CompanyContext = Depends(
     if candidate is None:
         candidate = Candidate(company_id=context.company_id, email=normalized_email, name=body.name)
         db.add(candidate)
-        db.flush()
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, "Candidate was created concurrently; retry invitation") from exc
     raw_token, hashed = create_invitation_token()
     invitation = Invitation(
         token_hash=hashed,
@@ -259,7 +281,11 @@ def create_invitation(body: InvitationCreate, context: CompanyContext = Depends(
     )
     db.add(notification)
     audit(db, context.company_id, context.principal.user_id, "invitation.create", invitation)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Invitation was created concurrently; retry") from exc
     settings = get_settings()
     console = settings.email_delivery_mode == "console"
     company = db.get(Company, context.company_id)

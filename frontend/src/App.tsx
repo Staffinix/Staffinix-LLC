@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { api, hasE2ESession, supabase } from "./lib";
 
@@ -28,7 +28,7 @@ function Login() {
   const submit = handleSubmit(async ({ email, password }) => {
     setMessage("");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMessage(error.message); else navigate("/company");
+    if (error) setMessage(error.message); else navigate(sessionStorage.getItem("invite_token") ? "/invite" : "/company");
   });
   return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Secure access</p><h1 className="text-3xl font-bold">Welcome back</h1><p className="mt-2 text-slate-400">Use your verified company or candidate account.</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete="current-password" {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role="alert" className="text-sm text-rose-400">{message}</p>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? "Signing in…" : "Sign in"}</button></form><Link className="mt-6 block text-center text-sm text-cyan-300" to="/candidate">Candidate portal</Link></section></main>;
 }
@@ -101,13 +101,21 @@ function Candidate() {
   return <Shell><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Candidate portal</p><h1 className="mt-2 text-4xl font-bold">Your interviews</h1><p className="mt-3 text-slate-400">Progress and deadlines are saved by the server. Refreshing never creates a new attempt.</p><div className="mt-8 grid gap-4">{sessions.data?.map((session) => <article className="card flex flex-col justify-between gap-4 sm:flex-row sm:items-center" key={session.id}><div><h2 className="font-semibold">Interview assignment</h2><p className="mt-1 text-sm text-slate-400">Available until {new Date(session.available_until).toLocaleString()}</p></div><button className="button" onClick={() => start.mutate(session.id)} disabled={start.isPending}>Start or resume</button></article>)}{sessions.isSuccess && !sessions.data.length && <div className="card text-slate-400">No interviews are assigned to this verified account.</div>}{sessions.error && <p role="alert" className="text-rose-400">{sessions.error.message}</p>}{start.data && <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">Attempt {start.data.attempt_number} is ready. Voice interview UI is scheduled for Phase 4.</p>}</div></Shell>;
 }
 
-function AcceptInvite() {
-  const [params] = useSearchParams();
+function AcceptInvite({ token }: { token: string | null }) {
   const navigate = useNavigate();
-  const inviteToken = params.get("token");
-  const [message, setMessage] = useState(inviteToken ? "Accepting your invitation…" : "Invitation token is missing.");
-  useEffect(() => { if (!inviteToken) return; api("/api/v1/invitations/accept", { method: "POST", body: JSON.stringify({ token: inviteToken }) }).then(() => navigate("/candidate")).catch((error) => setMessage(error.message)); }, [inviteToken, navigate]);
+  const [message, setMessage] = useState(token ? "Accepting your invitation…" : "Invitation token is missing.");
+  useEffect(() => { if (!token) return; sessionStorage.removeItem("invite_token"); api("/api/v1/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }).then(() => navigate("/candidate")).catch((error) => setMessage(error.message)); }, [token, navigate]);
   return <main className="grid min-h-screen place-items-center"><div className="card" role="status">{message}</div></main>;
+}
+
+function InviteRoute({ signedIn }: { signedIn: boolean }) {
+  const [token] = useState(() => {
+    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get("token");
+    if (fragmentToken) sessionStorage.setItem("invite_token", fragmentToken);
+    if (window.location.hash) window.history.replaceState({}, "", "/invite");
+    return fragmentToken || sessionStorage.getItem("invite_token");
+  });
+  return signedIn ? <AcceptInvite token={token} /> : <Navigate to="/login" replace />;
 }
 
 function App() {
@@ -115,7 +123,7 @@ function App() {
   const [signedIn, setSignedIn] = useState(hasE2ESession);
   useEffect(() => { if (hasE2ESession) return; supabase.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setReady(true); }); const { data } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session))); return () => data.subscription.unsubscribe(); }, []);
   if (!ready) return <div className="grid min-h-screen place-items-center">Loading…</div>;
-  return <Routes><Route path="/login" element={<Login />} /><Route path="/invite" element={signedIn ? <AcceptInvite /> : <Navigate to="/login" replace />} /><Route path="/company" element={signedIn ? <Company /> : <Navigate to="/login" replace />} /><Route path="/candidate" element={signedIn ? <Candidate /> : <Navigate to="/login" replace />} /><Route path="*" element={<Navigate to={signedIn ? "/company" : "/login"} replace />} /></Routes>;
+  return <Routes><Route path="/login" element={<Login />} /><Route path="/invite" element={<InviteRoute signedIn={signedIn} />} /><Route path="/company" element={signedIn ? <Company /> : <Navigate to="/login" replace />} /><Route path="/candidate" element={signedIn ? <Candidate /> : <Navigate to="/login" replace />} /><Route path="*" element={<Navigate to={signedIn ? "/company" : "/login"} replace />} /></Routes>;
 }
 
 export default App;

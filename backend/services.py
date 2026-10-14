@@ -49,10 +49,12 @@ def create_invitation_token() -> tuple[str, str]:
 
 
 def accept_invitation(db: Session, raw_token: str, user_id: str, email: str | None) -> Assignment:
-    invitation = db.scalar(select(Invitation).where(Invitation.token_hash == token_hash(raw_token)))
+    invitation = db.scalar(
+        select(Invitation).where(Invitation.token_hash == token_hash(raw_token)).with_for_update()
+    )
     if invitation is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invitation not found")
-    candidate = db.get(Candidate, invitation.candidate_id)
+    candidate = db.scalar(select(Candidate).where(Candidate.id == invitation.candidate_id).with_for_update())
     if invitation.revoked_at or invitation.accepted_at:
         raise HTTPException(status.HTTP_409_CONFLICT, "Invitation is no longer usable")
     if aware(invitation.expires_at) <= now():
@@ -80,7 +82,11 @@ def accept_invitation(db: Session, raw_token: str, user_id: str, email: str | No
         db.add(assignment)
         db.flush()
     audit(db, invitation.company_id, user_id, "invitation.accept", invitation)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Invitation was accepted concurrently") from exc
     return assignment
 
 

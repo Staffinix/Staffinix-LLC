@@ -30,6 +30,10 @@ python -m alembic upgrade head
 python -m uvicorn backend.main:app --reload
 ```
 
+Run that command from the repository root (`Interview Panal`), not from the
+`backend` directory. If the prompt ends in `\backend>`, first run `Set-Location ..`;
+otherwise Python cannot import the `backend` package.
+
 In a second terminal:
 
 ```powershell
@@ -70,7 +74,7 @@ For automated browser verification only, a Vite development server may receive a
 
 ## Environment variables
 
-Backend: `APP_ENV`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `CORS_ORIGINS`, `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_APP_URL`, `INVITATION_TTL_HOURS`, `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`, and `OPENROUTER_APP_NAME`.
+Backend: `APP_ENV`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `CORS_ORIGINS`, `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_APP_URL`, `INVITATION_TTL_HOURS`, `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`, `OPENROUTER_APP_NAME`, `REDIS_URL`, `MAX_REQUEST_BYTES`, and `RATE_LIMIT_PER_MINUTE`.
 
 Frontend: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY`. Values prefixed with `VITE_` are public browser configuration; never put service-role or other secrets there.
 
@@ -82,7 +86,7 @@ python -m alembic upgrade head
 python -m alembic downgrade -1   # development rollback only
 ```
 
-The relational application data belongs in PostgreSQL. Qdrant and Redis are provisioned now for later RAG and job phases, but the current API does not claim to use them yet. Back up PostgreSQL with managed point-in-time recovery plus tested logical exports; snapshot Qdrant independently after ingestion is implemented.
+The relational application data belongs in PostgreSQL. Redis enforces API rate limits, and Qdrant is provisioned for a later RAG phase. Back up PostgreSQL with managed point-in-time recovery plus tested logical exports; snapshot Qdrant independently after ingestion is implemented.
 
 PostgreSQL is exposed on `localhost:5433` by default to avoid conflicts with native Windows PostgreSQL installations. Containers on the Compose network use `postgres:5432`.
 
@@ -101,5 +105,5 @@ The API is at `http://localhost:8000`, OpenAPI at `/docs`, health at `/health`, 
 
 ## Production notes
 
-Build the API image from `backend/Dockerfile` and the static client from `frontend/Dockerfile`. Set production CORS origins explicitly, run migrations as a controlled release step, and keep PostgreSQL/Qdrant/Redis on private networks. Staging must use separate projects and credentials. Do not enable candidate media, AI evaluation, or monitoring until the remaining consent, retention, provider, and review controls in the security review are implemented.
+Build the API image from `backend/Dockerfile` and the static client from `frontend/Dockerfile`. Production startup fails closed unless PostgreSQL, Supabase, Resend with a verified sender, HTTPS public URLs, explicit CORS, OpenRouter, and a non-local Redis service are configured. Run migrations as a controlled release step and keep PostgreSQL/Qdrant/Redis on private networks. Staging must use separate projects and credentials. Do not enable candidate media, AI evaluation, or monitoring until the remaining consent, retention, provider, and review controls in the security review are implemented.
 

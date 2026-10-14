@@ -4,11 +4,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CompanyCreate(BaseModel):
+class CompanyCreate(StrictModel):
     name: str = Field(min_length=2, max_length=160)
 
 
@@ -17,7 +21,7 @@ class CompanyRead(ORMModel):
     name: str
 
 
-class JobCreate(BaseModel):
+class JobCreate(StrictModel):
     title: str = Field(min_length=2, max_length=160)
     description: str = Field(min_length=10, max_length=20_000)
     required_skills: list[str] = Field(default_factory=list, max_length=50)
@@ -38,7 +42,7 @@ class JobRead(ORMModel):
     required_skills: list[str]
 
 
-class QuestionCreate(BaseModel):
+class QuestionCreate(StrictModel):
     text: str = Field(min_length=5, max_length=5000)
     position: int = Field(ge=1, le=200)
     time_limit_seconds: int = Field(ge=30, le=3600)
@@ -55,22 +59,18 @@ class QuestionRead(ORMModel):
     rubric: dict
 
 
-class QuestionGenerationRequest(BaseModel):
+class QuestionGenerationRequest(StrictModel):
     count: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
 
 
-class GeneratedCriterion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class GeneratedCriterion(StrictModel):
     name: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=5, max_length=500)
     max_points: int = Field(ge=1, le=100)
 
 
-class GeneratedQuestion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class GeneratedQuestion(StrictModel):
     text: str = Field(min_length=10, max_length=5000)
     difficulty: Literal["easy", "medium", "hard"]
     competency: str = Field(min_length=2, max_length=160)
@@ -78,13 +78,11 @@ class GeneratedQuestion(BaseModel):
     criteria: list[GeneratedCriterion] = Field(min_length=1, max_length=10)
 
 
-class GeneratedQuestionBatch(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class GeneratedQuestionBatch(StrictModel):
     questions: list[GeneratedQuestion] = Field(min_length=1, max_length=20)
 
 
-class TemplateCreate(BaseModel):
+class TemplateCreate(StrictModel):
     job_id: str
     name: str = Field(min_length=2, max_length=160)
     duration_minutes: int = Field(ge=5, le=480)
@@ -100,7 +98,7 @@ class TemplateRead(ORMModel):
     published: bool
 
 
-class InvitationCreate(BaseModel):
+class InvitationCreate(StrictModel):
     email: EmailStr
     name: str | None = Field(default=None, max_length=160)
     job_id: str
@@ -114,7 +112,7 @@ class InvitationRead(BaseModel):
     token: str | None = None
 
 
-class InvitationAccept(BaseModel):
+class InvitationAccept(StrictModel):
     token: str = Field(min_length=32, max_length=512)
 
 
@@ -124,7 +122,7 @@ class AssignmentRead(ORMModel):
     available_until: datetime
 
 
-class AnswerCreate(BaseModel):
+class AnswerCreate(StrictModel):
     question_id: str
     transcript: str = Field(min_length=1, max_length=50_000)
 
@@ -139,7 +137,7 @@ class AttemptRead(ORMModel):
     configuration_snapshot: dict
 
 
-class ReattemptCreate(BaseModel):
+class ReattemptCreate(StrictModel):
     reason: str = Field(min_length=10, max_length=2000)
     expires_at: datetime | None = None
 

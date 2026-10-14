@@ -1,6 +1,5 @@
 import html
 import json
-from urllib.parse import urlencode
 
 import httpx
 
@@ -31,7 +30,7 @@ class ResendEmailProvider(EmailProvider):
             raise ProviderError("Resend email is not configured")
         if not self.settings.email_from or "your-verified-domain.com" in self.settings.email_from:
             raise ProviderError("A verified Resend sender is not configured")
-        invite_url = f"{self.settings.public_app_url.rstrip('/')}/invite?{urlencode({'token': token})}"
+        invite_url = f"{self.settings.public_app_url.rstrip('/')}/invite#token={token}"
         safe_name = html.escape(candidate_name or "Candidate")
         safe_company = html.escape(company_name)
         safe_job = html.escape(job_title)

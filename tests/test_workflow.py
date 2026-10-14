@@ -9,13 +9,13 @@ os.environ["EMAIL_DELIVERY_MODE"] = "console"
 
 import jwt
 import pytest
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from backend.database import Base, SessionLocal, engine
-from backend.auth import current_principal
+from backend.auth import Principal, bearer, current_principal
 from backend.config import get_settings
 from backend.main import app
 from backend.models import Invitation
@@ -39,11 +39,26 @@ def auth(user_id: str, email: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token(user_id, email)}"}
 
 
+def fake_principal(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> Principal:
+    if credentials is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required")
+    payload = jwt.decode(
+        credentials.credentials,
+        "test-secret-with-sufficient-length",
+        algorithms=["HS256"],
+        audience="authenticated",
+    )
+    return Principal(user_id=payload["sub"], email=payload.get("email"))
+
+
 @pytest.fixture(autouse=True)
 def database():
+    assert engine.url.get_backend_name() == "sqlite", "Tests must never run against a persistent database"
+    app.dependency_overrides[current_principal] = fake_principal
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield
+    app.dependency_overrides.clear()
     Base.metadata.drop_all(engine)
 
 
@@ -217,7 +232,7 @@ def test_supabase_auth_server_validates_production_tokens(monkeypatch):
         def json():
             return {"id": "supabase-user", "email": "user@example.com"}
 
-    monkeypatch.setattr("backend.auth.httpx.get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr("backend.auth.auth_client.get", lambda *args, **kwargs: Response())
     try:
         principal = current_principal(HTTPAuthorizationCredentials(scheme="Bearer", credentials="access-token"))
         assert principal.user_id == "supabase-user"
@@ -236,7 +251,7 @@ def test_supabase_auth_server_rejects_invalid_tokens(monkeypatch):
     class Response:
         status_code = 401
 
-    monkeypatch.setattr("backend.auth.httpx.get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr("backend.auth.auth_client.get", lambda *args, **kwargs: Response())
     try:
         with pytest.raises(HTTPException) as error:
             current_principal(HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid"))
@@ -290,4 +305,33 @@ def test_generated_questions_require_company_approval(client, monkeypatch):
     questions = client.get(f"/api/v1/interviews/{interview.json()['id']}/questions", headers=headers)
     assert questions.status_code == 200
     assert questions.json()[0]["approved"] is True
+
+
+def test_requests_reject_unknown_fields_and_return_security_headers(client):
+    response = client.post(
+        "/api/v1/companies",
+        json={"name": "Acme", "unexpected": True},
+        headers=auth("admin", "admin@example.com"),
+    )
+    assert response.status_code == 422
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_duplicate_question_position_is_rejected(client):
+    headers, _, job, _ = bootstrap(client, "admin", "admin@example.com", "Acme")
+    interview = client.post(
+        "/api/v1/interviews",
+        json={"job_id": job["id"], "name": "Duplicate check", "duration_minutes": 30},
+        headers=headers,
+    ).json()
+    payload = {"text": "A question with a protected position", "position": 1, "time_limit_seconds": 180}
+    assert client.post(
+        f"/api/v1/interviews/{interview['id']}/questions", json=payload, headers=headers
+    ).status_code == 201
+    response = client.post(
+        f"/api/v1/interviews/{interview['id']}/questions", json=payload, headers=headers
+    )
+    assert response.status_code == 409
 

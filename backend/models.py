@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -37,7 +37,10 @@ class Company(IdMixin, Base):
 
 class Membership(IdMixin, Base):
     __tablename__ = "memberships"
-    __table_args__ = (UniqueConstraint("auth_user_id", "company_id"),)
+    __table_args__ = (
+        UniqueConstraint("auth_user_id", "company_id"),
+        Index("uq_memberships_auth_user_id", "auth_user_id", unique=True),
+    )
     auth_user_id: Mapped[str] = mapped_column(String(128), index=True)
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
     role: Mapped[Role] = mapped_column(Enum(Role))
@@ -74,6 +77,7 @@ class InterviewTemplate(IdMixin, Base):
 
 class Question(IdMixin, Base):
     __tablename__ = "questions"
+    __table_args__ = (Index("uq_questions_template_position", "template_id", "position", unique=True),)
     template_id: Mapped[str] = mapped_column(ForeignKey("interview_templates.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
     position: Mapped[int] = mapped_column(Integer)

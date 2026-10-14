@@ -35,6 +35,8 @@ def test_resend_sends_private_invitation_link(monkeypatch):
     assert captured["url"] == "https://api.resend.com/emails"
     assert captured["json"]["to"] == ["candidate@example.com"]
     assert "private-token" in captured["json"]["html"]
+    assert "/invite#token=private-token" in captured["json"]["html"]
+    assert "/invite?token=" not in captured["json"]["html"]
     assert "A &lt;Candidate&gt;" in captured["json"]["html"]
     assert captured["json"]["subject"] == "Interview invitation from Example & Co Bcc: attacker@example.com"
 
