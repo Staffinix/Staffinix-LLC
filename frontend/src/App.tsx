@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { captureInvitationToken, clearPendingInvitationToken, getPendingInvitationToken } from "./invitation";
 import { api, hasE2ESession, supabase } from "./lib";
 
 type Session = { id: string; template_id: string; available_until: string };
@@ -27,14 +28,37 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const candidateDestination = new URLSearchParams(location.search).get("next") === "candidate";
+  const [hasInvitation] = useState(() => Boolean(getPendingInvitationToken(localStorage)));
+  const [mode, setMode] = useState<"signin" | "signup">(hasInvitation ? "signup" : "signin");
   const [message, setMessage] = useState("");
+  const [messageIsSuccess, setMessageIsSuccess] = useState(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   const submit = handleSubmit(async ({ email, password }) => {
     setMessage("");
+    setMessageIsSuccess(false);
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/invite` },
+      });
+      if (error) {
+        setMessage(error.message);
+      } else if (data.session) {
+        navigate(hasInvitation ? "/invite" : "/candidate");
+      } else {
+        setMessageIsSuccess(true);
+        setMessage("Account created. Check your email to confirm it, then return to this browser. If needed, reopen the original invitation link.");
+      }
+      return;
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMessage(error.message); else navigate(sessionStorage.getItem("invite_token") ? "/invite" : "/company");
+    if (error) setMessage(error.message); else navigate(hasInvitation ? "/invite" : (candidateDestination ? "/candidate" : "/company"));
   });
-  return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">Secure access</p><h1 className="text-3xl font-bold">Welcome back</h1><p className="mt-2 text-slate-400">Use your verified company or candidate account.</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete="current-password" {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role="alert" className="text-sm text-rose-400">{message}</p>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? "Signing in…" : "Sign in"}</button></form><Link className="mt-6 block text-center text-sm text-cyan-300" to="/candidate">Candidate portal</Link></section></main>;
+  const switchMode = () => { setMode((current) => current === "signin" ? "signup" : "signin"); setMessage(""); setMessageIsSuccess(false); };
+  return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">{hasInvitation ? "Candidate invitation" : (candidateDestination ? "Candidate portal" : "Secure access")}</p><h1 className="text-3xl font-bold">{mode === "signup" ? "Create your account" : "Welcome back"}</h1><p className="mt-2 text-slate-400">{hasInvitation ? (mode === "signup" ? "Use the same email address that received the invitation." : "Sign in with the invited candidate account.") : (candidateDestination ? "Sign in to view your assigned interviews." : "Use your verified company account.")}</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role={messageIsSuccess ? "status" : "alert"} className={`text-sm ${messageIsSuccess ? "text-emerald-300" : "text-rose-400"}`}>{message}</p>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? (mode === "signup" ? "Creating account…" : "Signing in…") : (mode === "signup" ? "Create candidate account" : "Sign in")}</button></form><button className="mt-6 block w-full text-center text-sm text-cyan-300" type="button" onClick={switchMode}>{mode === "signup" ? "Already have an account? Sign in" : "New candidate? Create an account"}</button>{!hasInvitation && mode === "signup" && <p className="mt-3 text-center text-xs text-slate-500">Candidate interviews require an invitation from the company.</p>}{!hasInvitation && <Link className="mt-4 block text-center text-sm text-slate-400 hover:text-white" to={candidateDestination ? "/login" : "/login?next=candidate"}>{candidateDestination ? "Company sign in" : "Candidate portal"}</Link>}</section></main>;
 }
 
 function PdfQuestionImporter({ templateId, published }: { templateId: string; published: boolean }) {
@@ -220,17 +244,18 @@ function Candidate() {
 
 function AcceptInvite({ token }: { token: string | null }) {
   const navigate = useNavigate();
+  const acceptanceStarted = useRef(false);
   const [message, setMessage] = useState(token ? "Accepting your invitation…" : "Invitation token is missing.");
-  useEffect(() => { if (!token) return; sessionStorage.removeItem("invite_token"); api("/api/v1/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }).then(() => navigate("/candidate")).catch((error) => setMessage(error.message)); }, [token, navigate]);
-  return <main className="grid min-h-screen place-items-center"><div className="card" role="status">{message}</div></main>;
+  useEffect(() => { if (!token || acceptanceStarted.current) return; acceptanceStarted.current = true; api("/api/v1/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }).then(() => { clearPendingInvitationToken(localStorage); sessionStorage.removeItem("invite_token"); navigate("/candidate"); }).catch((error) => setMessage(errorMessage(error))); }, [token, navigate]);
+  const failed = Boolean(token && message !== "Accepting your invitation…");
+  return <main className="grid min-h-screen place-items-center px-6"><div className="card max-w-lg" role="status"><p>{message}</p>{failed && <><p className="mt-3 text-sm text-slate-400">Use the exact email address that received this invitation, or ask the company to send a new link if it expired.</p><button className="button mt-5" type="button" onClick={async () => { await supabase.auth.signOut(); navigate("/login"); }}>Sign out and try another account</button></>}</div></main>;
 }
 
 function InviteRoute({ signedIn }: { signedIn: boolean }) {
   const [token] = useState(() => {
-    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get("token");
-    if (fragmentToken) sessionStorage.setItem("invite_token", fragmentToken);
+    const pendingToken = captureInvitationToken(window.location.hash, localStorage);
     if (window.location.hash) window.history.replaceState({}, "", "/invite");
-    return fragmentToken || sessionStorage.getItem("invite_token");
+    return pendingToken;
   });
   return signedIn ? <AcceptInvite token={token} /> : <Navigate to="/login" replace />;
 }
@@ -240,7 +265,7 @@ function App() {
   const [signedIn, setSignedIn] = useState(hasE2ESession);
   useEffect(() => { if (hasE2ESession) return; supabase.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setReady(true); }); const { data } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session))); return () => data.subscription.unsubscribe(); }, []);
   if (!ready) return <div className="grid min-h-screen place-items-center">Loading…</div>;
-  return <Routes><Route path="/login" element={<Login />} /><Route path="/invite" element={<InviteRoute signedIn={signedIn} />} /><Route path="/company" element={signedIn ? <Company /> : <Navigate to="/login" replace />} /><Route path="/candidate" element={signedIn ? <Candidate /> : <Navigate to="/login" replace />} /><Route path="*" element={<Navigate to={signedIn ? "/company" : "/login"} replace />} /></Routes>;
+  return <Routes><Route path="/login" element={<Login />} /><Route path="/invite" element={<InviteRoute signedIn={signedIn} />} /><Route path="/company" element={signedIn ? <Company /> : <Navigate to="/login" replace />} /><Route path="/candidate" element={signedIn ? <Candidate /> : <Navigate to="/login?next=candidate" replace />} /><Route path="*" element={<Navigate to={signedIn ? "/company" : "/login"} replace />} /></Routes>;
 }
 
 export default App;

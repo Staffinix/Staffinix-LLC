@@ -51,6 +51,7 @@ class ResendEmailProvider(EmailProvider):
                         f"<p>Hello {safe_name},</p>"
                         f"<p>{safe_company} invited you to interview for <strong>{safe_job}</strong>.</p>"
                         f'<p><a href="{safe_url}">Accept invitation</a></p>'
+                        "<p>If this is your first invitation, create a candidate account using this same email address, then confirm it.</p>"
                         "<p>This private link expires automatically and can be used only once.</p>"
                     ),
                 },

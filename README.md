@@ -46,7 +46,9 @@ General shells use `source .venv/bin/activate`; the remaining commands are ident
 
 ## Supabase configuration
 
-Create users with Supabase Auth and enable email verification. Copy the project URL and publishable key into both `.env` and `frontend/.env`. The backend validates access tokens with Supabase Auth, so no JWT secret or service-role key is required. Configure the Site URL and redirect allow-list for `http://localhost:5173/invite`.
+Enable email/password sign-in and email verification in Supabase Auth. Copy the project URL and publishable key into both `.env` and `frontend/.env`. The backend validates access tokens with Supabase Auth, so no JWT secret or service-role key is required. In **Authentication → URL Configuration**, add `http://localhost:5173/invite` to the redirect allow-list. For production, also add `https://your-frontend-domain.com/invite` and set the Site URL to the deployed frontend origin.
+
+A first-time candidate clicks the private invitation link, chooses **Create candidate account**, enters the same email address that received the invitation, and confirms the Supabase email. Returning to `/invite` accepts the invitation and opens `/candidate`. A returning candidate can use **Candidate portal** on the sign-in page. The invitation token stays private in the URL fragment and is retained until the API confirms acceptance; expired, reused, or wrong-email links remain rejected by the backend.
 
 The first signed-in company user opens `/company` and creates a company. The company portal supports job creation, interview creation, OpenRouter question generation, human approval, publication, and candidate invitations. With `EMAIL_DELIVERY_MODE=console`, the invitation endpoint returns a development token. With `EMAIL_DELIVERY_MODE=resend`, it sends the private invitation link and never returns the token.
 
