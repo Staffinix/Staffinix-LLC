@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -27,6 +28,30 @@ def current_principal(
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required")
     settings = get_settings()
+    if settings.app_env != "test":
+        if not settings.supabase_url or not settings.supabase_publishable_key:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Supabase Auth is not configured")
+        try:
+            response = httpx.get(
+                f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+                headers={
+                    "apikey": settings.supabase_publishable_key,
+                    "Authorization": f"Bearer {credentials.credentials}",
+                },
+                timeout=5,
+            )
+        except httpx.RequestError as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Authentication service unavailable") from exc
+        if response.status_code != status.HTTP_200_OK:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid access token")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid access token") from exc
+        if not isinstance(payload, dict) or not payload.get("id"):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid access token")
+        return Principal(user_id=payload["id"], email=payload.get("email"))
+
     try:
         payload = jwt.decode(
             credentials.credentials,

@@ -9,10 +9,14 @@ os.environ["EMAIL_DELIVERY_MODE"] = "console"
 
 import jwt
 import pytest
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from backend.database import Base, SessionLocal, engine
+from backend.auth import current_principal
+from backend.config import get_settings
 from backend.main import app
 from backend.models import Invitation
 
@@ -196,4 +200,46 @@ def test_candidate_cannot_access_another_assignment(client):
         headers=auth("candidate-b", "b@candidate.com"),
     )
     assert response.status_code == 404
+
+
+def test_supabase_auth_server_validates_production_tokens(monkeypatch):
+    settings = get_settings()
+    original = (settings.app_env, settings.supabase_url, settings.supabase_publishable_key)
+    settings.app_env = "development"
+    settings.supabase_url = "https://example.supabase.co"
+    settings.supabase_publishable_key = "sb_publishable_test"
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"id": "supabase-user", "email": "user@example.com"}
+
+    monkeypatch.setattr("backend.auth.httpx.get", lambda *args, **kwargs: Response())
+    try:
+        principal = current_principal(HTTPAuthorizationCredentials(scheme="Bearer", credentials="access-token"))
+        assert principal.user_id == "supabase-user"
+        assert principal.email == "user@example.com"
+    finally:
+        settings.app_env, settings.supabase_url, settings.supabase_publishable_key = original
+
+
+def test_supabase_auth_server_rejects_invalid_tokens(monkeypatch):
+    settings = get_settings()
+    original = (settings.app_env, settings.supabase_url, settings.supabase_publishable_key)
+    settings.app_env = "development"
+    settings.supabase_url = "https://example.supabase.co"
+    settings.supabase_publishable_key = "sb_publishable_test"
+
+    class Response:
+        status_code = 401
+
+    monkeypatch.setattr("backend.auth.httpx.get", lambda *args, **kwargs: Response())
+    try:
+        with pytest.raises(HTTPException) as error:
+            current_principal(HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid"))
+        assert error.value.status_code == 401
+    finally:
+        settings.app_env, settings.supabase_url, settings.supabase_publishable_key = original
 

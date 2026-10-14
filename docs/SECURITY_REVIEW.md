@@ -3,7 +3,7 @@
 ## Implemented controls
 
 - Passwords are not accepted or stored by the API. Supabase Auth is the identity authority.
-- JWT signature, audience, expiry, and subject are validated before application access.
+- Supabase Auth validates each access token before application access; test-only tokens are verified locally.
 - Roles and company identifiers come from active database memberships, never request bodies.
 - Company-owned reads and writes include company scope; automated tests exercise tenant and candidate isolation.
 - Candidate invitations use 256-bit random tokens; only SHA-256 hashes are stored. Tokens are email-bound, expiring, single-use, and revocable in the model.
@@ -13,7 +13,7 @@
 
 ## Remaining risks before production
 
-- Add Supabase JWKS verification with issuer validation and key rotation; the current shared-secret validator supports legacy HS256 projects only.
+- Add short-lived caching or local JWKS validation if authentication-service latency becomes material; preserve key-rotation support.
 - Add endpoint-specific rate limiting, Redis-backed idempotency keys, CSP, CSRF analysis for any future cookie auth, and structured/redacted logs.
 - Apply and test PostgreSQL RLS policies as defense in depth.
 - Add malware scanning, content sniffing, decompression limits, and private signed URLs before accepting documents or media.

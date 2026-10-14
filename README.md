@@ -42,15 +42,15 @@ General shells use `source .venv/bin/activate`; the remaining commands are ident
 
 ## Supabase configuration
 
-Create users with Supabase Auth and enable email verification. For legacy HS256 projects, place the server-only JWT secret in `SUPABASE_JWT_SECRET`; place only the public URL and anon key in `frontend/.env`. Configure the Site URL and redirect allow-list for `http://localhost:5173/invite`. Production projects using asymmetric signing keys require the documented JWKS validator upgrade before deployment.
+Create users with Supabase Auth and enable email verification. Copy the project URL and publishable key into both `.env` and `frontend/.env`. The backend validates access tokens with Supabase Auth, so no JWT secret or service-role key is required. Configure the Site URL and redirect allow-list for `http://localhost:5173/invite`.
 
 The first signed-in company user opens `/company` and creates a company. Company setup through the current UI is real; jobs, templates, questions, publication, and invitations are available through `/docs` until their management forms are added. With `EMAIL_DELIVERY_MODE=console`, the invitation endpoint returns a development token. Production must queue an email containing `/invite?token=...` and must not return the token.
 
 ## Environment variables
 
-Backend: `APP_ENV`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_JWT_AUDIENCE`, `CORS_ORIGINS`, `EMAIL_DELIVERY_MODE`, and `INVITATION_TTL_HOURS`.
+Backend: `APP_ENV`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `CORS_ORIGINS`, `EMAIL_DELIVERY_MODE`, and `INVITATION_TTL_HOURS`.
 
-Frontend: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Values prefixed with `VITE_` are public browser configuration; never put service-role or other secrets there.
+Frontend: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY`. Values prefixed with `VITE_` are public browser configuration; never put service-role or other secrets there.
 
 ## Database and local infrastructure
 

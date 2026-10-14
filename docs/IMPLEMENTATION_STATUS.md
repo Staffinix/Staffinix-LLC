@@ -14,7 +14,7 @@ Last updated: 2026-10-13
 
 ## Test results
 
-- `python -m pytest`: **5 passed** in 3.55s. Python 3.14 emitted 81 upstream FastAPI/Starlette deprecation warnings; no test failed.
+- `python -m pytest`: **7 passed**. This includes Supabase Auth validation and invalid-token rejection; Python 3.14 emits upstream FastAPI/Starlette deprecation warnings.
 - `python -m compileall -q backend`: **passed**.
 - `python -m alembic upgrade head` followed by `downgrade base` against a fresh SQLite database: **passed**.
 - `npm run build`: **passed**; TypeScript checked and Vite produced the production bundle.
@@ -22,7 +22,7 @@ Last updated: 2026-10-13
 
 ## Remaining
 
-- Supabase email verification UI and production JWKS rotation/caching validation.
+- Supabase email verification UI and optional Auth-validation caching/JWKS optimization.
 - Document storage, parsing, versioning, Qdrant indexing, hybrid retrieval, and question generation.
 - Voice upload/transcription, rubric evaluation, reports, monitoring, workers, and SSE.
 - PostgreSQL RLS policies, provider integration tests, Playwright coverage, rate limiting, retention/deletion, and production deployment validation.
