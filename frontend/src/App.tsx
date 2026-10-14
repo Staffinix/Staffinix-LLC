@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { captureInvitationToken, clearPendingInvitationToken, getPendingInvitationToken } from "./invitation";
+import { candidateConfirmationPath, captureInvitationToken, clearPendingInvitationToken, getPendingInvitationToken, isUnconfirmedEmailError } from "./invitation";
 import { api, hasE2ESession, supabase } from "./lib";
 
 type Session = { id: string; template_id: string; available_until: string };
@@ -34,6 +34,9 @@ function Login() {
   const [mode, setMode] = useState<"signin" | "signup">(hasInvitation ? "signup" : "signin");
   const [message, setMessage] = useState("");
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
+  const [isResending, setIsResending] = useState(false);
+  const confirmationRedirectTo = `${window.location.origin}${candidateConfirmationPath(hasInvitation)}`;
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   const submit = handleSubmit(async ({ email, password }) => {
     setMessage("");
@@ -42,7 +45,7 @@ function Login() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/invite` },
+        options: { emailRedirectTo: confirmationRedirectTo },
       });
       if (error) {
         setMessage(error.message);
@@ -55,10 +58,22 @@ function Login() {
       return;
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMessage(error.message); else navigate(hasInvitation ? "/invite" : (candidateDestination ? "/candidate" : "/company"));
+    if (error) {
+      setMessage(error.message);
+      setUnconfirmedEmail(isUnconfirmedEmailError(error) ? email : "");
+    } else navigate(hasInvitation ? "/invite" : (candidateDestination ? "/candidate" : "/company"));
   });
-  const switchMode = () => { setMode((current) => current === "signin" ? "signup" : "signin"); setMessage(""); setMessageIsSuccess(false); };
-  return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">{hasInvitation ? "Candidate invitation" : (candidateDestination ? "Candidate portal" : "Secure access")}</p><h1 className="text-3xl font-bold">{mode === "signup" ? "Create your account" : "Welcome back"}</h1><p className="mt-2 text-slate-400">{hasInvitation ? (mode === "signup" ? "Use the same email address that received the invitation." : "Sign in with the invited candidate account.") : (candidateDestination ? "Sign in to view your assigned interviews." : "Use your verified company account.")}</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role={messageIsSuccess ? "status" : "alert"} className={`text-sm ${messageIsSuccess ? "text-emerald-300" : "text-rose-400"}`}>{message}</p>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? (mode === "signup" ? "Creating account…" : "Signing in…") : (mode === "signup" ? "Create candidate account" : "Sign in")}</button></form><button className="mt-6 block w-full text-center text-sm text-cyan-300" type="button" onClick={switchMode}>{mode === "signup" ? "Already have an account? Sign in" : "New candidate? Create an account"}</button>{!hasInvitation && mode === "signup" && <p className="mt-3 text-center text-xs text-slate-500">Candidate interviews require an invitation from the company.</p>}{!hasInvitation && <Link className="mt-4 block text-center text-sm text-slate-400 hover:text-white" to={candidateDestination ? "/login" : "/login?next=candidate"}>{candidateDestination ? "Company sign in" : "Candidate portal"}</Link>}</section></main>;
+  const resendConfirmation = async () => {
+    setIsResending(true);
+    setMessage("");
+    const { error } = await supabase.auth.resend({ type: "signup", email: unconfirmedEmail, options: { emailRedirectTo: confirmationRedirectTo } });
+    setIsResending(false);
+    setMessageIsSuccess(!error);
+    setMessage(error ? error.message : "Confirmation email sent. Check your inbox and spam folder, then open the confirmation link.");
+    if (!error) setUnconfirmedEmail("");
+  };
+  const switchMode = () => { setMode((current) => current === "signin" ? "signup" : "signin"); setMessage(""); setMessageIsSuccess(false); setUnconfirmedEmail(""); };
+  return <main className="grid min-h-screen place-items-center px-6"><section className="card w-full max-w-md"><p className="mb-2 text-sm font-semibold uppercase tracking-[.2em] text-cyan-400">{hasInvitation ? "Candidate invitation" : (candidateDestination ? "Candidate portal" : "Secure access")}</p><h1 className="text-3xl font-bold">{mode === "signup" ? "Create your account" : "Welcome back"}</h1><p className="mt-2 text-slate-400">{hasInvitation ? (mode === "signup" ? "Use the same email address that received the invitation." : "Sign in with the invited candidate account.") : (candidateDestination ? "Sign in to view your assigned interviews." : "Use your verified company account.")}</p><form onSubmit={submit} className="mt-8 space-y-4"><label className="block"><span className="label">Email</span><input className="input" type="email" autoComplete="email" {...register("email")} />{errors.email && <small className="text-rose-400">{errors.email.message}</small>}</label><label className="block"><span className="label">Password</span><input className="input" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} {...register("password")} />{errors.password && <small className="text-rose-400">{errors.password.message}</small>}</label>{message && <p role={messageIsSuccess ? "status" : "alert"} className={`text-sm ${messageIsSuccess ? "text-emerald-300" : "text-rose-400"}`}>{message}</p>}{unconfirmedEmail && <button className="w-full text-sm font-medium text-cyan-300 hover:text-cyan-200" type="button" onClick={resendConfirmation} disabled={isResending}>{isResending ? "Sending confirmation…" : "Resend confirmation email"}</button>}<button className="button w-full" disabled={isSubmitting}>{isSubmitting ? (mode === "signup" ? "Creating account…" : "Signing in…") : (mode === "signup" ? "Create candidate account" : "Sign in")}</button></form><button className="mt-6 block w-full text-center text-sm text-cyan-300" type="button" onClick={switchMode}>{mode === "signup" ? "Already have an account? Sign in" : "New candidate? Create an account"}</button>{!hasInvitation && mode === "signup" && <p className="mt-3 text-center text-xs text-slate-500">Candidate interviews require an invitation from the company.</p>}{!hasInvitation && <Link className="mt-4 block text-center text-sm text-slate-400 hover:text-white" to={candidateDestination ? "/login" : "/login?next=candidate"}>{candidateDestination ? "Company sign in" : "Candidate portal"}</Link>}</section></main>;
 }
 
 function PdfQuestionImporter({ templateId, published }: { templateId: string; published: boolean }) {

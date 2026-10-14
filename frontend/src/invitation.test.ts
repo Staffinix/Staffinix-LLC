@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureInvitationToken, clearPendingInvitationToken, getPendingInvitationToken, invitationTokenFromHash } from "./invitation";
+import { candidateConfirmationPath, captureInvitationToken, clearPendingInvitationToken, getPendingInvitationToken, invitationTokenFromHash, isUnconfirmedEmailError } from "./invitation";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -27,5 +27,16 @@ describe("pending invitation", () => {
     storage.setItem("invite_token", "private-token");
     clearPendingInvitationToken(storage);
     expect(getPendingInvitationToken(storage)).toBeNull();
+  });
+
+  it("returns confirmed invitees to acceptance and other candidates to their portal", () => {
+    expect(candidateConfirmationPath(true)).toBe("/invite");
+    expect(candidateConfirmationPath(false)).toBe("/candidate");
+  });
+
+  it("recognizes both current and legacy unconfirmed-email errors", () => {
+    expect(isUnconfirmedEmailError({ code: "email_not_confirmed", message: "Email not confirmed" })).toBe(true);
+    expect(isUnconfirmedEmailError({ message: "Email not confirmed" })).toBe(true);
+    expect(isUnconfirmedEmailError({ code: "invalid_credentials", message: "Invalid login credentials" })).toBe(false);
   });
 });

@@ -17,3 +17,11 @@ export function getPendingInvitationToken(storage: Storage): string | null {
 export function clearPendingInvitationToken(storage: Storage): void {
   storage.removeItem(pendingInvitationKey);
 }
+
+export function candidateConfirmationPath(hasInvitation: boolean): "/invite" | "/candidate" {
+  return hasInvitation ? "/invite" : "/candidate";
+}
+
+export function isUnconfirmedEmailError(error: { code?: string; message: string }): boolean {
+  return error.code === "email_not_confirmed" || error.message.toLowerCase() === "email not confirmed";
+}
