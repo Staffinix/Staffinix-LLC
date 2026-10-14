@@ -142,3 +142,15 @@ class AuditLog(IdMixin, Base):
     entity_type: Mapped[str] = mapped_column(String(80))
     entity_id: Mapped[str] = mapped_column(String(36))
     details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Notification(IdMixin, Base):
+    __tablename__ = "notifications"
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), index=True)
+    channel: Mapped[str] = mapped_column(String(20), default="email")
+    recipient: Mapped[str] = mapped_column(String(320))
+    template: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)

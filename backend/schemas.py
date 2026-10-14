@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -42,6 +43,35 @@ class QuestionCreate(BaseModel):
     position: int = Field(ge=1, le=200)
     time_limit_seconds: int = Field(ge=30, le=3600)
     rubric: dict = Field(default_factory=dict)
+
+
+class QuestionGenerationRequest(BaseModel):
+    count: int = Field(default=5, ge=1, le=20)
+    difficulty: Literal["easy", "medium", "hard", "mixed"] = "mixed"
+
+
+class GeneratedCriterion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=2, max_length=100)
+    description: str = Field(min_length=5, max_length=500)
+    max_points: int = Field(ge=1, le=100)
+
+
+class GeneratedQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=10, max_length=5000)
+    difficulty: Literal["easy", "medium", "hard"]
+    competency: str = Field(min_length=2, max_length=160)
+    time_limit_seconds: int = Field(ge=30, le=3600)
+    criteria: list[GeneratedCriterion] = Field(min_length=1, max_length=10)
+
+
+class GeneratedQuestionBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    questions: list[GeneratedQuestion] = Field(min_length=1, max_length=20)
 
 
 class TemplateCreate(BaseModel):

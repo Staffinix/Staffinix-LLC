@@ -19,6 +19,7 @@ from backend.models import (
     Invitation,
     Job,
     Membership,
+    Notification,
     Question,
     ReattemptPermission,
     Role,
@@ -35,10 +36,12 @@ from backend.schemas import (
     JobCreate,
     JobRead,
     QuestionCreate,
+    QuestionGenerationRequest,
     ReattemptCreate,
     TemplateCreate,
     TemplateRead,
 )
+from backend.providers import OpenRouterQuestionProvider, ProviderError, get_email_provider
 from backend.services import accept_invitation, audit, aware, create_invitation_token, now, start_attempt
 
 
@@ -120,6 +123,77 @@ def add_question(template_id: str, body: QuestionCreate, context: CompanyContext
     return {"id": question.id, "approved": question.approved}
 
 
+@router.post("/interviews/{template_id}/questions/generate", status_code=201)
+def generate_questions(
+    template_id: str,
+    body: QuestionGenerationRequest,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    template = tenant_template(db, template_id, context.company_id)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    job = db.scalar(select(Job).where(Job.id == template.job_id, Job.company_id == context.company_id))
+    try:
+        batch = OpenRouterQuestionProvider().generate(
+            job_title=job.title,
+            job_description=job.description,
+            required_skills=job.required_skills,
+            existing_questions=[question.text for question in template.questions],
+            count=body.count,
+            difficulty=body.difficulty,
+        )
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    next_position = max((question.position for question in template.questions), default=0) + 1
+    created = []
+    for offset, generated in enumerate(batch.questions):
+        rubric = {
+            "difficulty": generated.difficulty,
+            "competency": generated.competency,
+            "criteria": [criterion.model_dump() for criterion in generated.criteria],
+            "maximum_marks": sum(criterion.max_points for criterion in generated.criteria),
+            "provider": "openrouter",
+            "model": get_settings().openrouter_model,
+        }
+        question = Question(
+            template_id=template.id,
+            text=generated.text,
+            position=next_position + offset,
+            time_limit_seconds=generated.time_limit_seconds,
+            approved=False,
+            rubric=rubric,
+        )
+        db.add(question)
+        db.flush()
+        audit(db, context.company_id, context.principal.user_id, "question.generate", question)
+        created.append({"id": question.id, "text": question.text, "approved": False, "rubric": rubric})
+    db.commit()
+    return created
+
+
+@router.post("/questions/{question_id}/approve")
+def approve_question(
+    question_id: str,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    question = db.scalar(
+        select(Question)
+        .join(InterviewTemplate)
+        .where(Question.id == question_id, InterviewTemplate.company_id == context.company_id)
+    )
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+    template = db.get(InterviewTemplate, question.template_id)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    question.approved = True
+    audit(db, context.company_id, context.principal.user_id, "question.approve", question)
+    db.commit()
+    return {"id": question.id, "approved": True}
+
+
 @router.post("/interviews/{template_id}/publish", response_model=TemplateRead)
 def publish_template(template_id: str, context: CompanyContext = Depends(manager), db: Session = Depends(get_db)):
     template = tenant_template(db, template_id, context.company_id)
@@ -153,10 +227,45 @@ def create_invitation(body: InvitationCreate, context: CompanyContext = Depends(
     )
     db.add(invitation)
     db.flush()
+    notification = Notification(
+        company_id=context.company_id,
+        candidate_id=candidate.id,
+        recipient=normalized_email,
+        template="candidate_invitation",
+        status="pending",
+    )
+    db.add(notification)
     audit(db, context.company_id, context.principal.user_id, "invitation.create", invitation)
     db.commit()
-    console = get_settings().email_delivery_mode == "console"
-    return InvitationRead(id=invitation.id, expires_at=invitation.expires_at, delivery_status="console" if console else "queued", token=raw_token if console else None)
+    settings = get_settings()
+    console = settings.email_delivery_mode == "console"
+    company = db.get(Company, context.company_id)
+    job = db.get(Job, body.job_id)
+    try:
+        notification.provider_message_id = get_email_provider(settings).send_invitation(
+            normalized_email,
+            candidate.name,
+            company.name,
+            job.title,
+            raw_token,
+        )
+        notification.status = "sent" if not console else "console"
+        audit(db, context.company_id, context.principal.user_id, "invitation.deliver", invitation)
+        db.commit()
+    except ProviderError as exc:
+        # shortcut: synchronous delivery is sufficient for initial volume; use a transactional outbox before scaling.
+        invitation.revoked_at = now()
+        notification.status = "failed"
+        notification.error = str(exc)[:500]
+        audit(db, context.company_id, context.principal.user_id, "invitation.delivery_failed", invitation)
+        db.commit()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    return InvitationRead(
+        id=invitation.id,
+        expires_at=invitation.expires_at,
+        delivery_status=notification.status,
+        token=raw_token if console else None,
+    )
 
 
 @router.post("/invitations/accept", response_model=AssignmentRead)

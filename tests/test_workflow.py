@@ -19,6 +19,7 @@ from backend.auth import current_principal
 from backend.config import get_settings
 from backend.main import app
 from backend.models import Invitation
+from backend.schemas import GeneratedCriterion, GeneratedQuestion, GeneratedQuestionBatch
 
 
 def token(user_id: str, email: str) -> str:
@@ -242,4 +243,46 @@ def test_supabase_auth_server_rejects_invalid_tokens(monkeypatch):
         assert error.value.status_code == 401
     finally:
         settings.app_env, settings.supabase_url, settings.supabase_publishable_key = original
+
+
+def test_generated_questions_require_company_approval(client, monkeypatch):
+    headers, _, job, _ = bootstrap(client, "admin", "admin@example.com", "Acme")
+    interview = client.post(
+        "/api/v1/interviews",
+        json={"job_id": job["id"], "name": "AI screen", "duration_minutes": 30, "attempt_limit": 1},
+        headers=headers,
+    )
+    assert interview.status_code == 201
+
+    def generated(*args, **kwargs):
+        return GeneratedQuestionBatch(
+            questions=[
+                GeneratedQuestion(
+                    text="How do you prevent concurrent duplicate interview attempts?",
+                    difficulty="hard",
+                    competency="Concurrency control",
+                    time_limit_seconds=180,
+                    criteria=[
+                        GeneratedCriterion(
+                            name="Transactions",
+                            description="Uses a transaction and a uniqueness constraint.",
+                            max_points=10,
+                        )
+                    ],
+                )
+            ]
+        )
+
+    monkeypatch.setattr("backend.api.OpenRouterQuestionProvider.generate", generated)
+    response = client.post(
+        f"/api/v1/interviews/{interview.json()['id']}/questions/generate",
+        json={"count": 1, "difficulty": "hard"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    question = response.json()[0]
+    assert question["approved"] is False
+    approved = client.post(f"/api/v1/questions/{question['id']}/approve", headers=headers)
+    assert approved.status_code == 200
+    assert approved.json()["approved"] is True
 

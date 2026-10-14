@@ -11,7 +11,7 @@ from backend.database import Base, engine
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if get_settings().app_env in {"development", "test"}:
+    if get_settings().app_env == "test":
         Base.metadata.create_all(engine)
     yield
 
