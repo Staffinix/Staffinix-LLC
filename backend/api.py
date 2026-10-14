@@ -297,6 +297,28 @@ def approve_question(
     return {"id": question.id, "approved": True}
 
 
+@router.post("/questions/{question_id}/deselect")
+def deselect_question(
+    question_id: str,
+    context: CompanyContext = Depends(manager),
+    db: Session = Depends(get_db),
+):
+    question = db.scalar(
+        select(Question)
+        .join(InterviewTemplate)
+        .where(Question.id == question_id, InterviewTemplate.company_id == context.company_id)
+    )
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+    template = db.get(InterviewTemplate, question.template_id)
+    if template.published:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Published interviews are immutable")
+    question.approved = False
+    audit(db, context.company_id, context.principal.user_id, "question.deselect", question)
+    db.commit()
+    return {"id": question.id, "approved": False}
+
+
 @router.post("/interviews/{template_id}/publish", response_model=TemplateRead)
 def publish_template(template_id: str, context: CompanyContext = Depends(manager), db: Session = Depends(get_db)):
     template = tenant_template(db, template_id, context.company_id)
