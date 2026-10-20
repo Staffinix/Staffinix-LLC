@@ -22,7 +22,7 @@ import {
 import { CrmForm } from "@/components/crm/crm-form";
 import { deleteClient, getClient, updateClient } from "@/lib/clients.functions";
 import { STATUS_LABEL, STATUS_STYLES, TIER_LABEL, TIER_STYLES } from "@/lib/crm-constants";
-import { Loader2, Trash2, Mail, Phone, Globe, MapPin } from "lucide-react";
+import { Loader2, Pencil, Trash2, Mail, Phone, Globe, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -90,7 +90,7 @@ function ClientDetailPage() {
           title={c.name}
           description={c.industry ?? "Client account"}
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={cn("border", STATUS_STYLES[c.status])}>
                 {STATUS_LABEL[c.status]}
               </Badge>
@@ -99,6 +99,10 @@ function ClientDetailPage() {
                   {TIER_LABEL[c.tier]}
                 </Badge>
               )}
+              <Button variant="outline" size="sm" onClick={() => setTab("edit")}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -132,7 +136,6 @@ function ClientDetailPage() {
             </TabsTrigger>
             <TabsTrigger value="submissions">Submissions ({data.submissions.length})</TabsTrigger>
             <TabsTrigger value="placements">Placements ({data.placements.length})</TabsTrigger>
-            <TabsTrigger value="edit">Edit</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-6 space-y-4">
@@ -249,17 +252,19 @@ function ClientDetailPage() {
             />
           </TabsContent>
 
-          <TabsContent value="edit" className="mt-6">
-            <div className="max-w-3xl">
-              <CrmForm
-                kind="client"
-                initial={c as never}
-                submitting={upd.isPending}
-                submitLabel="Save changes"
-                onSubmit={(v) => upd.mutate(v)}
-              />
+          {tab === "edit" && (
+            <div className="mt-6">
+              <div className="max-w-3xl">
+                <CrmForm
+                  kind="client"
+                  initial={c as never}
+                  submitting={upd.isPending}
+                  submitLabel="Save changes"
+                  onSubmit={(v) => upd.mutate(v)}
+                />
+              </div>
             </div>
-          </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
