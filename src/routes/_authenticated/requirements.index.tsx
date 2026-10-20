@@ -49,6 +49,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Pencil,
   Sparkles,
   ArrowUpDown,
   DollarSign,
@@ -331,6 +332,12 @@ function RequisitionsListPage() {
                             </Link>
                           </Button>
                         )}
+                        <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+                          <Link to="/requirements/$id/edit" params={{ id: r.id }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </Link>
+                        </Button>
                         <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
                           <Link to="/requirements/$id" params={{ id: r.id }}>
                             <Eye className="h-3.5 w-3.5" />

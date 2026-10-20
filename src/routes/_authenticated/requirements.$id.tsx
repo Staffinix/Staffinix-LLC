@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
@@ -12,8 +12,15 @@ import { getRequirement } from "@/lib/requirements.functions";
 
 export const Route = createFileRoute("/_authenticated/requirements/$id")({
   head: () => ({ meta: [{ title: "Requisition — Staffinix" }] }),
-  component: RequirementDetailPage,
+  component: RequirementRoute,
 });
+
+function RequirementRoute() {
+  const editing = useLocation({
+    select: (location) => location.pathname.replace(/\/$/, "").endsWith("/edit"),
+  });
+  return editing ? <Outlet /> : <RequirementDetailPage />;
+}
 
 function RequirementDetailPage() {
   const { id } = Route.useParams();
@@ -39,6 +46,11 @@ function RequirementDetailPage() {
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
             <Link to="/requirements">
               <ArrowLeft className="h-3.5 w-3.5" /> Back to Requisitions
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="gap-1.5 text-xs">
+            <Link to="/requirements/$id/edit" params={{ id: requirement.id }}>
+              Edit Requisition & JD
             </Link>
           </Button>
           <Button asChild size="sm" className="gap-1.5 text-xs">

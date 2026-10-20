@@ -65,8 +65,8 @@ function EditRequirementPage() {
     location: data.location ?? "",
     work_mode: (data.work_mode as WorkMode | null) ?? undefined,
     visa_types: data.visa_types ?? [],
-    rate_min: data.rate_min ? Number(data.rate_min) : null,
-    rate_max: data.rate_max ? Number(data.rate_max) : null,
+    rate_min: data.rate_min != null ? Number(data.rate_min) : null,
+    rate_max: data.rate_max != null ? Number(data.rate_max) : null,
     rate_type: (data.rate_type as RateType | null) ?? undefined,
     currency: data.currency ?? "USD",
     min_experience_years: data.min_experience_years,
@@ -75,6 +75,7 @@ function EditRequirementPage() {
     description: data.description ?? "",
     recruiter_notes: data.recruiter_notes ?? "",
     status: data.status as RequirementStatus,
+    priority: data.priority as RequirementPriority,
     duration: data.duration ?? "",
     skills: data.skills.map((s) => ({ skill: s.skill, is_mandatory: s.is_mandatory })),
   };
