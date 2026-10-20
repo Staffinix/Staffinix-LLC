@@ -2387,6 +2387,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      set_user_access: {
+        Args: { _role: string; _user_id: string };
+        Returns: undefined;
+      };
       review_platform_access_request: {
         Args: { _approve: boolean; _note?: string | null; _request_id: string };
         Returns: {

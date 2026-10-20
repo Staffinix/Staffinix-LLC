@@ -22,11 +22,11 @@ assignment, never as Recruiters. The top bar, sidebar and profile use the highes
 
 ## Platform roles
 
-| Role               | Access                                              |
-| ------------------ | --------------------------------------------------- |
-| `platform_owner`   | Dashboard, platform console, audit, developer tools |
-| `platform_admin`   | Dashboard, platform console, audit, developer tools |
-| `platform_support` | Developer tools only                                |
+| Role               | Access                                                            |
+| ------------------ | ----------------------------------------------------------------- |
+| `platform_owner`   | Dashboard, platform console, audit, developer tools, Company Team |
+| `platform_admin`   | Dashboard, platform console, audit, developer tools, Company Team |
+| `platform_support` | Developer tools only                                              |
 
 Platform roles are stored separately from tenant application roles.
 
@@ -49,10 +49,24 @@ Platform roles are stored separately from tenant application roles.
 3. Postgres RLS and storage policies enforce tenant and ownership constraints.
 
 Administrators cannot modify their own authorization state. Cross-tenant user changes are rejected.
-Company Team lists only L2 (`super_admin`, `admin`) and L4 (`recruiter`) memberships.
-Accounts with any other application role are excluded, including mixed-role accounts.
+For L2 callers, Company Team lists only L2 (`super_admin`, `admin`) and L4 (`recruiter`)
+memberships without platform access. Accounts with other roles or platform memberships are excluded.
 L2 administrators can invite Admins/Recruiters and switch other Admin/Recruiter members between
-those two roles. Only Super Admins may assign or modify Super Admin members. L3 and other roles
-cannot be assigned or modified through Company Team, including by calling its server functions
-or role-assignment RPC directly. Platform-owner onboarding of an unassigned user remains an
-explicit special case for L2/L4 role assignment.
+those two roles. Only protected L2 administrators may assign or modify protected L2 members.
+L2 cannot grant L1/L3 access or modify an existing platform membership, including via direct RPCs.
+
+Verified, active L1 memberships (`platform_owner` or `platform_admin`) may view all roles in
+their tenant and assign any supported role to other members, even without an L2 company role.
+The role dropdown offers L1 Owner, L2 Admin, L3 Developer, and L4 Recruiters. Existing legacy
+variants remain visible as current access until explicitly replaced. New invitations support
+L2/L3/L4; Owner access is assigned to an existing account with an explicit confirmation.
+
+Company Team resolves each member's platform and application memberships, so an Owner who
+also has a stored L2 company role displays as L1, matching the header and profile. Promoting to
+L1 creates platform-wide `platform_owner` membership. Demoting to L2/L3/L4 removes platform
+membership and replaces the application role atomically through `set_user_access`. The existing
+`set_user_role` RPC delegates to the same checks. UI confirmation is not the security boundary;
+the database validates active L1 membership, target tenancy, role allowlist, and self-change rules.
+
+Only `platform_owner` retains the existing special case for onboarding an unassigned profile.
+Neither L1 nor L2 may change their own role or modify an existing user in another tenant.

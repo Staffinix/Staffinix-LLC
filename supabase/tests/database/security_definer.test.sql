@@ -163,6 +163,7 @@ SELECT is(
         'is_platform_admin',
         'is_platform_owner',
         'set_user_role',
+        'set_user_access',
         'review_platform_access_request'
       )
   ),

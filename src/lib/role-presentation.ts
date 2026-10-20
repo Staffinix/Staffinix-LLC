@@ -29,13 +29,17 @@ export function getAssignedRoleLevel(
   roles: readonly string[],
   platformRole: string | null,
 ): RoleLevel | null {
-  const assigned = platformRole ? [...roles, platformRole] : roles;
-  for (const level of ["L1", "L2", "L3", "L4"] as const) {
-    if (assigned.some((role) => Object.hasOwn(ROLE_LEVELS, role) && ROLE_LEVELS[role] === level)) {
-      return level;
-    }
-  }
-  return null;
+  const role = getAssignedRole(roles, platformRole);
+  return role ? ROLE_LEVELS[role] : null;
+}
+
+export function getAssignedRole(
+  roles: readonly string[],
+  platformRole: string | null,
+): string | null {
+  return (
+    Object.keys(ROLE_LEVELS).find((role) => role === platformRole || roles.includes(role)) ?? null
+  );
 }
 
 export function getAssignedRoleLabel(

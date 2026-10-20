@@ -44,7 +44,18 @@ import { UserPlus, MoreHorizontal, Loader2, ShieldAlert } from "lucide-react";
 import { listUsers, inviteUser, updateUserRole, setUserActive } from "@/lib/users.functions";
 import { useProfile } from "@/hooks/use-profile";
 import { formatDistanceToNow } from "date-fns";
-import { getRoleLabel } from "@/lib/role-presentation";
+import { getAssignedRole, getAssignedRoleLabel, getRoleLabel } from "@/lib/role-presentation";
+import { isL1Owner, type AppRole, type AssignableUserRole } from "@/lib/authorization-policy";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/users")({
   head: () => ({ meta: [{ title: "Team — Staffinix" }] }),
@@ -56,13 +67,15 @@ const ROLES = [
   { value: "admin", label: getRoleLabel("admin") },
   { value: "recruiter", label: getRoleLabel("recruiter") },
 ] as const;
+const OWNER_ROLES = ["platform_owner", "admin", "developer_admin", "recruiter"] as const;
 
 function UsersPage() {
   const { data: me } = useProfile();
   const listFn = useServerFn(listUsers);
   const qc = useQueryClient();
 
-  const isAdmin = me?.roles?.includes("super_admin") || me?.roles?.includes("admin");
+  const isOwner = isL1Owner(me?.platformRole);
+  const isAdmin = isOwner || me?.roles?.includes("super_admin") || me?.roles?.includes("admin");
   const isSuperAdmin = me?.roles?.includes("super_admin");
 
   const {
@@ -86,7 +99,7 @@ function UsersPage() {
             <ShieldAlert className="mx-auto h-8 w-8 text-muted-foreground" />
             <h2 className="mt-4 text-lg font-semibold">Admin access required</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Team management requires L2 - Admin access.
+              Team management requires L1 - Owner or L2 - Admin access.
             </p>
           </div>
         </main>
@@ -100,10 +113,15 @@ function UsersPage() {
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <PageHeader
           title="Company Team & Recruiter Workload"
-          description="Manage L2 - Admin and L4 - Recruiters. Protected administrator changes remain restricted."
+          description={
+            isOwner
+              ? "Manage all four access levels. L1 - Owner grants platform-wide privileges; role changes cannot be made to your own account."
+              : "Manage L2 - Admin and L4 - Recruiters. Protected administrator changes remain restricted."
+          }
           actions={
             <InviteDialog
               isSuperAdmin={!!isSuperAdmin}
+              isOwner={isOwner}
               onInvited={() => qc.invalidateQueries({ queryKey: ["users"] })}
             />
           }
@@ -133,7 +151,13 @@ function UsersPage() {
               </TableHeader>
               <TableBody>
                 {users?.map((u) => (
-                  <UserRow key={u.id} user={u} meId={me.userId} isSuperAdmin={!!isSuperAdmin} />
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    meId={me.userId}
+                    isSuperAdmin={!!isSuperAdmin}
+                    isOwner={isOwner}
+                  />
                 ))}
                 {users && users.length === 0 && (
                   <TableRow>
@@ -162,21 +186,25 @@ function UserRow({
   user,
   meId,
   isSuperAdmin,
+  isOwner,
 }: {
   user: UserRow;
   meId: string;
   isSuperAdmin: boolean;
+  isOwner: boolean;
 }) {
   const qc = useQueryClient();
   const updateRoleFn = useServerFn(updateUserRole);
   const setActiveFn = useServerFn(setUserActive);
+  const [pendingRole, setPendingRole] = useState<AssignableUserRole | null>(null);
 
   const roleMutation = useMutation({
-    mutationFn: (role: string) =>
-      updateRoleFn({ data: { user_id: user.id, role: role as (typeof ROLES)[number]["value"] } }),
+    mutationFn: (role: AssignableUserRole) => updateRoleFn({ data: { user_id: user.id, role } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("Role updated");
+      qc.invalidateQueries({ queryKey: ["recruiters"] });
+      setPendingRole(null);
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -198,10 +226,16 @@ function UserRow({
       .join("")
       .toUpperCase() ?? user.email[0].toUpperCase();
 
-  const currentRole = ROLES.find((role) => user.roles.includes(role.value))?.value;
+  const currentRole = isL1Owner(user.platformRole)
+    ? "platform_owner"
+    : getAssignedRole(user.roles, user.platformRole);
   const isSelf = user.id === meId;
-  const canManage = !isSelf && (isSuperAdmin || !user.roles.includes("super_admin"));
-  const assignable = ROLES.filter((role) => isSuperAdmin || role.value !== "super_admin");
+  const canManage =
+    !isSelf &&
+    (isOwner || (!user.platformRole && (isSuperAdmin || !user.roles.includes("super_admin"))));
+  const assignable: ReadonlyArray<{ value: AssignableUserRole; label: string }> = isOwner
+    ? OWNER_ROLES.map((value) => ({ value, label: getRoleLabel(value) }))
+    : ROLES.filter((role) => isSuperAdmin || role.value !== "super_admin");
 
   const openReqs = user.open_requirements ?? 0;
   const submissions = user.submissions ?? 0;
@@ -237,13 +271,22 @@ function UserRow({
         {canManage ? (
           <Select
             value={currentRole ?? undefined}
-            onValueChange={(v) => roleMutation.mutate(v)}
+            onValueChange={(v: AssignableUserRole) => {
+              if (v === currentRole) return;
+              if (v === "platform_owner" || isL1Owner(user.platformRole)) setPendingRole(v);
+              else roleMutation.mutate(v);
+            }}
             disabled={roleMutation.isPending}
           >
-            <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectTrigger className="w-48 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              {currentRole && !assignable.some((role) => role.value === currentRole) && (
+                <SelectItem value={currentRole} disabled>
+                  {getRoleLabel(currentRole)} (existing access)
+                </SelectItem>
+              )}
               {assignable.map((r) => (
                 <SelectItem key={r.value} value={r.value}>
                   {r.label}
@@ -254,7 +297,7 @@ function UserRow({
           </Select>
         ) : (
           <Badge variant="secondary" className="font-normal">
-            {currentRole ? getRoleLabel(currentRole) : "No role"}
+            {getAssignedRoleLabel(user.roles, user.platformRole)}
             {currentRole === "super_admin" ? " (protected)" : ""}
           </Badge>
         )}
@@ -307,6 +350,38 @@ function UserRow({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        <AlertDialog
+          open={pendingRole !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingRole(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingRole === "platform_owner"
+                  ? "Grant L1 - Owner access?"
+                  : "Remove L1 - Owner access?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingRole === "platform_owner"
+                  ? "This grants platform-wide administration and the ability to manage other users' roles."
+                  : "This removes platform membership and replaces this user's company role with the selected role."}{" "}
+                Only continue if this change is intended for {user.full_name ?? user.email}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pendingRole) roleMutation.mutate(pendingRole);
+                }}
+              >
+                Confirm role change
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </TableCell>
     </TableRow>
   );
@@ -314,16 +389,18 @@ function UserRow({
 
 function InviteDialog({
   isSuperAdmin,
+  isOwner,
   onInvited,
 }: {
   isSuperAdmin: boolean;
+  isOwner: boolean;
   onInvited: () => void;
 }) {
   const inviteFn = useServerFn(inviteUser);
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<(typeof ROLES)[number]["value"]>("recruiter");
+  const [role, setRole] = useState<AppRole>("recruiter");
 
   const mutation = useMutation({
     mutationFn: () => inviteFn({ data: { full_name: fullName, email, role } }),
@@ -338,7 +415,12 @@ function InviteDialog({
     onError: (e) => toast.error((e as Error).message),
   });
 
-  const assignable = ROLES.filter((r) => isSuperAdmin || r.value !== "super_admin");
+  const assignable = isOwner
+    ? OWNER_ROLES.filter((value) => value !== "platform_owner").map((value) => ({
+        value,
+        label: getRoleLabel(value),
+      }))
+    : ROLES.filter((r) => isSuperAdmin || r.value !== "super_admin");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

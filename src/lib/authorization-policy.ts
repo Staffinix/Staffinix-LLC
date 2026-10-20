@@ -11,6 +11,27 @@ export const APP_ROLES = [
 ] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
+export const ASSIGNABLE_USER_ROLES = [...APP_ROLES, "platform_owner"] as const;
+export type AssignableUserRole = (typeof ASSIGNABLE_USER_ROLES)[number];
+export function isL1Owner(platformRole: string | null | undefined): boolean {
+  return platformRole === "platform_owner" || platformRole === "platform_admin";
+}
+
+export function assertTeamAdmin(snapshot: AuthorizationSnapshot): void {
+  assertActive(snapshot);
+  if (!isL1Owner(snapshot.platformRole)) assertAdmin(snapshot);
+}
+
+export function assertCanAssignTeamRole(
+  actor: AuthorizationSnapshot,
+  role: AssignableUserRole,
+): void {
+  assertTeamAdmin(actor);
+  if (isL1Owner(actor.platformRole)) return;
+  if (!isCompanyTeamMember([role]))
+    throw new ForbiddenError("Company Team can assign only L2 and L4 roles.");
+  if (role === "super_admin") assertSuperAdmin(actor);
+}
 export const COMPANY_TEAM_ROLES = ["super_admin", "admin", "recruiter"] as const;
 
 export function isCompanyTeamMember(roles: readonly string[]): boolean {
@@ -80,9 +101,10 @@ export function assertCanManageUser(input: {
   targetId: string;
   targetTenantId: string | null;
   targetRoles: readonly string[];
-  assignedRole?: AppRole;
+  targetPlatformRole?: PlatformRole | null;
+  assignedRole?: AssignableUserRole;
 }): void {
-  assertAdmin(input.actor);
+  assertTeamAdmin(input.actor);
   if (input.actorId === input.targetId) {
     throw new ForbiddenError("You cannot modify your own authorization state.");
   }
@@ -96,20 +118,11 @@ export function assertCanManageUser(input: {
   ) {
     throw new ForbiddenError("The target user is outside your tenant.");
   }
-  if (
-    input.assignedRole &&
-    input.assignedRole === "super_admin" &&
-    !input.actor.roles.includes("super_admin")
-  ) {
-    throw new ForbiddenError(
-      "Only protected L2 - Admin accounts can assign protected administrator roles.",
-    );
-  }
-  if (input.assignedRole && !isCompanyTeamMember([input.assignedRole])) {
-    throw new ForbiddenError("Company Team can assign only L2 and L4 roles.");
-  }
-  const onboarding = canOnboardUnassignedUser && input.targetRoles.length === 0;
-  if (!onboarding && !isCompanyTeamMember(input.targetRoles)) {
+  if (input.assignedRole) assertCanAssignTeamRole(input.actor, input.assignedRole);
+  if (isL1Owner(input.actor.platformRole)) return;
+  if (input.targetPlatformRole)
+    throw new ForbiddenError("Only L1 - Owner can modify platform members.");
+  if (!isCompanyTeamMember(input.targetRoles)) {
     throw new ForbiddenError("Company Team can manage only L2 and L4 members.");
   }
   if (input.targetRoles.includes("super_admin") && !input.actor.roles.includes("super_admin")) {

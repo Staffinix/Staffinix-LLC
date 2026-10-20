@@ -7,6 +7,8 @@ import {
   assertDeveloperAdmin,
   assertPlatformAdmin,
   assertSuperAdmin,
+  ASSIGNABLE_USER_ROLES,
+  assertTeamAdmin,
   isCompanyTeamMember,
   ForbiddenError,
   type AuthorizationSnapshot,
@@ -21,6 +23,76 @@ const snapshot = (
   roles,
   platformRole: null,
   ...overrides,
+});
+
+test("L1 memberships can manage every supported access role without an L2 role", () => {
+  for (const platformRole of ["platform_owner", "platform_admin"] as const) {
+    const actor = snapshot([], { platformRole });
+    assert.doesNotThrow(() => assertTeamAdmin(actor));
+    for (const assignedRole of ASSIGNABLE_USER_ROLES) {
+      assert.doesNotThrow(() =>
+        assertCanManageUser({
+          actor,
+          actorId: "owner",
+          targetId: "target",
+          targetTenantId: "tenant-a",
+          targetRoles: ["developer_admin"],
+          targetPlatformRole: "platform_owner",
+          assignedRole,
+        }),
+      );
+    }
+  }
+});
+
+test("L1 access preserves self, inactive and cross-tenant protections", () => {
+  const base = {
+    actor: snapshot([], { platformRole: "platform_owner" }),
+    actorId: "owner",
+    targetId: "target",
+    targetTenantId: "tenant-a",
+    targetRoles: ["recruiter"],
+    assignedRole: "platform_owner" as const,
+  };
+  assert.throws(() => assertCanManageUser({ ...base, targetId: "owner" }), ForbiddenError);
+  assert.throws(() => assertCanManageUser({ ...base, targetTenantId: "tenant-b" }), ForbiddenError);
+  assert.throws(
+    () =>
+      assertCanManageUser({
+        ...base,
+        actor: snapshot([], { platformRole: "platform_owner", active: false }),
+      }),
+    ForbiddenError,
+  );
+});
+
+test("L2 cannot grant L1 or modify an existing platform membership", () => {
+  for (const role of ["admin", "super_admin"] as const) {
+    const base = {
+      actor: snapshot([role]),
+      actorId: "actor",
+      targetId: "target",
+      targetTenantId: "tenant-a",
+      targetRoles: ["recruiter"],
+    };
+    assert.throws(
+      () => assertCanManageUser({ ...base, assignedRole: "platform_owner" }),
+      ForbiddenError,
+    );
+    assert.throws(
+      () =>
+        assertCanManageUser({
+          ...base,
+          targetPlatformRole: "platform_owner",
+          assignedRole: "recruiter",
+        }),
+      ForbiddenError,
+    );
+    assert.throws(
+      () => assertCanManageUser({ ...base, targetPlatformRole: "platform_admin" }),
+      ForbiddenError,
+    );
+  }
 });
 
 test("ordinary authenticated and recruiter users cannot access admin operations", () => {

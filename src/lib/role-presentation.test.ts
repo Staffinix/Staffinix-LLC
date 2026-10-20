@@ -4,6 +4,7 @@ import test from "node:test";
 import { APP_ROLES } from "./authorization-policy.ts";
 import {
   getAssignedRoleLabel,
+  getAssignedRole,
   getAssignedRoleLevel,
   getRoleLabel,
   ROLE_LEVEL_LABELS,
@@ -24,6 +25,27 @@ test("visible role names use the four requested labels", () => {
     assert.equal(getRoleLabel(role), ROLE_LEVEL_LABELS.L3);
   for (const role of ["recruiter", "marketing_executive"])
     assert.equal(getRoleLabel(role), ROLE_LEVEL_LABELS.L4);
+});
+
+test("Company Team resolves platform membership ahead of its L2 company role", () => {
+  assert.equal(getAssignedRole(["super_admin"], "platform_owner"), "platform_owner");
+  assert.equal(getAssignedRoleLabel(["super_admin"], "platform_owner"), "L1 - Owner");
+  assert.equal(getAssignedRole(["recruiter", "developer_admin"], null), "developer_admin");
+  assert.equal(getAssignedRole(["admin", "super_admin"], null), "super_admin");
+});
+
+test("Company Team reads platform roles and exposes all four choices only to L1", () => {
+  const server = readFileSync(new URL("./users.functions.ts", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../routes/_authenticated/users.tsx", import.meta.url), "utf8");
+  assert.match(server, /platformRole: platformRoles\.get\(profile\.id\)/);
+  assert.match(server, /rpc\("set_user_access"/);
+  assert.match(page, /getAssignedRoleLabel\(user\.roles, user\.platformRole\)/);
+  assert.match(
+    page,
+    /const OWNER_ROLES = \["platform_owner", "admin", "developer_admin", "recruiter"\]/,
+  );
+  assert.match(page, /const canManage =\s*!isSelf/);
+  assert.match(page, /Grant L1 - Owner access\?/);
 });
 
 test("all stored roles retain their level and tier precedence is independent of array order", () => {

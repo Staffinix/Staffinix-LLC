@@ -62,8 +62,8 @@ const FEATURE_ROLES: Record<Feature, readonly AppRole[]> = {
 };
 
 const PLATFORM_FEATURES: Record<PlatformRole, readonly Feature[]> = {
-  platform_owner: ["dashboard", "platform", "audit", "developer"],
-  platform_admin: ["dashboard", "platform", "audit", "developer"],
+  platform_owner: ["dashboard", "platform", "audit", "developer", "users"],
+  platform_admin: ["dashboard", "platform", "audit", "developer", "users"],
   platform_support: ["developer"],
 };
 

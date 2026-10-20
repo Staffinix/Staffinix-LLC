@@ -20,6 +20,13 @@ test("platform owner with super admin receives both platform and tenant access",
   assert.equal(canAccessPath(owner, "/matching"), true);
 });
 
+test("L1 can open Company Team without a company-admin role", () => {
+  for (const platformRole of ["platform_owner", "platform_admin"]) {
+    assert.equal(canAccessPath(identity("", platformRole), "/users"), true);
+  }
+  assert.equal(canAccessPath(identity("", "platform_support"), "/users"), false);
+});
+
 test("developer admin is isolated to the developer workspace", () => {
   const developer = identity("developer_admin");
   assert.equal(canAccessFeature(developer, "developer"), true);
