@@ -139,7 +139,13 @@ function InterviewsPage() {
                       </p>
                     </TableCell>
                     <TableCell className="text-sm text-foreground">
-                      {i.submission?.candidate?.first_name} {i.submission?.candidate?.last_name}
+                      <Link
+                        to="/submissions/board"
+                        className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline"
+                        title="Open Pipeline Tracker"
+                      >
+                        {i.submission?.candidate?.first_name} {i.submission?.candidate?.last_name}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {i.submission?.requirement?.title ?? "—"}
