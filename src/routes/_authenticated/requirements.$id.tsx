@@ -42,27 +42,29 @@ function RequirementDetailPage() {
     <>
       <AppTopbar title={requirement.title} />
       <main className="flex-1 space-y-6 p-6 md:p-8">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
             <Link to="/requirements">
               <ArrowLeft className="h-3.5 w-3.5" /> Back to Requisitions
             </Link>
           </Button>
-          <Button asChild size="sm" className="gap-1.5 text-xs">
-            <Link to="/requirements/$id/edit" params={{ id: requirement.id }}>
-              Edit Requisition & JD
-            </Link>
-          </Button>
-          <Button asChild size="sm" className="gap-1.5 text-xs">
-            <Link to="/matching" search={{ reqId: requirement.id }}>
-              <Sparkles className="h-3.5 w-3.5" /> Run matching
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/tailoring" search={{ reqId: requirement.id }}>
-              Tailor a candidate resume
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild size="sm" className="gap-1.5 text-xs">
+              <Link to="/requirements/$id/edit" params={{ id: requirement.id }}>
+                Edit Requisition & JD
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5 text-xs">
+              <Link to="/matching" search={{ reqId: requirement.id }}>
+                <Sparkles className="h-3.5 w-3.5" /> Run matching
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/tailoring" search={{ reqId: requirement.id }}>
+                Tailor a candidate resume
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <PageHeader
