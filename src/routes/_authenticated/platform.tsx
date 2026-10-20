@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Building2,
@@ -9,6 +9,7 @@ import {
   FileText,
   Loader2,
   Pencil,
+  Plus,
   UserRoundSearch,
   UsersRound,
   X,
@@ -124,6 +125,14 @@ function PlatformConsole() {
         <PageHeader
           title="Platform Console"
           description="Level 1 — Staffinix SaaS Administration · Multi-tenant accounts, subscription plans & governance."
+          actions={
+            <Button asChild size="sm">
+              <Link to="/tenants/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Organization
+              </Link>
+            </Button>
+          }
         />
 
         <section aria-label="Platform totals" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
