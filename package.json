@@ -45,7 +45,7 @@
     "security:explicit-selects": "node scripts/check-explicit-database-selects.mjs",
     "test:list-bounds": "node scripts/check-list-endpoint-bounds.mjs",
     "audit:database-performance": "node scripts/run-database-performance-audit.mjs",
-    "test:rbac": "node --test --experimental-strip-types src/lib/authorization-policy.test.ts src/lib/feature-access.test.ts src/lib/platform-auth.server.test.ts",
+    "test:rbac": "node --test --experimental-strip-types src/lib/authorization-policy.test.ts src/lib/feature-access.test.ts src/lib/platform-auth.server.test.ts src/lib/recruiters.test.ts",
     "security:server-auth": "node scripts/check-server-function-auth.mjs",
     "security:auth-bypass": "node scripts/check-auth-bypass.mjs",
     "security:auth-bypass-bundle": "node scripts/check-auth-bypass.mjs --bundle",

@@ -103,7 +103,7 @@ function RecruitersPage() {
               ) : !filtered.length ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    No team members found.
+                    No recruiters found.
                   </TableCell>
                 </TableRow>
               ) : (

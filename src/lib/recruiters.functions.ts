@@ -9,6 +9,7 @@ export const listRecruiters = createServerFn({ method: "GET" })
     const { data: roles, error: rolesError } = await context.supabase
       .from("user_roles")
       .select("user_id, role")
+      .eq("role", "recruiter")
       .limit(500);
     if (rolesError) throw new Error(`Failed to load recruiter roles: ${rolesError.message}`);
 
