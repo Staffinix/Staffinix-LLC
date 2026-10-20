@@ -93,8 +93,8 @@ function PipelineTrackerPage() {
           description="Live submission records for the authenticated tenant."
         />
         <p className="text-sm text-muted-foreground">
-          Before moving a draft forward, approve and attach a tailored resume for its candidate and
-          requisition. Open the submission to review its resume.
+          Update stages directly to track candidate progress. An approved tailored resume is not
+          required for stage changes.
         </p>
 
         <Card className="border-border bg-card">

@@ -98,7 +98,7 @@ function SubmissionDetailPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["submission", id] });
       await qc.invalidateQueries({ queryKey: ["submissions"] });
-      toast.success("Approved resume attached. You can now update the stage.");
+      toast.success("Approved resume attached.");
     },
     onError: (error) => toast.error(error.message),
   });
@@ -237,8 +237,8 @@ function SubmissionDetailPage() {
             ) : !approvedResumes.isPending && !approvedResumes.data?.length ? (
               <p className="text-sm text-muted-foreground">
                 No approved resume is available. Use Review tailored resume history above to
-                generate and approve one, then return here to attach it before moving the draft
-                forward.
+                generate and approve one, then return here to attach it. Resume attachment is
+                optional for pipeline stage changes.
               </p>
             ) : null}
           </CardContent>

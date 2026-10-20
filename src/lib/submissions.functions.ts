@@ -336,18 +336,6 @@ export const changeSubmissionStage = createServerFn({ method: "POST" })
     if (gErr) throw new Error(gErr.message);
     if (!current) throw new Error("Submission not found");
 
-    if (data.to_stage !== "draft") {
-      if (!current.resume_version_id) {
-        throw new Error("Approve and attach a fact-validated tailored resume before submitting");
-      }
-      await requireApprovedResumeVersion(
-        supabase,
-        current.resume_version_id,
-        current.candidate_id,
-        current.requirement_id,
-      );
-    }
-
     const patch: {
       stage: (typeof STAGES)[number];
       submitted_at?: string;
