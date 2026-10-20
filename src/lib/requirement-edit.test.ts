@@ -1,6 +1,31 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "./us-requisition.ts";
+
+test("requisitions accept U.S. state locations and USD only", () => {
+  for (const value of [
+    "Dallas, TX",
+    "New York, NY, USA",
+    "Washington, DC",
+    "Remote, USA",
+    "Remote",
+  ]) {
+    assert.equal(UsRequisitionLocationSchema.safeParse(value).success, true);
+  }
+  for (const value of [
+    "",
+    "France",
+    "Delhi, India",
+    "Toronto, ON",
+    "Remote, India",
+    "Dallas, ZZ",
+  ]) {
+    assert.equal(UsRequisitionLocationSchema.safeParse(value).success, false);
+  }
+  assert.equal(UsRequisitionCurrencySchema.safeParse("USD").success, true);
+  assert.equal(UsRequisitionCurrencySchema.safeParse("INR").success, false);
+});
 
 const routeSource = (name: string) =>
   readFileSync(new URL(`../routes/_authenticated/${name}`, import.meta.url), "utf8");

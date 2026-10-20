@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai-gateway.server";
 import { processDocumentInIsolatedWorker } from "@/lib/document-processing.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
+import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "./us-requisition";
 
 // ------------- shared schemas -------------
 
@@ -29,13 +30,13 @@ const RequirementInputSchema = z.object({
   title: z.string().trim().min(2).max(200),
   client_id: z.string().uuid().nullable().optional(),
   vendor_id: z.string().uuid().nullable().optional(),
-  location: z.string().trim().max(160).nullable().optional(),
+  location: UsRequisitionLocationSchema,
   work_mode: z.enum(WORK_MODES).nullable().optional(),
   visa_types: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   rate_min: z.number().nonnegative().nullable().optional(),
   rate_max: z.number().nonnegative().nullable().optional(),
   rate_type: z.enum(RATE_TYPES).nullable().optional(),
-  currency: z.string().trim().min(1).max(8).default("USD"),
+  currency: UsRequisitionCurrencySchema.default("USD"),
   min_experience_years: z.number().int().min(0).max(60).nullable().optional(),
   max_experience_years: z.number().int().min(0).max(60).nullable().optional(),
   primary_technology: z.string().trim().max(120).nullable().optional(),

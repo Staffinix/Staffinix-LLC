@@ -37,6 +37,7 @@ import {
   createVendor as createVendorFn,
 } from "@/lib/requirements.functions";
 import { cn } from "@/lib/utils";
+import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "@/lib/us-requisition";
 
 export type RequirementFormValues = {
   title: string;
@@ -132,11 +133,16 @@ export function RequirementForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const locationResult = UsRequisitionLocationSchema.safeParse(v.location);
+      if (!locationResult.success)
+        throw new Error("Enter a U.S. city and state (Dallas, TX), or Remote, USA.");
+      if (!UsRequisitionCurrencySchema.safeParse(v.currency).success)
+        throw new Error("Select USD and review the rate amounts before saving.");
       const payload = {
         ...v,
         source,
         title: v.title.trim(),
-        location: emptyToNull(v.location),
+        location: v.location.trim(),
         primary_technology: emptyToNull(v.primary_technology),
         description: emptyToNull(v.description),
         recruiter_notes: emptyToNull(v.recruiter_notes),
@@ -248,11 +254,11 @@ export function RequirementForm({
             />
           </Field>
 
-          <Field label="Location">
+          <Field label="U.S. Location (City, State) *">
             <Input
               value={v.location}
               onChange={(e) => setV({ ...v, location: e.target.value })}
-              placeholder="Dallas, TX"
+              placeholder="Dallas, TX or Remote, USA"
             />
           </Field>
           <Field label="Work mode">
@@ -352,12 +358,24 @@ export function RequirementForm({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Currency">
-            <Input
-              value={v.currency}
-              maxLength={8}
-              onChange={(e) => setV({ ...v, currency: e.target.value.toUpperCase() })}
-            />
+          <Field label="Currency (U.S. dollars)">
+            <Select value={v.currency} onValueChange={(currency) => setV({ ...v, currency })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {v.currency !== "USD" && (
+                  <SelectItem value={v.currency} disabled>
+                    {v.currency} (existing)
+                  </SelectItem>
+                )}
+                <SelectItem value="USD">USD — U.S. Dollar</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              U.S. locations only. Changing currency does not convert rates; review the amounts
+              before saving.
+            </p>
           </Field>
 
           <Field label="Visa types" className="md:col-span-2">
