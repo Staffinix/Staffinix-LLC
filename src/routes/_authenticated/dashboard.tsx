@@ -390,6 +390,7 @@ function UnifiedDashboardPage() {
                       allowDecimals={false}
                     />
                     <RechartsTooltip
+                      itemStyle={{ color: "var(--popover-foreground)" }}
                       contentStyle={{
                         background: "var(--popover)",
                         color: "var(--popover-foreground)",
@@ -470,6 +471,8 @@ function UnifiedDashboardPage() {
                         allowDecimals={false}
                       />
                       <RechartsTooltip
+                        cursor={{ fill: "var(--muted)", fillOpacity: 0.5, stroke: "none" }}
+                        itemStyle={{ color: "var(--popover-foreground)" }}
                         contentStyle={{
                           background: "var(--popover)",
                           color: "var(--popover-foreground)",
