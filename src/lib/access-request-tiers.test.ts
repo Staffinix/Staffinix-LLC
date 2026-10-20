@@ -9,9 +9,9 @@ import {
 
 test("request form exposes exactly the L2, L3, and L4 tiers", () => {
   assert.deepEqual(ACCESS_TIER_OPTIONS, [
-    { value: "l2_admin", label: "Admin (L2)" },
-    { value: "l3_developer", label: "Developer (L3)" },
-    { value: "l4_recruiter", label: "Recruiter (L4)" },
+    { value: "l2_admin", label: "L2 - Admin" },
+    { value: "l3_developer", label: "L3 - Developer" },
+    { value: "l4_recruiter", label: "L4 - Recruiters" },
   ]);
 });
 
@@ -49,7 +49,7 @@ test("empty and whitespace-only reasons are rejected", () => {
 });
 
 test("email preview labels never expose internal tier values", () => {
-  assert.equal(getAccessTierLabel("l2_admin"), "Admin (L2)");
-  assert.equal(getAccessTierLabel("l3_developer"), "Developer (L3)");
-  assert.equal(getAccessTierLabel("l4_recruiter"), "Recruiter (L4)");
+  assert.equal(getAccessTierLabel("l2_admin"), "L2 - Admin");
+  assert.equal(getAccessTierLabel("l3_developer"), "L3 - Developer");
+  assert.equal(getAccessTierLabel("l4_recruiter"), "L4 - Recruiters");
 });

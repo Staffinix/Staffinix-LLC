@@ -44,6 +44,7 @@ import { UserPlus, MoreHorizontal, Loader2, ShieldAlert } from "lucide-react";
 import { listUsers, inviteUser, updateUserRole, setUserActive } from "@/lib/users.functions";
 import { useProfile } from "@/hooks/use-profile";
 import { formatDistanceToNow } from "date-fns";
+import { getRoleLabel } from "@/lib/role-presentation";
 
 export const Route = createFileRoute("/_authenticated/users")({
   head: () => ({ meta: [{ title: "Team — Staffinix" }] }),
@@ -51,14 +52,10 @@ export const Route = createFileRoute("/_authenticated/users")({
 });
 
 const ROLES = [
-  { value: "super_admin", label: "Super Admin (L2)" },
-  { value: "admin", label: "Admin (L2)" },
-  { value: "recruiter", label: "Recruiter (L4)" },
+  { value: "super_admin", label: getRoleLabel("super_admin") },
+  { value: "admin", label: getRoleLabel("admin") },
+  { value: "recruiter", label: getRoleLabel("recruiter") },
 ] as const;
-
-function roleLabel(r: string) {
-  return ROLES.find((x) => x.value === r)?.label ?? r;
-}
 
 function UsersPage() {
   const { data: me } = useProfile();
@@ -89,7 +86,7 @@ function UsersPage() {
             <ShieldAlert className="mx-auto h-8 w-8 text-muted-foreground" />
             <h2 className="mt-4 text-lg font-semibold">Admin access required</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Team management is only available to Admins and Super Admins.
+              Team management requires L2 - Admin access.
             </p>
           </div>
         </main>
@@ -103,7 +100,7 @@ function UsersPage() {
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <PageHeader
           title="Company Team & Recruiter Workload"
-          description="Manage L2 administrators and L4 recruiters. L2 members can update Admin and Recruiter roles; Super Admin changes remain restricted."
+          description="Manage L2 - Admin and L4 - Recruiters. Protected administrator changes remain restricted."
           actions={
             <InviteDialog
               isSuperAdmin={!!isSuperAdmin}
@@ -250,13 +247,15 @@ function UserRow({
               {assignable.map((r) => (
                 <SelectItem key={r.value} value={r.value}>
                   {r.label}
+                  {r.value === "super_admin" ? " (protected)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         ) : (
           <Badge variant="secondary" className="font-normal">
-            {currentRole ? roleLabel(currentRole) : "No role"}
+            {currentRole ? getRoleLabel(currentRole) : "No role"}
+            {currentRole === "super_admin" ? " (protected)" : ""}
           </Badge>
         )}
       </TableCell>
@@ -392,6 +391,7 @@ function InviteDialog({
                 {assignable.map((r) => (
                   <SelectItem key={r.value} value={r.value}>
                     {r.label}
+                    {r.value === "super_admin" ? " (protected)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

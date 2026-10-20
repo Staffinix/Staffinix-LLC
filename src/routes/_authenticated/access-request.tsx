@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ROLE_LEVEL_LABELS } from "@/lib/role-presentation";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -425,7 +426,7 @@ function RecruiterRequestForm() {
             </div>
             <div className="space-y-1 text-[11px] text-muted-foreground">
               <p>
-                <span className="font-medium text-foreground">To:</span> Platform administrators
+                <span className="font-medium text-foreground">To:</span> {ROLE_LEVEL_LABELS.L1}
               </p>
               <p>
                 <span className="font-medium text-foreground">From:</span> {senderName} &lt;

@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ROLE_LEVEL_LABELS } from "@/lib/role-presentation";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import {
@@ -123,7 +124,7 @@ const FAQS = [
   },
   {
     q: "Which roles are supported?",
-    a: "Four tiers: platform owner, company executive/admin, delivery manager and recruiter. Navigation, data access and console visibility all adapt to the signed-in user's role.",
+    a: `Four tiers: ${Object.values(ROLE_LEVEL_LABELS).join(", ")}. Navigation, data access and console visibility adapt to the signed-in user's stored permissions.`,
   },
   {
     q: "Does it work for W2, C2C and 1099 hiring?",
@@ -396,10 +397,10 @@ function LandingPage() {
                 <h3 className="text-sm font-semibold">Built for every tier of your org</h3>
                 <ul className="mt-5 space-y-3 text-sm">
                   {[
-                    "Platform owners — multi-tenant governance and global audit",
-                    "Executives — ROI, margin and delivery dashboards",
-                    "Delivery managers — team workload and onboarding",
-                    "Recruiters — requisitions, bench, tailoring and pipeline",
+                    `${ROLE_LEVEL_LABELS.L1} — multi-tenant governance and global audit`,
+                    `${ROLE_LEVEL_LABELS.L2} — company administration and team workload`,
+                    `${ROLE_LEVEL_LABELS.L3} — integrations and developer tools`,
+                    `${ROLE_LEVEL_LABELS.L4} — requisitions, bench, tailoring and pipeline`,
                   ].map((t) => (
                     <li key={t} className="flex gap-2.5">
                       <Layers className="mt-0.5 h-4 w-4 shrink-0 text-primary" />

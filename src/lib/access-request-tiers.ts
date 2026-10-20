@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROLE_LEVEL_LABELS } from "./role-presentation.ts";
 
 export const REQUESTABLE_ACCESS_TIERS = ["l2_admin", "l3_developer", "l4_recruiter"] as const;
 
@@ -10,9 +11,9 @@ export const ACCESS_TIER_OPTIONS: ReadonlyArray<{
   value: RequestableAccessTier;
   label: string;
 }> = [
-  { value: "l2_admin", label: "Admin (L2)" },
-  { value: "l3_developer", label: "Developer (L3)" },
-  { value: "l4_recruiter", label: "Recruiter (L4)" },
+  { value: "l2_admin", label: ROLE_LEVEL_LABELS.L2 },
+  { value: "l3_developer", label: ROLE_LEVEL_LABELS.L3 },
+  { value: "l4_recruiter", label: ROLE_LEVEL_LABELS.L4 },
 ];
 
 const ACCESS_TIER_LABELS = Object.fromEntries(

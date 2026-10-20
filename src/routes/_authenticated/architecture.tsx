@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getTenancy } from "@/lib/tenancy.functions";
+import { getRoleLabel, ROLE_LEVEL_LABELS } from "@/lib/role-presentation";
 
 export const Route = createFileRoute("/_authenticated/architecture")({
   head: () => ({
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/architecture")({
       { property: "og:title", content: "Platform Architecture — Staffinix" },
       {
         property: "og:description",
-        content: "Platform owner, company executive, developer and business user levels.",
+        content: "L1 - Owner, L2 - Admin, L3 - Developer, and L4 - Recruiters.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -30,11 +31,11 @@ export const Route = createFileRoute("/_authenticated/architecture")({
 const LEVELS = [
   {
     level: "Level 1",
-    title: "Staffinix LLC — Platform Owner",
+    title: ROLE_LEVEL_LABELS.L1,
     icon: Crown,
     to: "/platform",
     accent: "from-amber-500/20 to-transparent border-amber-500/30",
-    who: "SaaS super admins",
+    who: "Authorized platform owners and administrators",
     capabilities: [
       "Provision and suspend tenant companies",
       "Manage plans, subscriptions and seat limits",
@@ -44,7 +45,7 @@ const LEVELS = [
   },
   {
     level: "Level 2",
-    title: "Company Executives — Tenant Admin",
+    title: ROLE_LEVEL_LABELS.L2,
     icon: Building2,
     to: "/company",
     accent: "from-sky-500/20 to-transparent border-sky-500/30",
@@ -58,7 +59,7 @@ const LEVELS = [
   },
   {
     level: "Level 3",
-    title: "Developers & Integrators",
+    title: ROLE_LEVEL_LABELS.L3,
     icon: Code2,
     to: "/developer",
     accent: "from-violet-500/20 to-transparent border-violet-500/30",
@@ -72,7 +73,7 @@ const LEVELS = [
   },
   {
     level: "Level 4",
-    title: "Business Users",
+    title: ROLE_LEVEL_LABELS.L4,
     icon: Users,
     to: "/overview",
     accent: "from-emerald-500/20 to-transparent border-emerald-500/30",
@@ -106,13 +107,11 @@ function ArchitecturePage() {
           <Badge variant="outline" className="capitalize">
             {data?.tenant?.plan ?? "—"} plan
           </Badge>
-          {data?.isPlatformStaff && (
-            <Badge className="capitalize">{data.platformRole?.replace("_", " ")}</Badge>
-          )}
+          {data?.isPlatformStaff && <Badge>{getRoleLabel(data.platformRole)}</Badge>}
           <div className="flex gap-1">
             {(data?.roles ?? []).map((r) => (
               <Badge key={r} variant="secondary" className="text-xs">
-                {r.replace(/_/g, " ")}
+                {getRoleLabel(r)}
               </Badge>
             ))}
           </div>

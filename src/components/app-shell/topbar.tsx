@@ -20,19 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 import { CopilotDrawer } from "@/components/ai/copilot-drawer";
 import { cn } from "@/lib/utils";
-
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  recruiter: "Recruiter",
-  account_manager: "Account Manager",
-  delivery_manager: "Delivery Manager",
-  marketing_executive: "Marketing",
-  developer_admin: "Developer Admin",
-  platform_owner: "Platform Owner",
-  platform_admin: "Platform Admin",
-  platform_support: "Platform Support",
-};
+import { getAssignedRoleLabel } from "@/lib/role-presentation";
 
 export function AppTopbar({ title }: { title: string }) {
   const { data } = useProfile();
@@ -95,7 +83,7 @@ export function AppTopbar({ title }: { title: string }) {
     }
   }
 
-  const primaryRole = data?.platformRole ?? data?.roles?.[0] ?? null;
+  const hasAssignedRole = !!data?.level;
 
   return (
     <header className="pointer-events-none sticky top-0 z-30 flex h-20 items-center px-3 md:px-5">
@@ -111,9 +99,9 @@ export function AppTopbar({ title }: { title: string }) {
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
-          {primaryRole && (
+          {hasAssignedRole && (
             <Badge variant="outline" className="hidden text-[10px] md:inline-flex">
-              {ROLE_LABEL[primaryRole] ?? primaryRole.replace(/_/g, " ")}
+              {getAssignedRoleLabel(data?.roles ?? [], data?.platformRole ?? null)}
             </Badge>
           )}
 

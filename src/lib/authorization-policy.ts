@@ -50,7 +50,7 @@ export function assertAdmin(snapshot: AuthorizationSnapshot): void {
 export function assertSuperAdmin(snapshot: AuthorizationSnapshot): void {
   assertActive(snapshot);
   if (!snapshot.roles.includes("super_admin")) {
-    throw new ForbiddenError("Super administrator privileges required.");
+    throw new ForbiddenError("Protected L2 - Admin privileges required.");
   }
 }
 
@@ -63,14 +63,14 @@ export function assertDeveloperAdmin(snapshot: AuthorizationSnapshot): void {
       (role) => role === "developer_admin" || role === "super_admin" || role === "admin",
     )
   ) {
-    throw new ForbiddenError("Developer administrator privileges required.");
+    throw new ForbiddenError("Authorized developer access required.");
   }
 }
 
 export function assertPlatformAdmin(snapshot: AuthorizationSnapshot): void {
   assertActive(snapshot);
   if (snapshot.platformRole !== "platform_owner" && snapshot.platformRole !== "platform_admin") {
-    throw new ForbiddenError("Platform administrator privileges required.");
+    throw new ForbiddenError("L1 - Owner privileges required.");
   }
 }
 
@@ -101,7 +101,9 @@ export function assertCanManageUser(input: {
     input.assignedRole === "super_admin" &&
     !input.actor.roles.includes("super_admin")
   ) {
-    throw new ForbiddenError("Only super administrators can assign Super Admin roles.");
+    throw new ForbiddenError(
+      "Only protected L2 - Admin accounts can assign protected administrator roles.",
+    );
   }
   if (input.assignedRole && !isCompanyTeamMember([input.assignedRole])) {
     throw new ForbiddenError("Company Team can assign only L2 and L4 roles.");
@@ -111,6 +113,8 @@ export function assertCanManageUser(input: {
     throw new ForbiddenError("Company Team can manage only L2 and L4 members.");
   }
   if (input.targetRoles.includes("super_admin") && !input.actor.roles.includes("super_admin")) {
-    throw new ForbiddenError("Only super administrators can modify Super Admin members.");
+    throw new ForbiddenError(
+      "Only protected L2 - Admin accounts can modify protected administrator members.",
+    );
   }
 }

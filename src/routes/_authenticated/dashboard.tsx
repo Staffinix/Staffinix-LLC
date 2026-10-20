@@ -47,6 +47,7 @@ import {
 } from "recharts";
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/requirements-constants";
 import { canAccessFeature, getFeatureForPath } from "@/lib/feature-access";
+import { ROLE_LEVEL_LABELS } from "@/lib/role-presentation";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -105,13 +106,7 @@ function UnifiedDashboardPage() {
 
   const firstName =
     profile?.profile?.full_name?.split(" ")[0] ??
-    (level === "L1"
-      ? "Platform Admin"
-      : level === "L2"
-        ? "Executive"
-        : level === "L3"
-          ? "Developer"
-          : "Recruiter");
+    (level ? ROLE_LEVEL_LABELS[level] : "Team member");
 
   const pageDescription = `${profile?.roleTitle ?? "Team"} workspace — live recruitment operations and the features assigned to your role.`;
 

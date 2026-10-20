@@ -10,14 +10,7 @@ import { getRecruiter } from "@/lib/recruiters.functions";
 import { Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  recruiter: "Recruiter",
-  account_manager: "Account Manager",
-  delivery_manager: "Delivery Manager",
-  marketing_executive: "Marketing",
-};
+import { getRoleLabel } from "@/lib/role-presentation";
 
 export const Route = createFileRoute("/_authenticated/recruiters/$id")({
   head: () => ({ meta: [{ title: "Recruiter — Staffinix" }] }),
@@ -67,7 +60,7 @@ function RecruiterDetailPage() {
                   variant="outline"
                   className="border-primary/20 bg-primary/10 text-primary text-xs"
                 >
-                  {ROLE_LABEL[r] ?? r}
+                  {getRoleLabel(r)}
                 </Badge>
               ))}
             </div>

@@ -17,15 +17,7 @@ import {
 } from "@/components/ui/table";
 import { listRecruiters } from "@/lib/recruiters.functions";
 import { Loader2, Search } from "lucide-react";
-
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  recruiter: "Recruiter",
-  account_manager: "Account Manager",
-  delivery_manager: "Delivery Manager",
-  marketing_executive: "Marketing",
-};
+import { getRoleLabel } from "@/lib/role-presentation";
 
 export const Route = createFileRoute("/_authenticated/recruiters/")({
   head: () => ({
@@ -142,7 +134,7 @@ function RecruitersPage() {
                               variant="outline"
                               className="border-primary/20 bg-primary/10 text-primary text-xs"
                             >
-                              {ROLE_LABEL[role] ?? role}
+                              {getRoleLabel(role)}
                             </Badge>
                           ))}
                         </div>

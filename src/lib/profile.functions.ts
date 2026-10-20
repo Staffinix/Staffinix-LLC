@@ -2,41 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { serverFunctionAuth } from "@/integrations/supabase/server-function-auth";
 import { z } from "zod";
-import type { RoleLevel } from "@/types/auth";
+import { getAssignedRoleLevel, getAssignedRoleLabel } from "@/lib/role-presentation";
 import { isAllowedProfileAvatarValue } from "@/lib/profile-avatar";
 import { resolveProfileAvatarUrl } from "@/lib/profile-avatar.server";
-
-function getRoleLevel(roles: string[], platformRole: string | null): RoleLevel {
-  if (platformRole === "platform_owner" || platformRole === "platform_admin") return "L1";
-  if (roles.includes("super_admin") || roles.includes("admin")) return "L2";
-  if (
-    platformRole === "platform_support" ||
-    roles.includes("developer_admin") ||
-    roles.includes("account_manager") ||
-    roles.includes("delivery_manager")
-  ) {
-    return "L3";
-  }
-  return "L4";
-}
-
-function getRoleTitle(roles: string[], platformRole: string | null): string {
-  const role =
-    platformRole ??
-    [
-      "super_admin",
-      "admin",
-      "developer_admin",
-      "delivery_manager",
-      "account_manager",
-      "recruiter",
-      "marketing_executive",
-      "user",
-    ].find((candidate) => roles.includes(candidate)) ??
-    "user";
-
-  return role.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-}
 
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([serverFunctionAuth, requireSupabaseAuth])
@@ -88,8 +56,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
 
     const roles = (rolesData ?? []).map((row) => row.role);
     const platformRole = platform?.role ?? null;
-    const resolvedLevel =
-      roles.length > 0 || platformRole ? getRoleLevel(roles, platformRole) : null;
+    const resolvedLevel = getAssignedRoleLevel(roles, platformRole);
 
     return {
       profile: {
@@ -106,7 +73,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
       platformRole,
       isPlatformStaff: platformRole !== null,
       level: resolvedLevel,
-      roleTitle: getRoleTitle(roles, platformRole),
+      roleTitle: getAssignedRoleLabel(roles, platformRole),
     };
   });
 

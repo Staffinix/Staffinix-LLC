@@ -26,24 +26,22 @@ import { useRoleLevel } from "@/hooks/use-role-level";
 import { supabase } from "@/integrations/supabase/client";
 import { updateMyProfile } from "@/lib/profile.functions";
 import { createProfileAvatarReference, PROFILE_AVATAR_BUCKET } from "@/lib/profile-avatar";
+import { getRoleLabel } from "@/lib/role-presentation";
 
 const PROFILE_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-const ROLE_MAP: Record<string, { label: string; desc: string }> = {
-  super_admin: { label: "Super Admin", desc: "Full administrative and tenant access" },
-  admin: { label: "Admin", desc: "Company administration and team management" },
-  developer_admin: { label: "Developer Admin", desc: "API, webhook, and developer console access" },
-  delivery_manager: { label: "Delivery Manager", desc: "Account and placement oversight" },
-  account_manager: {
-    label: "Account Manager",
-    desc: "Client relationship and requirement manager",
-  },
-  recruiter: { label: "Recruiter", desc: "Candidate sourcing, matching, and submissions" },
-  marketing_executive: { label: "Marketing Executive", desc: "Outreach and pipeline operations" },
-  platform_owner: { label: "Platform Owner", desc: "Staffinix SaaS system owner" },
-  platform_admin: { label: "Platform Admin", desc: "SaaS system administrator" },
-  platform_support: { label: "Platform Support", desc: "SaaS support engineer" },
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  super_admin: "Protected administrator with full tenant administration",
+  admin: "Company administration and team management",
+  developer_admin: "API, webhook, and developer console access",
+  delivery_manager: "Account and placement oversight",
+  account_manager: "Client relationship and requirement management",
+  recruiter: "Candidate sourcing, matching, and submissions",
+  marketing_executive: "Outreach and pipeline operations",
+  platform_owner: "Staffinix SaaS system owner",
+  platform_admin: "SaaS system administration",
+  platform_support: "SaaS support engineering",
 };
 
 export const Route = createFileRoute("/_authenticated/settings/profile")({
@@ -331,17 +329,16 @@ function ProfileSettingsPage() {
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
                   {effectiveRoles.map((r) => {
-                    const info = ROLE_MAP[r] ?? {
-                      label: r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-                      desc: "Authorized organization role",
-                    };
                     return (
                       <div
                         key={r}
                         className="flex flex-col rounded-lg border border-border bg-surface/70 px-3 py-2 text-xs shadow-2xs"
                       >
-                        <span className="font-semibold text-foreground">{info.label}</span>
-                        <span className="text-[10px] text-muted-foreground">{info.desc}</span>
+                        <span className="font-semibold text-foreground">{getRoleLabel(r)}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {ROLE_DESCRIPTIONS[r] ??
+                            "Contact an administrator to confirm your access"}
+                        </span>
                       </div>
                     );
                   })}
@@ -354,10 +351,10 @@ function ProfileSettingsPage() {
                   {data?.platformRole && (
                     <div className="flex flex-col rounded-lg border border-border bg-surface/70 px-3 py-2 text-xs shadow-2xs">
                       <span className="font-semibold text-foreground">
-                        {ROLE_MAP[data.platformRole]?.label ?? data.platformRole}
+                        {getRoleLabel(data.platformRole)}
                       </span>
                       <span className="text-[10px] text-muted-foreground">
-                        {ROLE_MAP[data.platformRole]?.desc ?? "Authorized platform membership"}
+                        {ROLE_DESCRIPTIONS[data.platformRole] ?? "Authorized platform membership"}
                       </span>
                     </div>
                   )}

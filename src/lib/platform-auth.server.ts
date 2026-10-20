@@ -34,6 +34,6 @@ export async function requirePlatformAdmin(
   userId: string,
 ): Promise<void> {
   if (!(await is_platform_admin(supabase, userId))) {
-    throw new ForbiddenError("Platform administrator privileges required.");
+    throw new ForbiddenError("L1 - Owner privileges required.");
   }
 }
