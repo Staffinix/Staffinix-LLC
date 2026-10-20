@@ -7,6 +7,7 @@ import {
   assertDeveloperAdmin,
   assertPlatformAdmin,
   assertSuperAdmin,
+  isCompanyTeamMember,
   ForbiddenError,
   type AuthorizationSnapshot,
 } from "./authorization-policy.ts";
@@ -77,6 +78,7 @@ test("a user can never modify their own authorization state", () => {
         actor: snapshot(["super_admin"]),
         actorId: "user-1",
         targetId: "user-1",
+        targetRoles: ["super_admin"],
         targetTenantId: "tenant-a",
         assignedRole: "admin",
       }),
@@ -84,20 +86,116 @@ test("a user can never modify their own authorization state", () => {
   );
 });
 
-test("admin cannot promote a recruiter to a privileged administrator role", () => {
-  for (const assignedRole of ["admin", "super_admin", "developer_admin"] as const) {
+test("admin cannot assign Super Admin or roles outside Company Team", () => {
+  for (const assignedRole of [
+    "super_admin",
+    "developer_admin",
+    "account_manager",
+    "delivery_manager",
+    "marketing_executive",
+  ] as const) {
     assert.throws(
       () =>
         assertCanManageUser({
           actor: snapshot(["admin"]),
           actorId: "admin-1",
           targetId: "recruiter-1",
+          targetRoles: ["recruiter"],
           targetTenantId: "tenant-a",
           assignedRole,
         }),
       ForbiddenError,
     );
   }
+});
+
+test("Company Team includes only L2 and L4 memberships, not mixed L3 roles", () => {
+  for (const roles of [["admin"], ["super_admin"], ["recruiter"], ["admin", "recruiter"]]) {
+    assert.equal(isCompanyTeamMember(roles), true);
+  }
+  for (const roles of [
+    [],
+    ["developer_admin"],
+    ["account_manager"],
+    ["delivery_manager"],
+    ["marketing_executive"],
+    ["recruiter", "developer_admin"],
+  ]) {
+    assert.equal(isCompanyTeamMember(roles), false);
+  }
+});
+
+test("both L2 types can switch Admin and Recruiter roles in their tenant", () => {
+  for (const actorRole of ["admin", "super_admin"] as const) {
+    for (const targetRole of ["admin", "recruiter"] as const) {
+      for (const assignedRole of ["admin", "recruiter"] as const) {
+        assert.doesNotThrow(() =>
+          assertCanManageUser({
+            actor: snapshot([actorRole]),
+            actorId: "actor",
+            targetId: "target",
+            targetTenantId: "tenant-a",
+            targetRoles: [targetRole],
+            assignedRole,
+          }),
+        );
+      }
+    }
+  }
+});
+
+test("L2 cannot update hidden roles or let Admin modify a Super Admin", () => {
+  for (const targetRoles of [
+    ["developer_admin"],
+    ["account_manager"],
+    ["delivery_manager"],
+    ["marketing_executive"],
+    ["recruiter", "developer_admin"],
+    ["super_admin"],
+    [],
+  ]) {
+    for (const assignedRole of [undefined, "admin", "recruiter"] as const) {
+      assert.throws(
+        () =>
+          assertCanManageUser({
+            actor: snapshot(["admin"]),
+            actorId: "actor",
+            targetId: "target",
+            targetTenantId: "tenant-a",
+            targetRoles,
+            assignedRole,
+          }),
+        ForbiddenError,
+      );
+    }
+  }
+});
+
+test("even Super Admin cannot assign or overwrite L3 roles through Company Team", () => {
+  assert.throws(
+    () =>
+      assertCanManageUser({
+        actor: snapshot(["super_admin"]),
+        actorId: "actor",
+        targetId: "target",
+        targetTenantId: "tenant-a",
+        targetRoles: ["developer_admin"],
+        assignedRole: "admin",
+      }),
+    ForbiddenError,
+  );
+  assert.throws(
+    () =>
+      assertCanManageUser({
+        actor: snapshot(["super_admin"]),
+        actorId: "actor",
+        targetId: "target",
+        targetTenantId: "tenant-a",
+        targetRoles: ["recruiter"],
+        assignedRole: "developer_admin",
+      }),
+    ForbiddenError,
+  );
 });
 
 test("cross-tenant user modification is denied for every company role", () => {
@@ -109,6 +207,7 @@ test("cross-tenant user modification is denied for every company role", () => {
           actorId: "actor",
           targetId: "target",
           targetTenantId: "tenant-b",
+          targetRoles: ["recruiter"],
           assignedRole: "recruiter",
         }),
       ForbiddenError,
@@ -122,6 +221,7 @@ test("super admin may manage another user only inside the same tenant", () => {
       actor: snapshot(["super_admin"]),
       actorId: "super-admin",
       targetId: "other-user",
+      targetRoles: ["recruiter"],
       targetTenantId: "tenant-a",
       assignedRole: "admin",
     }),
@@ -134,6 +234,7 @@ test("platform owner super admin may onboard an unassigned user while assigning 
       actor: snapshot(["super_admin"], { platformRole: "platform_owner" }),
       actorId: "platform-owner",
       targetId: "unassigned-user",
+      targetRoles: [],
       targetTenantId: null,
       assignedRole: "recruiter",
     }),
@@ -147,6 +248,7 @@ test("company super admin cannot claim an unassigned user", () => {
         actor: snapshot(["super_admin"]),
         actorId: "company-admin",
         targetId: "unassigned-user",
+        targetRoles: [],
         targetTenantId: null,
         assignedRole: "recruiter",
       }),
@@ -161,6 +263,7 @@ test("platform owner cannot use company role assignment across existing tenants"
         actor: snapshot(["super_admin"], { platformRole: "platform_owner" }),
         actorId: "platform-owner",
         targetId: "other-company-user",
+        targetRoles: ["recruiter"],
         targetTenantId: "tenant-b",
         assignedRole: "recruiter",
       }),

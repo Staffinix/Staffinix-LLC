@@ -3,10 +3,10 @@ import { z } from "zod";
 import { requireUsersAccess } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseAuthContext } from "@/integrations/supabase/auth-middleware";
 
-import { APP_ROLES } from "@/lib/authorization-policy";
+import { COMPANY_TEAM_ROLES, isCompanyTeamMember } from "@/lib/authorization-policy";
 import { resolveProfileAvatarUrls } from "@/lib/profile-avatar.server";
 
-const AppRoleSchema = z.enum(APP_ROLES);
+const AppRoleSchema = z.enum(COMPANY_TEAM_ROLES);
 
 async function requireAdminContext(context: SupabaseAuthContext) {
   const { requireAdmin } = await import("@/lib/rbac.server");
@@ -24,7 +24,7 @@ async function requireAdminContext(context: SupabaseAuthContext) {
   return { roles, tenantId: caller.tenant_id, platformRole: platform?.role ?? null };
 }
 
-async function resolveTargetTenant(context: SupabaseAuthContext, targetUserId: string) {
+async function resolveTarget(context: SupabaseAuthContext, targetUserId: string) {
   const { data, error } = await context.supabase
     .from("profiles")
     .select("id, tenant_id")
@@ -32,7 +32,12 @@ async function resolveTargetTenant(context: SupabaseAuthContext, targetUserId: s
     .maybeSingle();
   if (error) throw new Error("Unable to resolve target user.");
   if (!data) throw new Error("Unable to resolve target user.");
-  return data.tenant_id;
+  const { data: roles, error: rolesError } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", targetUserId);
+  if (rolesError) throw new Error("Unable to resolve target roles.");
+  return { tenantId: data.tenant_id, roles: (roles ?? []).map((row) => row.role) };
 }
 
 export const listUsers = createServerFn({ method: "GET" })
@@ -61,7 +66,10 @@ export const listUsers = createServerFn({ method: "GET" })
     for (const row of roles ?? [])
       rolesByUser.set(row.user_id, [...(rolesByUser.get(row.user_id) ?? []), row.role]);
 
-    const safeProfiles = await resolveProfileAvatarUrls(context.supabase, profiles ?? []);
+    const teamProfiles = (profiles ?? []).filter((profile) =>
+      isCompanyTeamMember(rolesByUser.get(profile.id) ?? []),
+    );
+    const safeProfiles = await resolveProfileAvatarUrls(context.supabase, teamProfiles);
     return safeProfiles.map((profile) => ({
       ...profile,
       last_sign_in_at: null,
@@ -82,7 +90,7 @@ export const inviteUser = createServerFn({ method: "POST" })
   .validator((input: unknown) => InviteSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { roles, tenantId } = await requireAdminContext(context);
-    if (data.role === "super_admin" || data.role === "admin" || data.role === "developer_admin") {
+    if (data.role === "super_admin") {
       const { assertSuperAdmin } = await import("@/lib/authorization-policy");
       assertSuperAdmin({ active: true, tenantId, roles, platformRole: null });
     }
@@ -116,13 +124,14 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .validator((input: unknown) => UpdateRoleSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { roles, tenantId, platformRole } = await requireAdminContext(context);
-    const targetTenantId = await resolveTargetTenant(context, data.user_id);
+    const target = await resolveTarget(context, data.user_id);
     const { assertCanManageUser } = await import("@/lib/authorization-policy");
     assertCanManageUser({
       actor: { active: true, tenantId, roles, platformRole },
       actorId: context.userId,
       targetId: data.user_id,
-      targetTenantId,
+      targetTenantId: target.tenantId,
+      targetRoles: target.roles,
       assignedRole: data.role,
     });
 
@@ -141,13 +150,14 @@ export const setUserActive = createServerFn({ method: "POST" })
   .validator((input: unknown) => SetActiveSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { tenantId, roles, platformRole } = await requireAdminContext(context);
-    const targetTenantId = await resolveTargetTenant(context, data.user_id);
+    const target = await resolveTarget(context, data.user_id);
     const { assertCanManageUser } = await import("@/lib/authorization-policy");
     assertCanManageUser({
       actor: { active: true, tenantId, roles, platformRole },
       actorId: context.userId,
       targetId: data.user_id,
-      targetTenantId,
+      targetTenantId: target.tenantId,
+      targetRoles: target.roles,
     });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

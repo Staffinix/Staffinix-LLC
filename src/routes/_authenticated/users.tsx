@@ -51,13 +51,9 @@ export const Route = createFileRoute("/_authenticated/users")({
 });
 
 const ROLES = [
-  { value: "super_admin", label: "Super Admin" },
-  { value: "admin", label: "Admin" },
-  { value: "developer_admin", label: "Developer Admin" },
-  { value: "recruiter", label: "Recruiter" },
-  { value: "account_manager", label: "Account Manager" },
-  { value: "delivery_manager", label: "Delivery Manager" },
-  { value: "marketing_executive", label: "Marketing Executive" },
+  { value: "super_admin", label: "Super Admin (L2)" },
+  { value: "admin", label: "Admin (L2)" },
+  { value: "recruiter", label: "Recruiter (L4)" },
 ] as const;
 
 function roleLabel(r: string) {
@@ -107,7 +103,7 @@ function UsersPage() {
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <PageHeader
           title="Company Team & Recruiter Workload"
-          description="Invite recruiters, assign roles, track active workload metrics (open reqs, submissions, interviews, placements), and manage departures."
+          description="Manage L2 administrators and L4 recruiters. L2 members can update Admin and Recruiter roles; Super Admin changes remain restricted."
           actions={
             <InviteDialog
               isSuperAdmin={!!isSuperAdmin}
@@ -205,8 +201,10 @@ function UserRow({
       .join("")
       .toUpperCase() ?? user.email[0].toUpperCase();
 
-  const currentRole = user.roles[0];
+  const currentRole = ROLES.find((role) => user.roles.includes(role.value))?.value;
   const isSelf = user.id === meId;
+  const canManage = !isSelf && (isSuperAdmin || !user.roles.includes("super_admin"));
+  const assignable = ROLES.filter((role) => isSuperAdmin || role.value !== "super_admin");
 
   const openReqs = user.open_requirements ?? 0;
   const submissions = user.submissions ?? 0;
@@ -239,7 +237,7 @@ function UserRow({
         </Link>
       </TableCell>
       <TableCell>
-        {isSuperAdmin && !isSelf ? (
+        {canManage ? (
           <Select
             value={currentRole ?? undefined}
             onValueChange={(v) => roleMutation.mutate(v)}
@@ -249,7 +247,7 @@ function UserRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ROLES.map((r) => (
+              {assignable.map((r) => (
                 <SelectItem key={r.value} value={r.value}>
                   {r.label}
                 </SelectItem>
@@ -283,7 +281,7 @@ function UserRow({
           : "Never"}
       </TableCell>
       <TableCell>
-        {!isSelf && (
+        {canManage && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -294,12 +292,16 @@ function UserRow({
               {user.is_active ? (
                 <DropdownMenuItem
                   className="text-destructive"
+                  disabled={activeMutation.isPending}
                   onClick={() => activeMutation.mutate(false)}
                 >
                   Deactivate
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={() => activeMutation.mutate(true)}>
+                <DropdownMenuItem
+                  disabled={activeMutation.isPending}
+                  onClick={() => activeMutation.mutate(true)}
+                >
                   Reactivate
                 </DropdownMenuItem>
               )}
@@ -337,11 +339,7 @@ function InviteDialog({
     onError: (e) => toast.error((e as Error).message),
   });
 
-  const assignable = ROLES.filter(
-    (r) =>
-      isSuperAdmin ||
-      (r.value !== "super_admin" && r.value !== "admin" && r.value !== "developer_admin"),
-  );
+  const assignable = ROLES.filter((r) => isSuperAdmin || r.value !== "super_admin");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

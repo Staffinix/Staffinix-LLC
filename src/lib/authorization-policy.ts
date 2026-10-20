@@ -11,6 +11,14 @@ export const APP_ROLES = [
 ] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
+export const COMPANY_TEAM_ROLES = ["super_admin", "admin", "recruiter"] as const;
+
+export function isCompanyTeamMember(roles: readonly string[]): boolean {
+  return (
+    roles.length > 0 &&
+    roles.every((role) => COMPANY_TEAM_ROLES.some((allowed) => allowed === role))
+  );
+}
 export type PlatformRole = "platform_owner" | "platform_admin" | "platform_support";
 
 export interface AuthorizationSnapshot {
@@ -71,6 +79,7 @@ export function assertCanManageUser(input: {
   actorId: string;
   targetId: string;
   targetTenantId: string | null;
+  targetRoles: readonly string[];
   assignedRole?: AppRole;
 }): void {
   assertAdmin(input.actor);
@@ -89,11 +98,19 @@ export function assertCanManageUser(input: {
   }
   if (
     input.assignedRole &&
-    (input.assignedRole === "admin" ||
-      input.assignedRole === "super_admin" ||
-      input.assignedRole === "developer_admin") &&
+    input.assignedRole === "super_admin" &&
     !input.actor.roles.includes("super_admin")
   ) {
-    throw new ForbiddenError("Only super administrators can assign administrator roles.");
+    throw new ForbiddenError("Only super administrators can assign Super Admin roles.");
+  }
+  if (input.assignedRole && !isCompanyTeamMember([input.assignedRole])) {
+    throw new ForbiddenError("Company Team can assign only L2 and L4 roles.");
+  }
+  const onboarding = canOnboardUnassignedUser && input.targetRoles.length === 0;
+  if (!onboarding && !isCompanyTeamMember(input.targetRoles)) {
+    throw new ForbiddenError("Company Team can manage only L2 and L4 members.");
+  }
+  if (input.targetRoles.includes("super_admin") && !input.actor.roles.includes("super_admin")) {
+    throw new ForbiddenError("Only super administrators can modify Super Admin members.");
   }
 }
