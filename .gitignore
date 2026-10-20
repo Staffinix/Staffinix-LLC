@@ -41,3 +41,11 @@ My-Version/
 
 .vercel
 .env*
+!.env.example
+
+# Private credentials must not enter source control.
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json

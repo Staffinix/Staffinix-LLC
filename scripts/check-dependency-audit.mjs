@@ -3,12 +3,6 @@ import { spawnSync } from "node:child_process";
 const minimumSeverity = "moderate";
 const severityRank = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 
-// No patched sprintf-js release exists as of 2026-10-11. Mammoth reaches it through its
-// CLI-only argparse dependency, while Staffinix uses Mammoth's extractRawText API inside the
-// isolated, size-limited document worker. Keep this exception narrow so every new advisory still
-// fails the release gate.
-const allowedAdvisories = new Set(["https://github.com/advisories/GHSA-hp3w-g68c-fv3c"]);
-
 const npmCli = process.env.npm_execpath;
 const result = npmCli
   ? spawnSync(process.execPath, [npmCli, "audit", "--json"], {
@@ -32,6 +26,9 @@ try {
 }
 
 const vulnerabilities = report.vulnerabilities ?? {};
+if (report.error || !report.metadata?.vulnerabilities) {
+  throw new Error("Dependency audit did not complete successfully.");
+}
 
 function advisoryUrlsFor(name, seen = new Set()) {
   if (seen.has(name)) return new Set();
@@ -49,19 +46,11 @@ function advisoryUrlsFor(name, seen = new Set()) {
 }
 
 const failures = [];
-const accepted = [];
 for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
   if ((severityRank[vulnerability.severity] ?? 99) < severityRank[minimumSeverity]) continue;
 
   const urls = advisoryUrlsFor(name);
-  const isNarrowlyAllowed = urls.size > 0 && [...urls].every((url) => allowedAdvisories.has(url));
-
-  if (isNarrowlyAllowed) accepted.push(`${name} (${vulnerability.severity})`);
-  else failures.push({ name, severity: vulnerability.severity, urls: [...urls] });
-}
-
-if (accepted.length > 0) {
-  console.warn(`Accepted documented unpatched advisory chain: ${accepted.join(", ")}`);
+  failures.push({ name, severity: vulnerability.severity, urls: [...urls] });
 }
 
 if (failures.length > 0) {

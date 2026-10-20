@@ -12,7 +12,7 @@ import {
   assertDeclaredRequestBodyWithinLimit,
   PayloadTooLargeError,
 } from "./integrations/http/request-size";
-import { applySecurityHeaders } from "./integrations/http/security-headers";
+import { applySecurityHeaders, createCspNonce } from "./integrations/http/security-headers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -58,13 +58,16 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const nonce = createCspNonce();
     try {
       if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
         assertDeclaredRequestBodyWithinLimit(request);
       }
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return applySecurityHeaders(request, await normalizeCatastrophicSsrResponse(response));
+      const headers = new Headers(request.headers);
+      headers.set("x-staffinix-csp-nonce", nonce);
+      const response = await handler.fetch(new Request(request, { headers }), env, ctx);
+      return applySecurityHeaders(request, await normalizeCatastrophicSsrResponse(response), nonce);
     } catch (error) {
       if (error instanceof PayloadTooLargeError) {
         return applySecurityHeaders(
