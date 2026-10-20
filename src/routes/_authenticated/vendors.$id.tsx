@@ -22,7 +22,17 @@ import {
 import { CrmForm } from "@/components/crm/crm-form";
 import { deleteVendor, getVendor, updateVendor } from "@/lib/vendors.functions";
 import { STATUS_LABEL, STATUS_STYLES, TIER_LABEL, TIER_STYLES } from "@/lib/crm-constants";
-import { Loader2, Trash2, Mail, Phone, Globe, MapPin, Linkedin, Briefcase } from "lucide-react";
+import {
+  Loader2,
+  Pencil,
+  Trash2,
+  Mail,
+  Phone,
+  Globe,
+  MapPin,
+  Linkedin,
+  Briefcase,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -85,7 +95,7 @@ function VendorDetailPage() {
           title={v.name}
           description="Vendor partner"
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={cn("border", STATUS_STYLES[v.status])}>
                 {STATUS_LABEL[v.status]}
               </Badge>
@@ -94,6 +104,10 @@ function VendorDetailPage() {
                   {TIER_LABEL[v.tier]}
                 </Badge>
               )}
+              <Button variant="outline" size="sm" onClick={() => setTab("edit")}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -125,7 +139,6 @@ function VendorDetailPage() {
               Requirements ({data.requirements.length})
             </TabsTrigger>
             <TabsTrigger value="submissions">Submissions ({data.submissions.length})</TabsTrigger>
-            <TabsTrigger value="edit">Edit</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-6 space-y-4">
@@ -235,17 +248,19 @@ function VendorDetailPage() {
             />
           </TabsContent>
 
-          <TabsContent value="edit" className="mt-6">
-            <div className="max-w-3xl">
-              <CrmForm
-                kind="vendor"
-                initial={v as never}
-                submitting={upd.isPending}
-                submitLabel="Save changes"
-                onSubmit={(val) => upd.mutate(val)}
-              />
+          {tab === "edit" && (
+            <div className="mt-6">
+              <div className="max-w-3xl">
+                <CrmForm
+                  kind="vendor"
+                  initial={v as never}
+                  submitting={upd.isPending}
+                  submitLabel="Save changes"
+                  onSubmit={(val) => upd.mutate(val)}
+                />
+              </div>
             </div>
-          </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
