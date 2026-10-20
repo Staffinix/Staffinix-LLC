@@ -17,9 +17,11 @@ import { resolveProfileAvatarUrls } from "@/lib/profile-avatar.server";
 const AppRoleSchema = z.enum(APP_ROLES);
 
 async function requireAdminContext(context: SupabaseAuthContext) {
-  const { getUserRoles } = await import("@/lib/rbac.server");
-  const roles = await getUserRoles(context.supabase, context.userId);
-  const [{ data: caller, error }, { data: platform, error: platformError }] = await Promise.all([
+  const [
+    { data: caller, error },
+    { data: platform, error: platformError },
+    { data: assignedRoles, error: rolesError },
+  ] = await Promise.all([
     context.supabase
       .from("profiles")
       .select("tenant_id, is_active")
@@ -30,9 +32,12 @@ async function requireAdminContext(context: SupabaseAuthContext) {
       .select("role")
       .eq("user_id", context.userId)
       .maybeSingle(),
+    context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
   ]);
-  if (error || platformError) throw new Error("Unable to resolve administrator context.");
+  if (error || platformError || rolesError)
+    throw new Error("Unable to resolve administrator context.");
   if (!caller?.tenant_id) throw new Error("Administrator is not assigned to a tenant.");
+  const roles = (assignedRoles ?? []).map((row) => row.role);
   assertTeamAdmin({
     active: caller.is_active,
     tenantId: caller.tenant_id,
@@ -42,11 +47,12 @@ async function requireAdminContext(context: SupabaseAuthContext) {
   return { roles, tenantId: caller.tenant_id, platformRole: platform?.role ?? null };
 }
 
-async function getPlatformRoles(userIds: string[]): Promise<Map<string, PlatformRole>> {
+async function getPlatformRoles(
+  supabase: SupabaseAuthContext["supabase"],
+  userIds: string[],
+): Promise<Map<string, PlatformRole>> {
   if (!userIds.length) return new Map();
-  // IDs come only from the authenticated, tenant-scoped profile lookup.
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("platform_admins")
     .select("user_id, role")
     .in("user_id", userIds);
@@ -67,7 +73,7 @@ async function resolveTarget(context: SupabaseAuthContext, targetUserId: string)
     .select("role")
     .eq("user_id", targetUserId);
   if (rolesError) throw new Error("Unable to resolve target roles.");
-  const platformRoles = await getPlatformRoles([targetUserId]);
+  const platformRoles = await getPlatformRoles(context.supabase, [targetUserId]);
   return {
     tenantId: data.tenant_id,
     roles: (roles ?? []).map((row) => row.role),
@@ -96,7 +102,7 @@ export const listUsers = createServerFn({ method: "GET" })
       ? await context.supabase.from("user_roles").select("user_id, role").in("user_id", ids)
       : { data: [], error: null };
     if (rolesError) throw new Error("Failed to load user roles.");
-    const platformRoles = await getPlatformRoles(ids);
+    const platformRoles = await getPlatformRoles(context.supabase, ids);
 
     const rolesByUser = new Map<string, string[]>();
     for (const row of roles ?? [])

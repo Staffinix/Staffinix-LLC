@@ -48,6 +48,19 @@ test("Company Team reads platform roles and exposes all four choices only to L1"
   assert.match(page, /Grant L1 - Owner access\?/);
 });
 
+test("Company Team reads do not require a Supabase server secret or privileged fallback", () => {
+  const server = readFileSync(new URL("./users.functions.ts", import.meta.url), "utf8");
+  const reads = server.slice(
+    server.indexOf("async function requireAdminContext"),
+    server.indexOf("const InviteSchema"),
+  );
+  assert.doesNotMatch(reads, /supabaseAdmin|client\.server|getUserRoles|SUPABASE_SECRET/);
+  assert.match(reads, /getPlatformRoles\(context\.supabase, ids\)/);
+  assert.match(reads, /getPlatformRoles\(context\.supabase, \[targetUserId\]\)/);
+  assert.match(reads, /\.from\("user_roles"\)\.select\("role"\)\.eq\("user_id", context\.userId\)/);
+  assert.match(reads, /assertTeamAdmin/);
+});
+
 test("all stored roles retain their level and tier precedence is independent of array order", () => {
   for (const role of APP_ROLES) assert.notEqual(getAssignedRoleLevel([role], null), null);
   assert.equal(getAssignedRoleLevel(["recruiter", "admin"], null), "L2");

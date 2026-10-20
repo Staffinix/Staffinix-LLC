@@ -68,5 +68,11 @@ membership and replaces the application role atomically through `set_user_access
 `set_user_role` RPC delegates to the same checks. UI confirmation is not the security boundary;
 the database validates active L1 membership, target tenancy, role allowlist, and self-change rules.
 
+Team-list reads and role changes use the signed-in user's Supabase client; they do not require
+`SUPABASE_SECRET_KEY`. Active L2 administrators may read platform membership metadata only
+for their tenant so they can identify protected platform accounts. This SELECT-only policy grants
+no role-management writes. Invitations and authentication-account activation/deactivation still
+use the server-only admin client and require a configured server secret.
+
 Only `platform_owner` retains the existing special case for onboarding an unassigned profile.
 Neither L1 nor L2 may change their own role or modify an existing user in another tenant.
