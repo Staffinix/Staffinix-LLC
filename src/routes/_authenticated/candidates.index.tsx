@@ -138,7 +138,7 @@ function L4RecruiterFilter({
       <PopoverContent align="start" className="w-80 space-y-3 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold">Assigned L4 recruiters</p>
+            <p className="text-sm font-semibold">Assigned Recruiters</p>
             <p className="text-xs text-muted-foreground">Select one or multiple names.</p>
           </div>
           {selectedIds.length > 0 && (
@@ -188,7 +188,6 @@ function L4RecruiterFilter({
 function BenchCandidatesPage() {
   const { data: profile } = useProfile();
   const { level } = useRoleLevel();
-  const isL3orL4 = level === "L3" || level === "L4";
   const isL2 = level === "L2";
   const isL4 = level === "L4";
   const queryClient = useQueryClient();
@@ -690,12 +689,12 @@ function BenchCandidatesPage() {
                   <TableHead className="p-3 font-semibold text-center">Location</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Availability</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Status</TableHead>
-                  <TableHead className="p-3 font-semibold text-center">Assigned L4</TableHead>
+                  <TableHead className="p-3 font-semibold text-center">
+                    Assigned Recruiter
+                  </TableHead>
                   <TableHead className="p-3 font-semibold text-center">Submission</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Submitted by</TableHead>
-                  {!isL3orL4 && (
-                    <TableHead className="p-3 font-semibold text-center">AI Match</TableHead>
-                  )}
+                  <TableHead className="p-3 font-semibold text-center">AI Matching</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Profile</TableHead>
                 </TableRow>
               </TableHeader>
@@ -815,20 +814,18 @@ function BenchCandidatesPage() {
                           </div>
                         )}
                       </TableCell>
-                      {!isL3orL4 && (
-                        <TableCell className="p-3 text-center">
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2.5 text-[11px] font-bold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                          >
-                            <Link to="/matching" search={{ candidateId: r.id }}>
-                              <Sparkles className="h-3 w-3 text-emerald-500" /> Select role
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      )}
+                      <TableCell className="p-3 text-center">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2.5 text-[11px] font-bold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                        >
+                          <Link to="/matching" search={{ candidateId: r.id }}>
+                            <Sparkles className="h-3 w-3 text-emerald-500" /> AI Matching
+                          </Link>
+                        </Button>
+                      </TableCell>
 
                       <TableCell className="p-3 text-center">
                         <div className="flex justify-center gap-1.5">

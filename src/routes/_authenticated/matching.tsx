@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 
 import { AppTopbar } from "@/components/app-shell/topbar";
+import { CandidateJobMatches } from "@/components/candidates/candidate-job-matches";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,8 +67,17 @@ export const Route = createFileRoute("/_authenticated/matching")({
     emailId: typeof search.emailId === "string" ? search.emailId : undefined,
   }),
   head: () => ({ meta: [{ title: "Candidate Matching — Staffinix" }] }),
-  component: MatchingPage,
+  component: MatchingRoute,
 });
+
+function MatchingRoute() {
+  const { candidateId, reqId, emailId } = Route.useSearch();
+  return candidateId && !reqId && !emailId ? (
+    <CandidateJobMatches key={candidateId} candidateId={candidateId} />
+  ) : (
+    <MatchingPage />
+  );
+}
 
 function MatchingPage() {
   const { reqId, candidateId, emailId } = Route.useSearch();

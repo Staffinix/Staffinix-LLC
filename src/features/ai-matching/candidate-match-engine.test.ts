@@ -1,5 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+
+test("candidate row matching opens candidate-scoped jobs without hiding recruiter actions", () => {
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const list = read("../../routes/_authenticated/candidates.index.tsx");
+  assert.match(list, /Assigned Recruiter/);
+  assert.doesNotMatch(list, /Assigned L4|isL3orL4/);
+  assert.match(list, /search=\{\{ candidateId: r.id \}\}/);
+  const route = read("../../routes/_authenticated/matching.tsx");
+  assert.match(route, /candidateId && !reqId && !emailId/);
+  assert.match(route, /CandidateJobMatches key=\{candidateId\}/);
+  const jobs = read("../../components/candidates/candidate-job-matches.tsx");
+  assert.match(jobs, /candidate_id: candidateId, limit: 50/);
+  assert.match(jobs, /query.isError/);
+  assert.match(jobs, /rows.length === 0/);
+  assert.match(jobs, /hard_constraints.reasons/);
+  assert.match(jobs, /do not guarantee eligibility/);
+});
 
 import {
   evaluateCandidateMatch,
