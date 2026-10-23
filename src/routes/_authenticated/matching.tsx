@@ -49,26 +49,29 @@ import {
   generateMatchRationale,
   listMatchingRequirements,
   matchCandidatesForRequirement,
+  matchCandidatesForEmail,
 } from "@/features/ai-matching/matching.functions";
 import {
   buildMatchingVisaOptions,
   matchesSelectedVisas,
 } from "@/features/ai-matching/matching-visa-filter";
 
-type MatchingSearch = { reqId?: string; candidateId?: string };
+type MatchingSearch = { reqId?: string; candidateId?: string; emailId?: string };
 type Rationale = Awaited<ReturnType<typeof generateMatchRationale>>;
 
 export const Route = createFileRoute("/_authenticated/matching")({
   validateSearch: (search: Record<string, unknown>): MatchingSearch => ({
     reqId: typeof search.reqId === "string" ? search.reqId : undefined,
     candidateId: typeof search.candidateId === "string" ? search.candidateId : undefined,
+    emailId: typeof search.emailId === "string" ? search.emailId : undefined,
   }),
   head: () => ({ meta: [{ title: "Candidate Matching — Staffinix" }] }),
   component: MatchingPage,
 });
 
 function MatchingPage() {
-  const { reqId, candidateId } = Route.useSearch();
+  const { reqId, candidateId, emailId } = Route.useSearch();
+  const hasSource = Boolean(reqId || emailId);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [minimumScore, setMinimumScore] = useState("0");
@@ -84,16 +87,23 @@ function MatchingPage() {
 
   const requirementsFn = useServerFn(listMatchingRequirements);
   const matchFn = useServerFn(matchCandidatesForRequirement);
+  const emailMatchFn = useServerFn(matchCandidatesForEmail);
   const rationaleFn = useServerFn(generateMatchRationale);
   const requirementsQuery = useQuery({
     queryKey: ["matching-requirements"],
     queryFn: () => requirementsFn(),
   });
   const matchQuery = useQuery({
-    queryKey: ["match-candidates", reqId, candidateId],
+    queryKey: ["match-candidates", reqId, candidateId, emailId],
     queryFn: () =>
-      matchFn({ data: { requirement_id: reqId!, candidate_id: candidateId, limit: 250 } }),
-    enabled: Boolean(reqId),
+      emailId
+        ? emailMatchFn({ data: { email_id: emailId } })
+        : matchFn({ data: { requirement_id: reqId!, candidate_id: candidateId, limit: 250 } }),
+    enabled: hasSource,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const rationaleMutation = useMutation({
     mutationFn: (candidateIdToAnalyze: string) =>
@@ -179,11 +189,12 @@ function MatchingPage() {
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-            <Link to="/requirements">
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Requisitions
+            <Link to={emailId ? "/email-intelligence" : "/requirements"}>
+              <ArrowLeft className="h-3.5 w-3.5" />{" "}
+              {emailId ? "Back to Smart Mail" : "Back to Requisitions"}
             </Link>
           </Button>
-          {reqId && (
+          {hasSource && (
             <Button
               variant="outline"
               size="sm"
@@ -202,6 +213,26 @@ function MatchingPage() {
           title="AI Candidate Matching"
           description="Rank authorized candidates using skills, domain relevance, experience, work authorization, location, resume evidence, and semantic similarity."
         />
+
+        {emailId && (
+          <Card>
+            <CardContent className="space-y-2 p-4 text-sm">
+              <p className="font-semibold">Candidate matching from Smart Mail</p>
+              <p className="text-muted-foreground">
+                Uses only the email subject and stored short preview; attachments and full email
+                content are not included. Matches are preliminary and require recruiter review
+                against the complete job description. No requisition or submission is created.
+              </p>
+              {matchQuery.data && "extraction_mode" in matchQuery.data && (
+                <p className="text-xs text-muted-foreground">
+                  {matchQuery.data.extraction_mode === "ai"
+                    ? "AI extracted role and skills from the preview."
+                    : "AI is not configured; keyword-based matching was used."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-border bg-card">
           <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(280px,1fr)_auto] lg:items-end">
@@ -227,16 +258,20 @@ function MatchingPage() {
                 </SelectContent>
               </Select>
             </label>
-            {reqId && matchQuery.data && (
+            {hasSource && matchQuery.data && (
               <div className="text-xs text-muted-foreground lg:text-right">
-                <p>{allRows.length} candidates scored</p>
+                <p>
+                  {matchQuery.data.total_candidates_evaluated} candidates scored (up to 1,000 most
+                  recently updated accessible profiles)
+                </p>
+                <p>{allRows.length} ranked results shown</p>
                 <p>{rows.length} match current filters</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {!reqId ? (
+        {!hasSource ? (
           <StateCard message="Choose a requisition above to rank candidates." />
         ) : matchQuery.isLoading ? (
           <StateCard loading message="Analyzing candidate data and resume evidence…" />
@@ -498,29 +533,33 @@ function MatchingPage() {
                         >
                           View match details
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => rationaleMutation.mutate(row.candidate.id)}
-                          disabled={analyzing}
-                        >
-                          {analyzing ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <BrainCircuit className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {rationale ? "Refresh AI analysis" : "Analyze with AI"}
-                        </Button>
+                        {!emailId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => rationaleMutation.mutate(row.candidate.id)}
+                            disabled={analyzing}
+                          >
+                            {analyzing ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <BrainCircuit className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            {rationale ? "Refresh AI analysis" : "Analyze with AI"}
+                          </Button>
+                        )}
                         <Button asChild size="sm">
                           <Link to="/candidates/$id" params={{ id: row.candidate.id }}>
                             View candidate
                           </Link>
                         </Button>
-                        <Button asChild size="sm" variant="outline">
-                          <Link to="/tailoring" search={{ candidateId: row.candidate.id, reqId }}>
-                            Tailor Resume for This Job
-                          </Link>
-                        </Button>
+                        {!emailId && (
+                          <Button asChild size="sm" variant="outline">
+                            <Link to="/tailoring" search={{ candidateId: row.candidate.id, reqId }}>
+                              Tailor Resume for This Job
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

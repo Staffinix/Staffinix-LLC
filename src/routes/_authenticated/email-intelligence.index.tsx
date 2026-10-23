@@ -179,6 +179,11 @@ function SmartEmailDashboard() {
 
         <Card>
           <CardContent className="space-y-4 p-4">
+            <p className="text-xs text-muted-foreground">
+              Match candidates using a selected email’s subject and stored preview. When AI is
+              configured, this text is sent to your configured AI provider. Attachments are not
+              analyzed and no mail is changed.
+            </p>
             <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
               <SearchInput
                 value={search}
@@ -231,6 +236,7 @@ function SmartEmailDashboard() {
                     <TableHead>Rule</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>AI category</TableHead>
+                    <TableHead className="text-right">Candidate matching</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -264,26 +270,37 @@ function SmartEmailDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>{email.ai_category ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild size="sm" variant="outline">
+                            <Link
+                              to="/matching"
+                              search={{ emailId: email.id }}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Match candidates
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {query.isPending && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                         Loading selected emails…
                       </TableCell>
                     </TableRow>
                   )}
                   {query.isError && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-destructive">
+                      <TableCell colSpan={7} className="py-10 text-center text-destructive">
                         Smart Email data could not be loaded.
                       </TableCell>
                     </TableRow>
                   )}
                   {!query.isPending && !query.isError && (query.data?.rows.length ?? 0) === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                         No selected emails match these filters.
                       </TableCell>
                     </TableRow>
@@ -331,6 +348,16 @@ function SmartEmailDashboard() {
                 </SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5">
+                <Button asChild>
+                  <Link to="/matching" search={{ emailId: selected.id }}>
+                    Match candidates from this email
+                  </Link>
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Matching uses the stored subject and short preview, not attachments or the full
+                  email. If AI is configured, this text is sent to the configured AI provider to
+                  identify the role and skills.
+                </p>
                 <div className="rounded-xl border bg-muted/30 p-4">
                   <p className="text-sm leading-6 text-muted-foreground">
                     {selected.preview || "No text preview was stored."}

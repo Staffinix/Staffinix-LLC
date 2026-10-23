@@ -31,7 +31,7 @@
     "test:ai-usage": "node --test --experimental-strip-types src/lib/ai-usage.server.test.ts",
     "test:copilot": "node --test --experimental-strip-types src/lib/copilot-candidate-count.test.ts",
     "test:matching-filters": "node --test --experimental-strip-types src/features/ai-matching/matching-visa-filter.test.ts",
-    "test:matching-engine": "node --test --experimental-strip-types src/features/ai-matching/candidate-match-engine.test.ts src/lib/tailoring-selection.test.ts",
+    "test:matching-engine": "node --test --experimental-strip-types src/features/ai-matching/candidate-match-engine.test.ts src/features/ai-matching/email-match-input.test.ts src/lib/tailoring-selection.test.ts",
     "test:email": "node --test --experimental-strip-types src/lib/email/connection-health.test.ts src/lib/email/filter-engine.test.ts src/lib/email/providers.server.test.ts src/lib/email/sync-cursor.test.ts src/lib/email/rule-form-validation.test.ts src/lib/email/token-crypto.server.test.ts",
     "test:rag": "node --test --experimental-strip-types src/lib/rag.server.test.ts",
     "test:rag:integration": "node --experimental-strip-types scripts/smoke-rag.mts",
