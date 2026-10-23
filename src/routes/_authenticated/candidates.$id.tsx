@@ -45,6 +45,7 @@ import {
   updateCandidateStatus,
 } from "@/lib/candidate-management.functions";
 import { CANDIDATE_STATUS_LABEL } from "@/lib/candidates-constants";
+import { STAGE_LABEL } from "@/lib/submissions-constants";
 import { useRoleLevel } from "@/hooks/use-role-level";
 import { RecruiterPicker } from "@/components/candidates/recruiter-picker";
 import { PipelineTracker } from "@/components/submissions/pipeline-tracker";
@@ -324,12 +325,10 @@ function CandidateDetailPage() {
                   <div key={submission.id} className="rounded-md border border-border p-2">
                     <div className="flex items-center justify-between gap-2">
                       <Badge variant="outline" className="capitalize">
-                        {submission.stage.replaceAll("_", " ")}
+                        {STAGE_LABEL[submission.stage]}
                       </Badge>
                       <span className="text-muted-foreground">
-                        {submission.submitted_at
-                          ? new Date(submission.submitted_at).toLocaleString()
-                          : "Draft"}
+                        Updated {new Date(submission.updated_at).toLocaleString()}
                       </span>
                     </div>
                     {submission.submittedBy && (

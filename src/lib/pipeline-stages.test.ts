@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { STAGE_LABEL, SUBMISSION_STAGES } from "./submissions-constants.ts";
 import {
   PIPELINE_STAGES,
   PIPELINE_STAGE_LABEL,
@@ -10,6 +11,23 @@ import {
 } from "./pipeline-stages.ts";
 
 const id = "97000000-0000-4000-8000-000000000001";
+test("candidate submission badges use the same canonical labels as the tracker", () => {
+  for (const stage of SUBMISSION_STAGES)
+    assert.equal(STAGE_LABEL[stage], PIPELINE_STAGE_LABEL[pipelineStage(stage)]);
+  for (const name of ["candidates.$id.tsx", "candidates.index.tsx"]) {
+    const source = readFileSync(
+      new URL(`../routes/_authenticated/${name}`, import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /STAGE_LABEL\[/);
+    assert.doesNotMatch(source, /submission\.stage\.replaceAll/);
+  }
+  const profile = readFileSync(
+    new URL("../routes/_authenticated/candidates.$id.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(profile, /Updated \{new Date\(submission.updated_at\)/);
+});
 test("candidate profiles embed the shared tracker with a candidate-scoped query and refresh", () => {
   const tracker = readFileSync(
     new URL("../components/submissions/pipeline-tracker.tsx", import.meta.url),

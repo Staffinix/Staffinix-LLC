@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppTopbar } from "@/components/app-shell/topbar";
+import { STAGE_LABEL } from "@/lib/submissions-constants";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -784,7 +785,7 @@ function BenchCandidatesPage() {
                         {r.latest_submission ? (
                           <div className="space-y-0.5 text-[11px]">
                             <Badge variant="outline" className="capitalize">
-                              {r.latest_submission.stage.replaceAll("_", " ")}
+                              {STAGE_LABEL[r.latest_submission.stage]}
                             </Badge>
                             <p className="text-muted-foreground">
                               {r.latest_submission.submitted_at
