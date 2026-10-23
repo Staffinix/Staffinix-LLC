@@ -14,15 +14,15 @@ export const SUBMISSION_STAGES = [
 export type SubmissionStage = (typeof SUBMISSION_STAGES)[number];
 
 export const STAGE_LABEL: Record<SubmissionStage, string> = {
-  draft: "Draft",
-  submitted: "Submitted",
-  vendor_review: "Vendor Review",
-  client_review: "Client Review",
+  draft: "Applied",
+  submitted: "Applied",
+  vendor_review: "Rate Confirmation",
+  client_review: "Rate Confirmation",
   interview: "Interview",
-  offer: "Offer",
-  hired: "Hired",
+  offer: "Selected",
+  hired: "Selected",
   rejected: "Rejected",
-  withdrawn: "Withdrawn",
+  withdrawn: "Rejected",
 };
 
 export const STAGE_STYLE: Record<SubmissionStage, string> = {

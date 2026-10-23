@@ -55,7 +55,6 @@ import { scheduleInterview, updateInterview, deleteInterview } from "@/lib/inter
 import { updatePlacement } from "@/lib/placements.functions";
 import { getSafeHttpUrl } from "@/lib/safe-url";
 import {
-  SUBMISSION_STAGES,
   STAGE_LABEL,
   STAGE_STYLE,
   INTERVIEW_ROUNDS,
@@ -70,6 +69,8 @@ import {
   type InterviewOutcome,
   type PlacementStatus,
 } from "@/lib/submissions-constants";
+import { SubmissionStageSelect } from "@/components/submissions/submission-stage-select";
+import type { PipelineStageChange } from "@/lib/pipeline-stages";
 
 export const Route = createFileRoute("/_authenticated/submissions/$id")({
   head: () => ({ meta: [{ title: "Submission — Staffinix" }] }),
@@ -115,11 +116,7 @@ function SubmissionDetailPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["submission", id] });
 
   const stageMutation = useMutation({
-    mutationFn: (payload: {
-      to_stage: SubmissionStage;
-      message?: string;
-      rejected_reason?: string;
-    }) => stageFn({ data: { id, ...payload } }),
+    mutationFn: (payload: Omit<PipelineStageChange, "id">) => stageFn({ data: { id, ...payload } }),
     onSuccess: () => {
       invalidate();
       toast.success("Stage updated");
@@ -173,22 +170,13 @@ function SubmissionDetailPage() {
             <Badge variant="outline" className={STAGE_STYLE[stage]}>
               {STAGE_LABEL[stage]}
             </Badge>
-            <Select
-              value=""
+            <SubmissionStageSelect
+              stage={stage}
+              interviewType={submission.interview_type}
+              interviewOther={submission.interview_other}
               disabled={stageMutation.isPending || attachResumeMutation.isPending}
-              onValueChange={(v) => stageMutation.mutate({ to_stage: v as SubmissionStage })}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Move to…" />
-              </SelectTrigger>
-              <SelectContent>
-                {SUBMISSION_STAGES.filter((s) => s !== stage).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STAGE_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(change) => stageMutation.mutateAsync(change)}
+            />
             <Button variant="outline" size="sm" onClick={() => deleteMutation.mutate()}>
               <Trash2 className="h-4 w-4" />
             </Button>

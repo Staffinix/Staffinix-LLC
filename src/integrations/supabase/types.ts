@@ -1861,6 +1861,8 @@ export type Database = {
       };
       submissions: {
         Row: {
+          interview_type: string | null;
+          interview_other: string | null;
           candidate_id: string;
           candidate_status_at_submission: Database["public"]["Enums"]["candidate_status"] | null;
           client_id: string | null;
@@ -1890,6 +1892,8 @@ export type Database = {
           vendor_id: string | null;
         };
         Insert: {
+          interview_type?: string | null;
+          interview_other?: string | null;
           candidate_id: string;
           candidate_status_at_submission?: Database["public"]["Enums"]["candidate_status"] | null;
           client_id?: string | null;
@@ -1919,6 +1923,8 @@ export type Database = {
           vendor_id?: string | null;
         };
         Update: {
+          interview_type?: string | null;
+          interview_other?: string | null;
           candidate_id?: string;
           candidate_status_at_submission?: Database["public"]["Enums"]["candidate_status"] | null;
           client_id?: string | null;

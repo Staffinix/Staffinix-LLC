@@ -9,13 +9,8 @@ import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SubmissionStageSelect } from "@/components/submissions/submission-stage-select";
+import type { PipelineStageChange } from "@/lib/pipeline-stages";
 import {
   Table,
   TableBody,
@@ -30,18 +25,6 @@ import {
   listSubmissions,
 } from "@/lib/submissions.functions";
 
-const STAGES = [
-  "draft",
-  "submitted",
-  "vendor_review",
-  "client_review",
-  "interview",
-  "offer",
-  "hired",
-  "rejected",
-  "withdrawn",
-] as const;
-type Stage = (typeof STAGES)[number];
 const PAGE_SIZE = 50;
 
 export const Route = createFileRoute("/_authenticated/submissions/board")({
@@ -62,8 +45,7 @@ function PipelineTrackerPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["submissions", "pipeline"] });
   const stageMutation = useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: Stage }) =>
-      changeStageFn({ data: { id, to_stage: stage } }),
+    mutationFn: (data: PipelineStageChange) => changeStageFn({ data }),
     onSuccess: async () => {
       await refresh();
       toast.success("Submission stage updated");
@@ -149,24 +131,13 @@ function PipelineTrackerPage() {
                     <TableCell>{row.client?.name || "Not recorded"}</TableCell>
                     <TableCell>{row.vendor?.name || "Not recorded"}</TableCell>
                     <TableCell>
-                      <Select
-                        value={row.stage}
+                      <SubmissionStageSelect
+                        stage={row.stage}
+                        interviewType={row.interview_type}
+                        interviewOther={row.interview_other}
                         disabled={stageMutation.isPending}
-                        onValueChange={(stage) =>
-                          stageMutation.mutate({ id: row.id, stage: stage as Stage })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-36 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STAGES.map((stage) => (
-                            <SelectItem key={stage} value={stage}>
-                              {stage.replaceAll("_", " ")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(change) => stageMutation.mutateAsync({ id: row.id, ...change })}
+                      />
                     </TableCell>
                     <TableCell>
                       {row.submitter?.full_name ||

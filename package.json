@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "npm run test:unit",
-    "test:submissions": "node --test --experimental-strip-types src/lib/submission-resume-evidence.test.ts src/lib/requirement-edit.test.ts",
+    "test:submissions": "node --test --experimental-strip-types src/lib/submission-resume-evidence.test.ts src/lib/requirement-edit.test.ts src/lib/pipeline-stages.test.ts",
     "audit:dependencies": "node scripts/check-dependency-audit.mjs",
     "dev": "vite dev",
     "build": "vite build",

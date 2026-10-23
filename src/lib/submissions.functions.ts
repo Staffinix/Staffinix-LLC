@@ -5,6 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 import { writeAudit } from "./audit.server";
 import { hasValidSubmissionResumeEvidence } from "./submission-resume-evidence";
+import { PipelineStageChangeSchema } from "./pipeline-stages";
 
 const STAGES = [
   "draft",
@@ -85,7 +86,7 @@ export const listSubmissions = createServerFn({ method: "POST" })
     let q = supabase
       .from("submissions")
       .select(
-        `id, stage, submitted_rate, rate_type, currency, match_score, created_at, updated_at, submitted_at, created_by, submitted_by,
+        `id, stage, interview_type, interview_other, submitted_rate, rate_type, currency, match_score, created_at, updated_at, submitted_at, created_by, submitted_by,
          requirement:requirements(id, title, primary_technology, location),
          candidate:candidates(id, first_name, last_name, current_title, visa_status),
          client:clients(id, name),
@@ -137,7 +138,7 @@ export const getSubmission = createServerFn({ method: "POST" })
     const { data: sub, error } = await supabase
       .from("submissions")
       .select(
-        `id, requirement_id, candidate_id, resume_version_id, stage, submitted_rate, rate_type, currency, vendor_id, client_id, email_subject, email_body, email_to, email_cc, email_sent_at, match_score, match_strengths, match_gaps, notes, submitted_by, submitted_at, rejected_reason, created_by, created_at, updated_at,
+        `id, requirement_id, candidate_id, resume_version_id, stage, interview_type, interview_other, submitted_rate, rate_type, currency, vendor_id, client_id, email_subject, email_body, email_to, email_cc, email_sent_at, match_score, match_strengths, match_gaps, notes, submitted_by, submitted_at, rejected_reason, created_by, created_at, updated_at,
          requirement:requirements(id, title, primary_technology, location, work_mode, rate_min, rate_max, rate_type, currency, visa_types, min_experience_years, max_experience_years),
          candidate:candidates(id, first_name, last_name, email, phone, current_title, current_employer, visa_status, location, experience_years, primary_technology),
          client:clients(id, name),
@@ -314,16 +315,7 @@ export const listApprovedSubmissionResumes = createServerFn({ method: "POST" })
 
 export const changeSubmissionStage = createServerFn({ method: "POST" })
   .middleware([requireSubmissionsAccess])
-  .validator((i: unknown) =>
-    z
-      .object({
-        id: z.string().uuid(),
-        to_stage: z.enum(STAGES),
-        message: z.string().max(2000).optional(),
-        rejected_reason: z.string().max(500).optional(),
-      })
-      .parse(i),
-  )
+  .validator((i: unknown) => PipelineStageChangeSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const { data: current, error: gErr } = await supabase
@@ -340,8 +332,17 @@ export const changeSubmissionStage = createServerFn({ method: "POST" })
       stage: (typeof STAGES)[number];
       submitted_at?: string;
       submitted_by?: string;
+      interview_type: string | null;
+      interview_other: string | null;
       rejected_reason?: string;
-    } = { stage: data.to_stage };
+    } = {
+      stage: data.to_stage,
+      interview_type: data.to_stage === "interview" ? (data.interview_type ?? null) : null,
+      interview_other:
+        data.to_stage === "interview" && data.interview_type === "other"
+          ? (data.interview_other ?? null)
+          : null,
+    };
     if (!current.submitted_at && data.to_stage !== "draft") {
       patch.submitted_at = new Date().toISOString();
       patch.submitted_by = userId;
