@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import {
   PIPELINE_STAGES,
   PIPELINE_STAGE_LABEL,
@@ -9,6 +10,27 @@ import {
 } from "./pipeline-stages.ts";
 
 const id = "97000000-0000-4000-8000-000000000001";
+test("candidate profiles embed the shared tracker with a candidate-scoped query and refresh", () => {
+  const tracker = readFileSync(
+    new URL("../components/submissions/pipeline-tracker.tsx", import.meta.url),
+    "utf8",
+  );
+  const profile = readFileSync(
+    new URL("../routes/_authenticated/candidates.$id.tsx", import.meta.url),
+    "utf8",
+  );
+  const board = readFileSync(
+    new URL("../routes/_authenticated/submissions.board.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(profile, /<PipelineTracker key=\{id\} candidateId=\{id\}/);
+  assert.match(board, /<PipelineTracker \/>/);
+  assert.match(tracker, /candidate_id: candidateId/);
+  assert.match(tracker, /queryKey: \["submissions", "pipeline", candidateId \?\? "all", page\]/);
+  assert.match(tracker, /queryKey: \["candidate-management"\]/);
+  assert.match(tracker, /SubmissionStageSelect/);
+  assert.doesNotMatch(tracker, /<TableHead>Rate<\/TableHead>/);
+});
 test("offers only the five requested stages while preserving legacy records", () => {
   assert.deepEqual(
     PIPELINE_STAGES.map((stage) => PIPELINE_STAGE_LABEL[stage]),

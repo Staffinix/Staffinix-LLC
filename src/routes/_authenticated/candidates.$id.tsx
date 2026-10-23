@@ -47,6 +47,7 @@ import {
 import { CANDIDATE_STATUS_LABEL } from "@/lib/candidates-constants";
 import { useRoleLevel } from "@/hooks/use-role-level";
 import { RecruiterPicker } from "@/components/candidates/recruiter-picker";
+import { PipelineTracker } from "@/components/submissions/pipeline-tracker";
 
 export const Route = createFileRoute("/_authenticated/candidates/$id")({
   head: () => ({ meta: [{ title: "Candidate Profile — Staffinix" }] }),
@@ -208,6 +209,11 @@ function CandidateDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        <section aria-label="Candidate pipeline tracker" className="space-y-4">
+          <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
+          <PipelineTracker key={id} candidateId={id} />
+        </section>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="border-border bg-card">
