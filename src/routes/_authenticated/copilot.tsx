@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
-import { CopilotPanel } from "@/components/ai/copilot-drawer";
+import { CopilotPanel } from "@/components/ai/copilot-panel";
 
 export const Route = createFileRoute("/_authenticated/copilot")({
   head: () => ({

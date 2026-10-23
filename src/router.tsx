@@ -21,6 +21,7 @@ export const getRouter = () => {
     scrollRestoration: true,
     scrollToTopSelectors: ["[data-app-scroll]"],
     defaultPreloadStaleTime: 0,
+    defaultPreload: "intent",
   });
 
   return router;

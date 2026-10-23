@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { AppTopbar } from "@/components/app-shell/topbar";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,7 @@ function RequisitionsListPage() {
   const listFn = useServerFn(listRequirements);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState<string>("all");
   const [priority, setPriority] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("created_desc");
@@ -89,13 +91,13 @@ function RequisitionsListPage() {
 
   const query = useMemo(
     () => ({
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       status: status !== "all" ? [status as (typeof REQ_STATUSES)[number]] : undefined,
       priority: priority !== "all" ? [priority as (typeof REQ_PRIORITIES)[number]] : undefined,
       page,
       page_size: pageSize,
     }),
-    [search, status, priority, page],
+    [debouncedSearch, status, priority, page],
   );
 
   const { data, isLoading, error } = useQuery({

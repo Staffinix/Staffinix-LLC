@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { STAGE_LABEL } from "@/lib/submissions-constants";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -193,6 +194,7 @@ function BenchCandidatesPage() {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [experience, setExperience] = useState<string>("all");
   const [availability, setAvailability] = useState<string>("all");
   const [visa, setVisa] = useState<string>("all");
@@ -222,7 +224,7 @@ function BenchCandidatesPage() {
               : [undefined, undefined];
 
     return {
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       min_experience: minimumExperience,
       max_experience: maximumExperience,
       availability:
@@ -245,7 +247,7 @@ function BenchCandidatesPage() {
       page_size: pageSize,
     };
   }, [
-    search,
+    debouncedSearch,
     experience,
     availability,
     visa,

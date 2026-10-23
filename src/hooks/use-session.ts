@@ -1,5 +1,12 @@
 import type { User } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,21 +26,23 @@ export function cancelSignOut() {
   setSigningOut(false);
 }
 
-export function useSession() {
+function useVerifiedSession() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(signingOut);
 
   useEffect(() => {
     let active = true;
+    let revision = 0;
 
     const synchronizeUser = async () => {
+      const currentRevision = ++revision;
       const {
         data: { user: verifiedUser },
         error,
       } = await supabase.auth.getUser();
 
-      if (!active) return;
+      if (!active || currentRevision !== revision) return;
       setUser(error ? null : verifiedUser);
       setReady(true);
       if (!error && verifiedUser) setSigningOut(false);
@@ -44,6 +53,7 @@ export function useSession() {
 
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
+        revision++;
         setUser(null);
         setReady(true);
         setSigningOut(false);
@@ -73,4 +83,17 @@ export function useSession() {
     isSigningOut,
     isAuthenticated: ready && Boolean(user) && !isSigningOut,
   };
+}
+
+const SessionContext = createContext<ReturnType<typeof useVerifiedSession> | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const session = useVerifiedSession();
+  return createElement(SessionContext.Provider, { value: session }, children);
+}
+
+export function useSession() {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error("useSession requires SessionProvider");
+  return session;
 }
