@@ -150,7 +150,7 @@ const PRICING = [
     period: "/recruiter / mo",
     body: "For scaling staffing teams running a live bench.",
     perks: [
-      "Unlimited requisitions",
+      "Unlimited requirements",
       "Anti-fabrication tailoring gate",
       "Pipeline board + interviews",
       "Outlook & Gmail drafts",
@@ -400,7 +400,7 @@ function LandingPage() {
                     `${ROLE_LEVEL_LABELS.L1} — multi-tenant governance and global audit`,
                     `${ROLE_LEVEL_LABELS.L2} — company administration and team workload`,
                     `${ROLE_LEVEL_LABELS.L3} — integrations and developer tools`,
-                    `${ROLE_LEVEL_LABELS.L4} — requisitions, bench, tailoring and pipeline`,
+                    `${ROLE_LEVEL_LABELS.L4} — requirements, bench, tailoring and pipeline`,
                   ].map((t) => (
                     <li key={t} className="flex gap-2.5">
                       <Layers className="mt-0.5 h-4 w-4 shrink-0 text-primary" />

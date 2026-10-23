@@ -70,7 +70,7 @@ const getPriorityLabel = (p?: string) =>
   (p && (PRIORITY_LABEL as Record<string, string>)[p]) || PRIORITY_LABEL.medium;
 
 export const Route = createFileRoute("/_authenticated/requirements/")({
-  head: () => ({ meta: [{ title: "Requisitions — Staffinix" }] }),
+  head: () => ({ meta: [{ title: "Requirements — Staffinix" }] }),
   component: RequisitionsListPage,
 });
 
@@ -122,11 +122,11 @@ function RequisitionsListPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <AppTopbar title="Requisitions" />
+      <AppTopbar title="Requirements" />
 
       <div className="flex-1 space-y-4 p-6">
         <PageHeader
-          title="Requisitions & JDs"
+          title="Requirements & JDs"
           description="Manage client job requirements, rate targets, required tech stacks, and track candidate pipeline fulfillment."
           actions={
             <Button
@@ -134,7 +134,7 @@ function RequisitionsListPage() {
               className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md transition-all duration-200"
             >
               <Link to="/requirements/new">
-                <Plus className="h-4 w-4" /> Add Requisition
+                <Plus className="h-4 w-4" /> Add Requirements
               </Link>
             </Button>
           }
@@ -223,9 +223,9 @@ function RequisitionsListPage() {
             <div className="flex h-64 flex-col items-center justify-center text-center p-6 space-y-3">
               <FileText className="h-10 w-10 text-muted-foreground stroke-[1.5]" />
               <div>
-                <p className="text-sm font-medium text-foreground">No requisitions found</p>
+                <p className="text-sm font-medium text-foreground">No requirements found</p>
                 <p className="text-xs text-muted-foreground">
-                  Try adjusting your search filters or add a new job requisition.
+                  Try adjusting your search filters or add new job requirements.
                 </p>
               </div>
             </div>
@@ -377,7 +377,7 @@ function RequisitionsListPage() {
                     {reviewReq.title}
                   </SheetTitle>
                   <SheetDescription className="text-xs text-muted-foreground">
-                    Requisition ID: {reviewReq.id} · Created{" "}
+                    Requirements ID: {reviewReq.id} · Created{" "}
                     {formatDistanceToNow(new Date(reviewReq.created_at), { addSuffix: true })}
                   </SheetDescription>
                 </SheetHeader>
@@ -520,14 +520,14 @@ function EmptyState() {
         <FileText className="h-5 w-5" />
       </div>
       <div>
-        <p className="font-medium">No requisitions match filters</p>
+        <p className="font-medium">No requirements match filters</p>
         <p className="text-sm text-muted-foreground">
-          Try clearing your search or add a new requisition.
+          Try clearing your search or add new requirements.
         </p>
       </div>
       <Button size="sm" asChild>
         <Link to="/requirements/new">
-          <Plus className="mr-1.5 h-4 w-4" /> New Requisition
+          <Plus className="mr-1.5 h-4 w-4" /> New Requirements
         </Link>
       </Button>
     </div>

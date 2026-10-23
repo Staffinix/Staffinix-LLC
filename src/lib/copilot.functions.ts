@@ -400,7 +400,7 @@ function localGroundedAnswer(question: string, snapshot: ContextSnapshot) {
     const lines = snapshot.requirements
       .slice(0, 5)
       .map((item) => `- **${item.title}** — ${item.status}; priority ${item.priority}`);
-    answer = `The latest **${snapshot.requirements.length} requisitions** break down as ${formatCounts(
+    answer = `The latest **${snapshot.requirements.length} requirements** break down as ${formatCounts(
       countBy(snapshot.requirements, "status"),
     )}.${lines.length ? `\n\n${lines.join("\n")}` : ""}`;
   } else if (/submission|pipeline|stage|bottleneck/.test(q)) {
@@ -429,7 +429,7 @@ function localGroundedAnswer(question: string, snapshot: ContextSnapshot) {
       countBy(snapshot.vendors, "status"),
     )}.`;
   } else {
-    answer = `Here is the live Staffinix snapshot:\n\n- **${snapshot.requirements.length}** recent requisitions\n- **${snapshot.candidates.length}** recent candidates\n- **${snapshot.submissions.length}** recent submissions\n- **${snapshot.interviews.length}** recent interviews\n- **${snapshot.placements.length}** recent placements\n- **${snapshot.clients.length}** clients\n- **${snapshot.vendors.length}** vendors\n\nAsk about any one area for a grounded breakdown. External AI generation is optional and no API key is required for these live summaries.`;
+    answer = `Here is the live Staffinix snapshot:\n\n- **${snapshot.requirements.length}** recent requirements\n- **${snapshot.candidates.length}** recent candidates\n- **${snapshot.submissions.length}** recent submissions\n- **${snapshot.interviews.length}** recent interviews\n- **${snapshot.placements.length}** recent placements\n- **${snapshot.clients.length}** clients\n- **${snapshot.vendors.length}** vendors\n\nAsk about any one area for a grounded breakdown. External AI generation is optional and no API key is required for these live summaries.`;
   }
 
   return {

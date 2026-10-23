@@ -29,7 +29,7 @@ import {
 } from "@/components/requirements/requirement-form";
 
 export const Route = createFileRoute("/_authenticated/requirements/new")({
-  head: () => ({ meta: [{ title: "New Requisition — Staffinix" }] }),
+  head: () => ({ meta: [{ title: "New Requirements — Staffinix" }] }),
   component: NewRequirementPage,
 });
 
@@ -42,18 +42,18 @@ function NewRequirementPage() {
 
   return (
     <>
-      <AppTopbar title="New Requisition" />
+      <AppTopbar title="New Requirements" />
       <main className="flex-1 space-y-6 p-6 md:p-8">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/requirements">
-              <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Requisitions
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Requirements
             </Link>
           </Button>
         </div>
         <PageHeader
-          title="New Requisition"
-          description="Enter client requisition details, required primary & secondary skills, rate range, and visa requirements."
+          title="New Requirements"
+          description="Enter client requirements details, required primary & secondary skills, rate range, and visa requirements."
         />
 
         <div className="mt-4">

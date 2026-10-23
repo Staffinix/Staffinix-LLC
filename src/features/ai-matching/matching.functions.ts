@@ -345,7 +345,7 @@ export const listMatchingRequirements = createServerFn({ method: "GET" })
       .eq("status", "open")
       .order("updated_at", { ascending: false })
       .limit(100);
-    if (error) throw new Error(`Unable to load requisitions for matching: ${error.message}`);
+    if (error) throw new Error(`Unable to load requirements for matching: ${error.message}`);
     return data ?? [];
   });
 

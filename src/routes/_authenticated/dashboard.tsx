@@ -134,9 +134,9 @@ function UnifiedDashboardPage() {
       badgeClass: "bg-primary/10 text-primary border-primary/20",
     },
     {
-      label: "Open Requisitions",
+      label: "Open Requirements",
       value: openReqsCount,
-      hint: "Currently active job requisitions",
+      hint: "Currently active job requirements",
       icon: FileText,
       to: "/requirements",
       badge: `${urgentRequirementsCount} urgent`,
@@ -442,11 +442,11 @@ function UnifiedDashboardPage() {
           </Card>
         </section>
 
-        {/* Section 3: Requisitions, Priority & Recruiter Leaderboard */}
+        {/* Section 3: Requirements, Priority & Recruiter Leaderboard */}
         <section className="grid gap-4 lg:grid-cols-3">
           <Card className="border-border bg-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Requisitions by status</CardTitle>
+              <CardTitle className="text-sm font-medium">Requirements by status</CardTitle>
             </CardHeader>
             <CardContent>
               {reqs && reqs.by_status.length > 0 ? (
@@ -498,7 +498,7 @@ function UnifiedDashboardPage() {
                 </div>
               ) : (
                 <div className="flex h-40 items-center justify-center text-xs text-muted-foreground">
-                  No requisitions yet.
+                  No requirements yet.
                 </div>
               )}
             </CardContent>
@@ -608,7 +608,7 @@ function UnifiedDashboardPage() {
                     className="group rounded-lg border border-border bg-surface/40 p-3 transition-all hover:border-primary/40 hover:bg-muted/40"
                   >
                     <div className="text-xs font-semibold text-foreground group-hover:text-primary">
-                      Requisitions
+                      Requirements
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       Review active job roles, client details, and parsed job descriptions.

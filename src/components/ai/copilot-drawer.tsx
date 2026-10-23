@@ -36,7 +36,7 @@ const WELCOME_MESSAGE: CopilotMessage = {
 
 const QUICK_ACTIONS = [
   "Show available bench candidates",
-  "Which requisitions need attention?",
+  "Which requirements need attention?",
   "Summarize pipeline bottlenecks",
 ];
 

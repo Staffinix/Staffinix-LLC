@@ -48,7 +48,7 @@ export function CandidateJobMatches({ candidateId }: { candidateId: string }) {
         )}
         {query.data && (
           <p className="text-sm text-muted-foreground">
-            Showing up to 50 ranked jobs from up to 150 accessible open requisitions. No submission
+            Showing up to 50 ranked jobs from up to 150 accessible open requirements. No submission
             is created.
           </p>
         )}
@@ -85,7 +85,7 @@ export function CandidateJobMatches({ candidateId }: { candidateId: string }) {
                 )}
                 <Button asChild variant="outline" size="sm">
                   <Link to="/requirements/$id" params={{ id: row.requirement.id }}>
-                    Review Requisition &amp; JD
+                    Review Requirements &amp; JD
                   </Link>
                 </Button>
               </CardContent>

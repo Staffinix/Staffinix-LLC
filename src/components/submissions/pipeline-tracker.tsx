@@ -78,7 +78,7 @@ export function PipelineTracker({ candidateId }: { candidateId?: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Candidate</TableHead>
-                <TableHead>Requisition</TableHead>
+                <TableHead>Requirements</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Vendor</TableHead>
                 <TableHead>Stage</TableHead>

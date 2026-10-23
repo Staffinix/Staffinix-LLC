@@ -202,7 +202,7 @@ function MatchingPage() {
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
             <Link to={emailId ? "/email-intelligence" : "/requirements"}>
               <ArrowLeft className="h-3.5 w-3.5" />{" "}
-              {emailId ? "Back to Smart Mail" : "Back to Requisitions"}
+              {emailId ? "Back to Smart Mail" : "Back to Requirements"}
             </Link>
           </Button>
           {hasSource && (
@@ -229,7 +229,7 @@ function MatchingPage() {
           <Card className="border-border bg-card">
             <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(280px,1fr)_auto] lg:items-end">
               <label className="space-y-2 text-sm font-medium">
-                Select an open requisition
+                Select open requirements
                 <Select
                   value={reqId ?? ""}
                   onValueChange={(value) =>
@@ -238,7 +238,7 @@ function MatchingPage() {
                   disabled={requirementsQuery.isLoading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a requisition to run matching" />
+                    <SelectValue placeholder="Choose requirements to run matching" />
                   </SelectTrigger>
                   <SelectContent>
                     {(requirementsQuery.data ?? []).map((requirement) => (
@@ -267,7 +267,7 @@ function MatchingPage() {
         )}
 
         {!hasSource ? (
-          <StateCard message="Choose a requisition above to rank candidates." />
+          <StateCard message="Choose requirements above to rank candidates." />
         ) : matchQuery.isLoading ? (
           <StateCard loading message="Analyzing candidate data and resume evidence…" />
         ) : matchQuery.isError ? (

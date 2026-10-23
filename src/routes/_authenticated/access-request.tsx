@@ -349,7 +349,7 @@ function RecruiterRequestForm() {
           <Crown className="h-4 w-4 text-primary" /> Request Recruiter Authorization
         </CardTitle>
         <CardDescription className="text-xs">
-          Submit your account for access authorization to client requisitions and AI matching tools.
+          Submit your account for access authorization to client requirements and AI matching tools.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -114,7 +114,7 @@ function PlatformConsole() {
   const metrics = [
     ["Registered Organizations", totals.tenants, Building2],
     ["Total Users & Team Members", totals.users, UsersRound],
-    ["Active Requisitions", totals.requirements, FileText],
+    ["Active Requirements", totals.requirements, FileText],
     ["Bench Candidates", totals.candidates, UserRoundSearch],
   ] as const;
 
@@ -174,7 +174,7 @@ function PlatformConsole() {
                       Max Users
                     </TableHead>
                     <TableHead className="text-center">
-                      Requisitions &amp;
+                      Requirements &amp;
                       <br />
                       Candidates
                     </TableHead>
@@ -348,7 +348,7 @@ function PlatformConsole() {
                         )}
                       </TableCell>
                       <TableCell className="text-center text-xs font-semibold text-primary">
-                        <p>{tenant.stats.requirements} Requisitions</p>
+                        <p>{tenant.stats.requirements} Requirements</p>
                         <p>{tenant.stats.candidates} Candidates</p>
                       </TableCell>
                       <TableCell className="text-right">

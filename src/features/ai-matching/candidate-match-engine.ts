@@ -433,7 +433,7 @@ export function evaluateCandidateMatch(input: {
       const acceptedVisas = requirement.visa_types.map(normalizeVisaStatus);
       if (!acceptedVisas.includes(normalizeVisaStatus(candidate.visa_status))) {
         hardConstraintReasons.push(
-          "Recorded work authorization is not accepted by the requisition",
+          "Recorded work authorization is not accepted by the requirements",
         );
       }
     }
@@ -446,7 +446,7 @@ export function evaluateCandidateMatch(input: {
   }
   if (structuredMandatory.length === 0 && !requirement.primary_technology) {
     reviewNotes.push(
-      "The requisition has no structured mandatory skills; description skills are ranking signals only",
+      "The requirements have no structured mandatory skills; description skills are ranking signals only",
     );
   }
   if (requiredEducation && !(evidence.education ?? []).length) {

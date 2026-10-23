@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authenticated/copilot")({
       { title: "AI Copilot — Staffinix" },
       {
         name: "description",
-        content: "Read-only RAG assistant grounded in your candidates, requisitions and pipeline.",
+        content: "Read-only RAG assistant grounded in your candidates, requirements and pipeline.",
       },
       { property: "og:title", content: "AI Copilot — Staffinix" },
       {

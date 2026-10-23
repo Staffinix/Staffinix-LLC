@@ -171,11 +171,11 @@ function TailoringPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Open requisition</CardTitle>
+              <CardTitle className="text-sm">Open requirements</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Input
-                aria-label="Search requisitions"
+                aria-label="Search requirements"
                 placeholder="Search job title"
                 value={jobSearch}
                 onChange={(event) => {
@@ -183,10 +183,10 @@ function TailoringPage() {
                   setJobPage(1);
                 }}
               />
-              {jobs.isPending && <p role="status">Loading requisitions…</p>}
+              {jobs.isPending && <p role="status">Loading requirements…</p>}
               {jobs.isError && (
                 <p role="alert">
-                  Requisitions could not be loaded.{" "}
+                  Requirements could not be loaded.{" "}
                   <Button variant="link" onClick={() => jobs.refetch()}>
                     Retry
                   </Button>
@@ -212,7 +212,7 @@ function TailoringPage() {
                 ))}
                 {jobs.data?.rows.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No accessible open requisitions found.
+                    No accessible open requirements found.
                   </p>
                 )}
               </div>
@@ -324,8 +324,8 @@ function TailoringWorkspace() {
   if (!reqId || !candidateId) {
     return (
       <TailoringState
-        title="Select a candidate and requisition"
-        message="Select a candidate and open requisition above to begin. Only records available to your role are shown."
+        title="Select a candidate and requirements"
+        message="Select a candidate and open requirements above to begin. Only records available to your role are shown."
       />
     );
   }
@@ -334,7 +334,7 @@ function TailoringWorkspace() {
     return (
       <TailoringState
         title="Loading records…"
-        message="Loading candidate and requisition data."
+        message="Loading candidate and requirements data."
         loading
       />
     );
@@ -349,7 +349,7 @@ function TailoringWorkspace() {
     return (
       <TailoringState
         title="Tailoring data could not be loaded"
-        message="The candidate or requisition is unavailable. No resume or submission was generated."
+        message="Candidate or requirements data is unavailable. No resume or submission was generated."
         error
       />
     );
@@ -393,7 +393,7 @@ function TailoringWorkspace() {
 
         <PageHeader
           title={`Resume tailoring: ${candidateName}`}
-          description={`Target requisition: ${requirement.title}`}
+          description={`Target requirements: ${requirement.title}`}
         />
         <TailoringAnalysis candidate={candidate} requirement={requirement} />
         <TailoringUpload candidateId={candidate.id} />
@@ -455,7 +455,9 @@ function TailoringWorkspace() {
                 </Button>
               ))}
             {!savedVersion && (
-              <p className="text-sm text-muted-foreground">No versions for this requisition yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No versions for these requirements yet.
+              </p>
             )}
           </CardContent>
         </Card>
@@ -527,7 +529,7 @@ function TailoringWorkspace() {
 
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-sm">Requisition record</CardTitle>
+              <CardTitle className="text-sm">Requirements record</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p className="font-semibold">{requirement.title}</p>
@@ -717,7 +719,7 @@ function TailoringWorkspace() {
                       onChange={(event) => setApprovalConfirmed(event.target.checked)}
                     />
                     I reviewed the rendered resume and approve every claim for use in this
-                    requisition.
+                    requirements.
                   </label>
                   <Button
                     disabled={!approvalConfirmed || approveMutation.isPending}

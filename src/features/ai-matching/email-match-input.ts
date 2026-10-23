@@ -33,7 +33,7 @@ export function buildEmailMatchRequirement(
     )
   ) {
     throw new Error(
-      "This email preview does not contain enough job or technology details. Use a requisition with the complete job description instead.",
+      "This email preview does not contain enough job or technology details. Use requirements with the complete job description instead.",
     );
   }
   return {

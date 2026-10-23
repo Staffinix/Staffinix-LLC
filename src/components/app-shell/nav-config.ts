@@ -36,7 +36,7 @@ export const NAV_GROUPS: ReadonlyArray<{ section: string; items: readonly NavIte
   {
     section: "Talent Operations",
     items: [
-      { to: "/requirements", label: "Requisitions", icon: FileText, feature: "requirements" },
+      { to: "/requirements", label: "Requirements", icon: FileText, feature: "requirements" },
       { to: "/candidates", label: "Candidates", icon: Users, feature: "candidates" },
       { to: "/matching", label: "AI Matching", icon: Sparkles, feature: "matching" },
       { to: "/tailoring", label: "Resume Tailoring", icon: Wand2, feature: "tailoring" },

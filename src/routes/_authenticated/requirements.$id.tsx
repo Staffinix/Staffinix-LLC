@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRequirement } from "@/lib/requirements.functions";
 
 export const Route = createFileRoute("/_authenticated/requirements/$id")({
-  head: () => ({ meta: [{ title: "Requisition — Staffinix" }] }),
+  head: () => ({ meta: [{ title: "Requirements — Staffinix" }] }),
   component: RequirementRoute,
 });
 
@@ -31,9 +31,9 @@ function RequirementDetailPage() {
   });
 
   if (requirementQuery.isLoading)
-    return <RequirementState loading message="Loading requisition…" />;
+    return <RequirementState loading message="Loading requirements…" />;
   if (requirementQuery.isError || !requirementQuery.data) {
-    return <RequirementState error message="Requisition data could not be loaded." />;
+    return <RequirementState error message="Requirements data could not be loaded." />;
   }
 
   const requirement = requirementQuery.data;
@@ -45,13 +45,13 @@ function RequirementDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
             <Link to="/requirements">
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Requisitions
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Requirements
             </Link>
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild size="sm" className="gap-1.5 text-xs">
               <Link to="/requirements/$id/edit" params={{ id: requirement.id }}>
-                Edit Requisition & JD
+                Edit Requirements & JD
               </Link>
             </Button>
             <Button asChild size="sm" className="gap-1.5 text-xs">
@@ -72,7 +72,7 @@ function RequirementDetailPage() {
           description={
             [requirement.client_name, requirement.vendor_name, requirement.location]
               .filter(Boolean)
-              .join(" · ") || "Requisition details"
+              .join(" · ") || "Requirements details"
           }
         />
 
@@ -143,7 +143,7 @@ function RequirementState({
 }) {
   return (
     <>
-      <AppTopbar title="Requisition" />
+      <AppTopbar title="Requirements" />
       <main className="flex-1 p-6 md:p-8">
         <Card role={error ? "alert" : "status"} className="border-border bg-card">
           <CardContent
