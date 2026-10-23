@@ -54,7 +54,7 @@ export const CANDIDATE_FORM_VISA_OPTIONS = [
   "Green Card",
   "US Citizen",
   "OPT-STEM",
-  "TN Visa",
+  "STEM OPT",
   "EAD",
 ] as const;
 
