@@ -92,6 +92,7 @@ function MatchingPage() {
   const requirementsQuery = useQuery({
     queryKey: ["matching-requirements"],
     queryFn: () => requirementsFn(),
+    enabled: !emailId,
   });
   const matchQuery = useQuery({
     queryKey: ["match-candidates", reqId, candidateId, emailId],
@@ -214,62 +215,46 @@ function MatchingPage() {
           description="Rank authorized candidates using skills, domain relevance, experience, work authorization, location, resume evidence, and semantic similarity."
         />
 
-        {emailId && (
-          <Card>
-            <CardContent className="space-y-2 p-4 text-sm">
-              <p className="font-semibold">Candidate matching from Smart Mail</p>
-              <p className="text-muted-foreground">
-                Uses only the email subject and stored short preview; attachments and full email
-                content are not included. Matches are preliminary and require recruiter review
-                against the complete job description. No requisition or submission is created.
-              </p>
-              {matchQuery.data && "extraction_mode" in matchQuery.data && (
-                <p className="text-xs text-muted-foreground">
-                  {matchQuery.data.extraction_mode === "ai"
-                    ? "AI extracted role and skills from the preview."
-                    : "AI is not configured; keyword-based matching was used."}
-                </p>
+        {!emailId && (
+          <Card className="border-border bg-card">
+            <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(280px,1fr)_auto] lg:items-end">
+              <label className="space-y-2 text-sm font-medium">
+                Select an open requisition
+                <Select
+                  value={reqId ?? ""}
+                  onValueChange={(value) =>
+                    navigate({ to: "/matching", search: { reqId: value }, replace: true })
+                  }
+                  disabled={requirementsQuery.isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a requisition to run matching" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(requirementsQuery.data ?? []).map((requirement) => (
+                      <SelectItem key={requirement.id} value={requirement.id}>
+                        {requirement.title}
+                        {requirement.primary_technology
+                          ? ` · ${requirement.primary_technology}`
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              {hasSource && matchQuery.data && (
+                <div className="text-xs text-muted-foreground lg:text-right">
+                  <p>
+                    {matchQuery.data.total_candidates_evaluated} candidates scored (up to 1,000 most
+                    recently updated accessible profiles)
+                  </p>
+                  <p>{allRows.length} ranked results shown</p>
+                  <p>{rows.length} match current filters</p>
+                </div>
               )}
             </CardContent>
           </Card>
         )}
-
-        <Card className="border-border bg-card">
-          <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(280px,1fr)_auto] lg:items-end">
-            <label className="space-y-2 text-sm font-medium">
-              Select an open requisition
-              <Select
-                value={reqId ?? ""}
-                onValueChange={(value) =>
-                  navigate({ to: "/matching", search: { reqId: value }, replace: true })
-                }
-                disabled={requirementsQuery.isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a requisition to run matching" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(requirementsQuery.data ?? []).map((requirement) => (
-                    <SelectItem key={requirement.id} value={requirement.id}>
-                      {requirement.title}
-                      {requirement.primary_technology ? ` · ${requirement.primary_technology}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            {hasSource && matchQuery.data && (
-              <div className="text-xs text-muted-foreground lg:text-right">
-                <p>
-                  {matchQuery.data.total_candidates_evaluated} candidates scored (up to 1,000 most
-                  recently updated accessible profiles)
-                </p>
-                <p>{allRows.length} ranked results shown</p>
-                <p>{rows.length} match current filters</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {!hasSource ? (
           <StateCard message="Choose a requisition above to rank candidates." />
