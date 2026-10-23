@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
 import { refreshCandidateEmbeddingBestEffort } from "@/lib/candidate-embedding-refresh";
 import { buildCandidateSearchOrGroups } from "@/lib/candidate-search";
+import { getCandidateSubmissionAttribution } from "@/lib/candidate-submission-attribution";
 import type { Json } from "@/integrations/supabase/types";
 import {
   requestStructuredAiOutput,
@@ -265,8 +266,8 @@ export const listCandidates = createServerFn({ method: "POST" })
     const from = (data.page - 1) * data.page_size;
     const to = from + data.page_size - 1;
     const candidateSelect = data.skill
-      ? ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills!inner(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at)" as const)
-      : ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at)" as const);
+      ? ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills!inner(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const)
+      : ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const);
 
     let q = supabase.from("candidates").select(candidateSelect, { count: "exact" });
     q = data.submission_sort
@@ -315,7 +316,11 @@ export const listCandidates = createServerFn({ method: "POST" })
     const profileIds = [
       ...new Set(
         candidateRows
-          .flatMap((candidate) => [candidate.assigned_to, candidate.submissions[0]?.submitted_by])
+          .flatMap((candidate) => [
+            candidate.assigned_to,
+            candidate.submissions[0]?.submitted_by,
+            getCandidateSubmissionAttribution(candidate).userId,
+          ])
           .filter(Boolean),
       ),
     ] as string[];
@@ -333,8 +338,13 @@ export const listCandidates = createServerFn({ method: "POST" })
 
     return {
       rows: candidateRows.map(({ candidate_skills, resumes, submissions, ...candidate }) => {
+        const attribution = getCandidateSubmissionAttribution({ ...candidate, submissions });
         return {
           ...candidate,
+          submission_attribution: {
+            kind: attribution.kind,
+            profile: attribution.userId ? (profileById.get(attribution.userId) ?? null) : null,
+          },
           assigned_recruiter: candidate.assigned_to
             ? (profileById.get(candidate.assigned_to) ?? null)
             : null,

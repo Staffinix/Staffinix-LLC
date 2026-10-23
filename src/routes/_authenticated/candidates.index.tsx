@@ -691,6 +691,7 @@ function BenchCandidatesPage() {
                   <TableHead className="p-3 font-semibold text-center">Status</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Assigned L4</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Submission</TableHead>
+                  <TableHead className="p-3 font-semibold text-center">Submitted by</TableHead>
                   {!isL3orL4 && (
                     <TableHead className="p-3 font-semibold text-center">AI Match</TableHead>
                   )}
@@ -790,16 +791,27 @@ function BenchCandidatesPage() {
                                 ? new Date(r.latest_submission.submitted_at).toLocaleDateString()
                                 : "Draft"}
                             </p>
-                            {r.latest_submission.submitted_by_profile && (
-                              <p className="max-w-32 truncate text-muted-foreground">
-                                by{" "}
-                                {r.latest_submission.submitted_by_profile.full_name ||
-                                  r.latest_submission.submitted_by_profile.email}
-                              </p>
-                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Not submitted</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="p-3 text-center text-xs">
+                        {r.submission_attribution.kind === "none" ? (
+                          <span className="text-muted-foreground">Not submitted</span>
+                        ) : (
+                          <div>
+                            <p>
+                              {r.submission_attribution.profile?.full_name ||
+                                r.submission_attribution.profile?.email ||
+                                "Not recorded"}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {r.submission_attribution.kind === "draft"
+                                ? "Draft created by"
+                                : "Latest submission"}
+                            </p>
+                          </div>
                         )}
                       </TableCell>
                       {!isL3orL4 && (
@@ -844,7 +856,7 @@ function BenchCandidatesPage() {
                 {list.isLoading && (
                   <TableRow>
                     <TableCell
-                      colSpan={13}
+                      colSpan={14}
                       className="p-10 text-center text-xs text-muted-foreground"
                     >
                       <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading candidates…
@@ -854,7 +866,7 @@ function BenchCandidatesPage() {
                 {list.isError && (
                   <TableRow>
                     <TableCell
-                      colSpan={13}
+                      colSpan={14}
                       role="alert"
                       className="p-10 text-center text-xs text-destructive"
                     >
@@ -865,7 +877,7 @@ function BenchCandidatesPage() {
                 {!list.isLoading && !list.isError && rows.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={13}
+                      colSpan={14}
                       className="p-10 text-center text-xs text-muted-foreground"
                     >
                       No candidates found.

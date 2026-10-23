@@ -22,7 +22,7 @@
     "test:observability": "node --test --experimental-strip-types src/lib/request-observability.test.ts",
     "test:candidate-search": "node --test --experimental-strip-types src/lib/candidate-search.test.ts && node scripts/check-candidate-search-plan.mjs",
     "test:candidate-updates": "node --test --experimental-strip-types src/lib/candidate-child-updates.test.ts src/lib/candidate-search.test.ts",
-    "test:candidate-form": "node --test --experimental-strip-types src/lib/candidate-form.test.ts",
+    "test:candidate-form": "node --test --experimental-strip-types src/lib/candidate-form.test.ts src/lib/candidate-submission-attribution.test.ts",
     "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts",
     "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts",
     "document-worker": "node workers/document-processor/server.mjs",
