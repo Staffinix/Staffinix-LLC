@@ -274,7 +274,6 @@
   }
 
   .app-ambient {
-    position: relative;
     isolation: isolate;
     background:
       radial-gradient(circle at 100% 0%, var(--ambient-a), transparent 34rem),

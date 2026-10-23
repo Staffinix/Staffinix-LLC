@@ -8,7 +8,7 @@ export function PageTransition({ routeKey, children }: { routeKey: string; child
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={routeKey}
-        className="flex min-h-0 flex-1 flex-col"
+        className="flex min-h-full flex-col"
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}

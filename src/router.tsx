@@ -19,6 +19,7 @@ export const getRouter = () => {
     ssr: { nonce: getCspNonce() },
     context: { queryClient },
     scrollRestoration: true,
+    scrollToTopSelectors: ["[data-app-scroll]"],
     defaultPreloadStaleTime: 0,
   });
 

@@ -29,12 +29,12 @@ export function AppSidebar() {
   const isUnprovisioned = identity.roles.length === 0 && !identity.platformRole;
 
   return (
-    <aside className="glass-strong sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 text-sidebar-foreground md:flex">
-      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+    <aside className="glass-strong hidden h-full w-64 shrink-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 text-sidebar-foreground md:flex">
+      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
         <StaffinixLogo />
       </div>
 
-      <nav className="flex-1 space-y-7 overflow-y-auto px-3 py-5">
+      <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-y-contain px-3 py-5">
         {currentNavGroups.map((group) => (
           <NavGroup
             key={group.section}
@@ -59,7 +59,7 @@ export function AppSidebar() {
         )}
       </nav>
 
-      <div className="space-y-2 border-t border-sidebar-border p-3">
+      <div className="shrink-0 space-y-2 border-t border-sidebar-border p-3">
         <Link
           to="/settings/profile"
           className={cn(

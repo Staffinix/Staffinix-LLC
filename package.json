@@ -23,6 +23,7 @@
     "test:candidate-search": "node --test --experimental-strip-types src/lib/candidate-search.test.ts && node scripts/check-candidate-search-plan.mjs",
     "test:candidate-updates": "node --test --experimental-strip-types src/lib/candidate-child-updates.test.ts src/lib/candidate-search.test.ts",
     "test:candidate-form": "node --test --experimental-strip-types src/lib/candidate-form.test.ts src/lib/candidate-submission-attribution.test.ts",
+    "test:app-shell": "node --test --experimental-strip-types src/components/app-shell/scroll-layout.test.ts src/components/app-shell/nav-visibility.test.ts",
     "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts",
     "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts",
     "document-worker": "node workers/document-processor/server.mjs",
@@ -53,7 +54,7 @@
     "security:production-fallbacks": "node scripts/check-production-fallbacks.mjs",
     "security:service-role": "node scripts/check-service-role-boundary.mjs",
     "security:service-role-bundle": "node scripts/check-service-role-boundary.mjs --bundle",
-    "test:unit": "npm run test:submissions && npm run test:auth && npm run test:input-validation && npm run test:security-headers && npm run test:safe-urls && npm run test:error-taxonomy && npm run test:access-requests && npm run test:observability && npm run test:rbac && npm run test:candidate-updates && npm run test:candidate-form && npm run test:vendor-csv && npm run test:resume-paths && npm run test:document-worker && npm run test:ai-gateway && npm run test:ai-usage && npm run test:copilot && npm run test:matching-filters && npm run test:matching-engine && npm run test:email && npm run test:rag",
+    "test:unit": "npm run test:submissions && npm run test:auth && npm run test:input-validation && npm run test:security-headers && npm run test:safe-urls && npm run test:error-taxonomy && npm run test:access-requests && npm run test:observability && npm run test:rbac && npm run test:app-shell && npm run test:candidate-updates && npm run test:candidate-form && npm run test:vendor-csv && npm run test:resume-paths && npm run test:document-worker && npm run test:ai-gateway && npm run test:ai-usage && npm run test:copilot && npm run test:matching-filters && npm run test:matching-engine && npm run test:email && npm run test:rag",
     "security:static": "npm run security:request-body-limit && npm run security:document-ai && npm run security:dashboard-aggregation && npm run security:explicit-selects && npm run test:list-bounds && npm run security:server-auth && npm run security:auth-bypass && npm run security:production-fallbacks && npm run security:service-role && npm run test:interactive-controls",
     "lint": "eslint .",
     "format": "prettier --write ."

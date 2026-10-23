@@ -179,16 +179,20 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <div className="app-ambient flex min-h-screen bg-background">
+    <div data-app-frame className="app-ambient fixed inset-0 flex overflow-hidden bg-background">
       {/* Main application navigation */}
       <AppSidebar />
 
       {/* Main content area */}
-      <main className="flex min-w-0 flex-1 flex-col pb-24 md:pb-0">
+      <div
+        data-app-scroll
+        data-scroll-restoration-id="app-content"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-24 md:pb-0"
+      >
         <PageTransition routeKey={location.pathname}>
           <Outlet />
         </PageTransition>
-      </main>
+      </div>
 
       <MobileNav />
     </div>

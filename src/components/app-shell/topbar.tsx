@@ -1,7 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { flushSync } from "react-dom";
-import { useEffect, useState } from "react";
 import { LogOut, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
@@ -19,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 import { CopilotDrawer } from "@/components/ai/copilot-drawer";
-import { cn } from "@/lib/utils";
 import { getAssignedRoleLabel } from "@/lib/role-presentation";
 
 export function AppTopbar({ title }: { title: string }) {
@@ -27,14 +25,6 @@ export function AppTopbar({ title }: { title: string }) {
   const { user } = useSession();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const update = () => setScrolled(window.scrollY > 8);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, []);
 
   const userEmail = data?.email || data?.profile?.email || user?.email || "";
   const rawName =
@@ -86,13 +76,8 @@ export function AppTopbar({ title }: { title: string }) {
   const hasAssignedRole = !!data?.level;
 
   return (
-    <header className="pointer-events-none sticky top-0 z-30 flex h-20 items-center px-3 md:px-5">
-      <div
-        className={cn(
-          "glass pointer-events-auto flex h-13 w-full items-center justify-between rounded-2xl px-3.5 transition-all duration-300 md:px-4",
-          scrolled && "glass-strong -translate-y-0.5 shadow-lg",
-        )}
-      >
+    <header className="sticky top-0 z-30 flex h-20 shrink-0 items-center bg-background px-3 md:px-5">
+      <div className="glass-strong flex h-13 w-full items-center justify-between rounded-2xl px-3.5 md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_12px_var(--primary-glow)]" />
           <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">{title}</h1>
