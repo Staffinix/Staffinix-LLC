@@ -106,7 +106,6 @@ function PipelineTrackerPage() {
                   <TableHead>Requisition</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Vendor</TableHead>
-                  <TableHead>Rate</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Submitted by</TableHead>
                   <TableHead>Updated</TableHead>
@@ -116,7 +115,7 @@ function PipelineTrackerPage() {
               <TableBody>
                 {submissionsQuery.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
                     </TableCell>
                   </TableRow>
@@ -124,7 +123,7 @@ function PipelineTrackerPage() {
                 {submissionsQuery.isError && (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={8}
                       role="alert"
                       className="h-32 text-center text-destructive"
                     >
@@ -134,7 +133,7 @@ function PipelineTrackerPage() {
                 )}
                 {!submissionsQuery.isLoading && !submissionsQuery.isError && rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                       No submissions recorded.
                     </TableCell>
                   </TableRow>
@@ -149,11 +148,6 @@ function PipelineTrackerPage() {
                     <TableCell>{row.requirement?.title || "Not recorded"}</TableCell>
                     <TableCell>{row.client?.name || "Not recorded"}</TableCell>
                     <TableCell>{row.vendor?.name || "Not recorded"}</TableCell>
-                    <TableCell>
-                      {row.submitted_rate == null
-                        ? "Not recorded"
-                        : `${row.currency || ""} ${row.submitted_rate}${row.rate_type ? ` / ${row.rate_type}` : ""}`.trim()}
-                    </TableCell>
                     <TableCell>
                       <Select
                         value={row.stage}
