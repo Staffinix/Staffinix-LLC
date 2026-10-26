@@ -6,6 +6,40 @@ import { shouldAdvanceCandidateFormOnEnter } from "./candidate-form-keyboard.ts"
 import { MARKETING_TYPES, toggleMarketingType } from "./candidates-constants.ts";
 import { formatUsPhone, normalizeUsPhone } from "./us-phone.ts";
 
+test("resume auto-fill is a reviewed preview, not an automatic candidate creation", () => {
+  const server = readFileSync(new URL("./candidates.functions.ts", import.meta.url), "utf8");
+  const preview = server
+    .split("export const previewCandidateResume =")[1]
+    .split("export const parseAndCreateCandidate =")[0];
+  assert.match(preview, /middleware\(\[requireCandidatesAccess\]\)/);
+  assert.match(preview, /readAndValidateResumeUpload/);
+  assert.match(preview, /runWithAiUsageGuard/);
+  assert.match(preview, /UNTRUSTED_DOCUMENT_SYSTEM_RULES/);
+  assert.doesNotMatch(preview, /createCandidateGraph|\.insert\(|\.update\(|\.upsert\(/);
+  const form = readFileSync(
+    new URL("../components/candidates/candidate-form.tsx", import.meta.url),
+    "utf8",
+  );
+  const fill = form.split("async function autofillResume()")[1].split("const skills =")[0];
+  assert.match(fill, /await previewFn/);
+  for (const setter of [
+    "setFirst",
+    "setLast",
+    "setEmail",
+    "setPhone",
+    "setCurrentJob",
+    "setTechSkills",
+    "setEmployment",
+    "setEducation",
+  ])
+    assert.ok(fill.includes(setter));
+  assert.doesNotMatch(fill, /createFn\(|createWithResumeFn\(|onSaved\(/);
+  assert.match(fill, /setVisa\(""\)/);
+  assert.match(form, /disabled=\{isParsing \|\| isSubmitting\}/);
+  assert.match(form, /previewUpload\?\.file === resumeFile/);
+  assert.match(form, /configured\s+AI\s+provider/);
+});
+
 test("normalizes supported US phone formats to E.164", () => {
   for (const value of [
     "4155552671",

@@ -41,6 +41,7 @@ import {
   createCandidateResumeUpload,
   createCandidateWithResume,
   updateCandidate,
+  previewCandidateResume,
 } from "@/lib/candidates.functions";
 import { formatUsPhone, normalizeUsPhone, US_PHONE_ERROR } from "@/lib/us-phone";
 
@@ -194,11 +195,71 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
   );
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [previewUpload, setPreviewUpload] = useState<{ file: File; upload_id: string } | null>(
+    null,
+  );
+  const previewFn = useServerFn(previewCandidateResume);
   const createFn = useServerFn(createCandidate);
   const createWithResumeFn = useServerFn(createCandidateWithResume);
   const createUploadFn = useServerFn(createCandidateResumeUpload);
   const attachResumeFn = useServerFn(attachCandidateResume);
   const updateFn = useServerFn(updateCandidate);
+
+  async function autofillResume() {
+    if (!resumeFile || isParsing || isSubmitting) return;
+    setIsParsing(true);
+    try {
+      const grant = await uploadResumeToStaging(resumeFile, createUploadFn);
+      const { candidate: parsed } = await previewFn({ data: { upload_id: grant.upload_id } });
+      setPreviewUpload({ file: resumeFile, upload_id: grant.upload_id });
+      setFirst(parsed.first_name ?? "");
+      setLast(parsed.last_name ?? "");
+      setEmail(parsed.email ?? "");
+      setPhone(formatUsPhone(parsed.phone ?? ""));
+      setPhoneError("");
+      setVisa("");
+      setCurrentJob(parsed.current_title ?? "");
+      setTechSkills(parsed.skills.map((item) => item.skill).join(", "));
+      setExpYears(parsed.experience_years?.toString() ?? "");
+      setLocation(parsed.location ?? "");
+      setEmployment(
+        parsed.employment.map((job) => ({
+          ...emptyEmployment(),
+          ...job,
+          clientId: newClientId(),
+          title: job.title ?? "",
+          location: job.location ?? "",
+          start_date: job.start_date ?? "",
+          end_date: job.end_date ?? "",
+          description: job.description ?? "",
+        })),
+      );
+      setEducation(
+        parsed.education.map((item) => ({
+          ...emptyEducation(),
+          ...item,
+          clientId: newClientId(),
+          degree: item.degree ?? "",
+          field: item.field ?? "",
+          start_year: item.start_year?.toString() ?? "",
+          end_year: item.end_year?.toString() ?? "",
+        })),
+      );
+      toast.success(
+        "Resume fields filled. Review every field and confirm required job, visa, and availability before saving.",
+      );
+    } catch (error) {
+      setPreviewUpload(null);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Resume auto-fill failed. Your form was not changed.",
+      );
+    } finally {
+      setIsParsing(false);
+    }
+  }
 
   const skills = useMemo(
     () =>
@@ -333,7 +394,10 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
       };
       let created: { id: string };
       if (resumeFile) {
-        const grant = await uploadResumeToStaging(resumeFile, createUploadFn);
+        const grant =
+          previewUpload?.file === resumeFile
+            ? previewUpload
+            : await uploadResumeToStaging(resumeFile, createUploadFn);
         created = await createWithResumeFn({ data: { candidate, upload_id: grant.upload_id } });
       } else {
         created = await createFn({ data: candidate });
@@ -341,6 +405,7 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
       toast.success("Bench candidate added.");
       onSaved(created.id);
     } catch (error) {
+      setPreviewUpload(null);
       toast.error(error instanceof Error ? error.message : "Candidate could not be saved.");
     } finally {
       setIsSubmitting(false);
@@ -366,184 +431,234 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
           onKeyDownCapture={handleEnter}
           className="space-y-5"
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="First Name" required>
-              <Input value={first} onChange={(e) => setFirst(e.target.value)} required />
-            </Field>
-            <Field label="Last Name" required>
-              <Input value={last} onChange={(e) => setLast(e.target.value)} required />
-            </Field>
-            <Field label="Email Address">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            <Field label="US Phone Number" error={phoneError}>
-              <Input
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  if (phoneError) setPhoneError("");
-                }}
-                onBlur={() => {
-                  const normalized = validatePhone();
-                  if (normalized) setPhone(formatUsPhone(normalized));
-                }}
-                aria-invalid={Boolean(phoneError)}
-                aria-describedby={phoneError ? "candidate-phone-error" : undefined}
-                placeholder="(317) 555-0188"
-              />
-            </Field>
-            <Field label="Current Job" required>
-              <Input value={currentJob} onChange={(e) => setCurrentJob(e.target.value)} required />
-            </Field>
-            <Field label="Required Job" required>
-              <Input
-                value={requiredJob}
-                onChange={(e) => setRequiredJob(e.target.value)}
-                required
-              />
-            </Field>
-          </div>
-          <Field label="Tech / Skills (comma-separated)">
-            <Input
-              value={techSkills}
-              onChange={(e) => setTechSkills(e.target.value)}
-              placeholder="React, TypeScript, Node.js"
-            />
-          </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Years of Experience">
-              <Input
-                type="number"
-                min="0"
-                max="60"
-                step="0.5"
-                value={expYears}
-                onChange={(e) => setExpYears(e.target.value)}
-              />
-            </Field>
-            <Field label="Location">
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} />
-            </Field>
-            <Field label="Ready to Relocate?" required>
-              <Select value={readyToRelocate} onValueChange={setReadyToRelocate}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            {readyToRelocate === "no" && (
-              <Field label="Preferred Location" required>
+          <fieldset disabled={isParsing || isSubmitting} className="space-y-5">
+            {mode === "create" && (
+              <div className="rounded-md border border-dashed border-primary/40 p-4 space-y-3">
+                <Label htmlFor="resume-autofill">
+                  Upload resume to auto-fill candidate details
+                </Label>
                 <Input
-                  value={preferredLocation}
-                  onChange={(e) => setPreferredLocation(e.target.value)}
+                  id="resume-autofill"
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={(event) => {
+                    setResumeFile(event.target.files?.[0] ?? null);
+                    setPreviewUpload(null);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={autofillResume}
+                  disabled={!resumeFile || isParsing}
+                  className="gap-2"
+                >
+                  {isParsing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}{" "}
+                  {isParsing ? "Reading resume…" : "Auto-fill from resume"}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  PDF or DOCX, up to 10 MiB. Auto-fill sends the resume to the configured AI
+                  provider and replaces resume-derived fields. Review the result before saving.
+                  Secure document processing must be configured. Legacy DOC is not supported yet.
+                </p>
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="First Name" required>
+                <Input value={first} onChange={(e) => setFirst(e.target.value)} required />
+              </Field>
+              <Field label="Last Name" required>
+                <Input value={last} onChange={(e) => setLast(e.target.value)} required />
+              </Field>
+              <Field label="Email Address">
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
+              <Field label="US Phone Number" error={phoneError}>
+                <Input
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (phoneError) setPhoneError("");
+                  }}
+                  onBlur={() => {
+                    const normalized = validatePhone();
+                    if (normalized) setPhone(formatUsPhone(normalized));
+                  }}
+                  aria-invalid={Boolean(phoneError)}
+                  aria-describedby={phoneError ? "candidate-phone-error" : undefined}
+                  placeholder="(317) 555-0188"
+                />
+              </Field>
+              <Field label="Current Job" required>
+                <Input
+                  value={currentJob}
+                  onChange={(e) => setCurrentJob(e.target.value)}
                   required
                 />
               </Field>
-            )}
-          </div>
-          <Field label={mode === "edit" ? "Update Resume" : "Upload Resume"}>
-            <div className="rounded-md border border-dashed border-border p-4">
-              <div className="flex items-center gap-3">
-                <FileUp className="h-5 w-5 text-primary" />
+              <Field label="Required Job" required>
                 <Input
-                  type="file"
-                  accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
-                  onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
+                  value={requiredJob}
+                  onChange={(e) => setRequiredJob(e.target.value)}
+                  required
                 />
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {mode === "edit" && initialData?.resumes.length
-                  ? `Current: ${initialData.resumes.find((resume) => resume.is_primary)?.file_name ?? initialData.resumes[0]?.file_name}. Choose a file to replace the primary resume. `
-                  : ""}
-                PDF or DOCX, up to 10 MiB{resumeFile ? ` · Selected: ${resumeFile.name}` : ""}.
-              </p>
+              </Field>
             </div>
-          </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Work Authorization / Visa Status" required={mode === "create"}>
-              <Select value={visa} onValueChange={setVisa}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select visa status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CANDIDATE_FORM_VISA_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {legacyVisa && !visa && (
-                <p className="text-xs text-muted-foreground">
-                  Legacy value “{initialData?.visa_status}” is preserved until you select a current
-                  visa option.
-                </p>
-              )}
+            <Field label="Tech / Skills (comma-separated)">
+              <Input
+                value={techSkills}
+                onChange={(e) => setTechSkills(e.target.value)}
+                placeholder="React, TypeScript, Node.js"
+              />
             </Field>
-            <Field label="Bench Availability" required>
-              <Select
-                value={availability}
-                onValueChange={(value) => setAvailability(value as Availability)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="immediate">Immediate Start</SelectItem>
-                  <SelectItem value="two_weeks">2 Weeks Notice</SelectItem>
-                  <SelectItem value="one_month">1 Month Notice</SelectItem>
-                  <SelectItem value="negotiable">Negotiable</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <fieldset className="space-y-2 rounded-lg border border-border p-4">
-            <legend className="px-1 text-xs font-semibold">Marketing Type</legend>
-            <p className="text-xs text-muted-foreground">Select all engagement types that apply.</p>
-            <div className="flex flex-wrap gap-4">
-              {MARKETING_TYPES.map((option) => (
-                <label key={option} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={marketingTypes.includes(option)}
-                    onCheckedChange={() =>
-                      setMarketingTypes((current) => toggleMarketingType(current, option))
-                    }
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Years of Experience">
+                <Input
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="0.5"
+                  value={expYears}
+                  onChange={(e) => setExpYears(e.target.value)}
+                />
+              </Field>
+              <Field label="Location">
+                <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+              </Field>
+              <Field label="Ready to Relocate?" required>
+                <Select value={readyToRelocate} onValueChange={setReadyToRelocate}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {readyToRelocate === "no" && (
+                <Field label="Preferred Location" required>
+                  <Input
+                    value={preferredLocation}
+                    onChange={(e) => setPreferredLocation(e.target.value)}
+                    required
                   />
-                  <span>{option}</span>
-                </label>
-              ))}
+                </Field>
+              )}
+            </div>
+            {mode === "edit" && (
+              <Field label="Update Resume">
+                <div className="rounded-md border border-dashed border-border p-4">
+                  <div className="flex items-center gap-3">
+                    <FileUp className="h-5 w-5 text-primary" />
+                    <Input
+                      type="file"
+                      accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                      onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {mode === "edit" && initialData?.resumes.length
+                      ? `Current: ${initialData.resumes.find((resume) => resume.is_primary)?.file_name ?? initialData.resumes[0]?.file_name}. Choose a file to replace the primary resume. `
+                      : ""}
+                    PDF or DOCX, up to 10 MiB{resumeFile ? ` · Selected: ${resumeFile.name}` : ""}.
+                  </p>
+                </div>
+              </Field>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Work Authorization / Visa Status" required={mode === "create"}>
+                <Select value={visa} onValueChange={setVisa}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select visa status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CANDIDATE_FORM_VISA_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {legacyVisa && !visa && (
+                  <p className="text-xs text-muted-foreground">
+                    Legacy value “{initialData?.visa_status}” is preserved until you select a
+                    current visa option.
+                  </p>
+                )}
+              </Field>
+              <Field label="Bench Availability" required>
+                <Select
+                  value={availability}
+                  onValueChange={(value) => setAvailability(value as Availability)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="immediate">Immediate Start</SelectItem>
+                    <SelectItem value="two_weeks">2 Weeks Notice</SelectItem>
+                    <SelectItem value="one_month">1 Month Notice</SelectItem>
+                    <SelectItem value="negotiable">Negotiable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <fieldset className="space-y-2 rounded-lg border border-border p-4">
+              <legend className="px-1 text-xs font-semibold">Marketing Type</legend>
+              <p className="text-xs text-muted-foreground">
+                Select all engagement types that apply.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {MARKETING_TYPES.map((option) => (
+                  <label key={option} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={marketingTypes.includes(option)}
+                      onCheckedChange={() =>
+                        setMarketingTypes((current) => toggleMarketingType(current, option))
+                      }
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <EmploymentSection items={employment} onChange={setEmployment} />
+            <EducationSection items={education} onChange={setEducation} />
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+              <Button variant="outline" size="sm" asChild>
+                {mode === "edit" && initialData ? (
+                  <Link to="/candidates/$id" params={{ id: initialData.id }}>
+                    Cancel
+                  </Link>
+                ) : (
+                  <Link to="/candidates">Cancel</Link>
+                )}
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSubmitting}
+                className="gap-2 font-semibold"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : mode === "edit" ? (
+                  <Save className="h-4 w-4" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {isSubmitting ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Candidate"}
+              </Button>
             </div>
           </fieldset>
-          <EmploymentSection items={employment} onChange={setEmployment} />
-          <EducationSection items={education} onChange={setEducation} />
-          <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-            <Button variant="outline" size="sm" asChild>
-              {mode === "edit" && initialData ? (
-                <Link to="/candidates/$id" params={{ id: initialData.id }}>
-                  Cancel
-                </Link>
-              ) : (
-                <Link to="/candidates">Cancel</Link>
-              )}
-            </Button>
-            <Button type="submit" size="sm" disabled={isSubmitting} className="gap-2 font-semibold">
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mode === "edit" ? (
-                <Save className="h-4 w-4" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              {isSubmitting ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Candidate"}
-            </Button>
-          </div>
         </form>
       </CardContent>
     </Card>
