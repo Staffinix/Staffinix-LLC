@@ -3,6 +3,50 @@ import test from "node:test";
 import { Worker } from "node:worker_threads";
 
 import JSZip from "jszip";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+
+test("local setup preserves unrelated configuration, keeps its token private, and refuses tracked secrets", () => {
+  const directory = mkdtempSync(join(tmpdir(), "staffinix-document-setup-"));
+  try {
+    mkdirSync(join(directory, "scripts"));
+    copyFileSync(
+      new URL("../../scripts/setup-local-document-processor.mjs", import.meta.url),
+      join(directory, "scripts/setup-local-document-processor.mjs"),
+    );
+    execFileSync("git", ["init", "--quiet"], { cwd: directory });
+    writeFileSync(join(directory, ".env.local"), "UNRELATED_SETTING=keep-me\n");
+    const run = () =>
+      execFileSync(process.execPath, ["scripts/setup-local-document-processor.mjs"], {
+        cwd: directory,
+        encoding: "utf8",
+      });
+    const output = run();
+    const first = readFileSync(join(directory, ".env.local"), "utf8");
+    assert.match(first, /UNRELATED_SETTING=keep-me/);
+    assert.match(first, /DOCUMENT_PROCESSOR_URL=http:\/\/127.0.0.1:8788/);
+    const token = first.match(/DOCUMENT_PROCESSOR_TOKEN=([a-f0-9]{64})/)[1];
+    assert.equal(output.includes(token), false);
+    run();
+    assert.equal(readFileSync(join(directory, ".env.local"), "utf8"), first);
+    execFileSync("git", ["add", ".env.local"], { cwd: directory });
+    const blocked = spawnSync(process.execPath, ["scripts/setup-local-document-processor.mjs"], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    assert.notEqual(blocked.status, 0);
+    assert.match(blocked.stderr, /tracked env file/);
+  } finally {
+    assert.ok(
+      resolve(directory).startsWith(
+        resolve(tmpdir()) + (process.platform === "win32" ? "\\" : "/"),
+      ),
+    );
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 const PDF_MIME = "application/pdf";
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";

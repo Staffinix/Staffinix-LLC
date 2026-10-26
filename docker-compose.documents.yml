@@ -1,0 +1,67 @@
+services:
+  document-gateway:
+    image: nginxinc/nginx-unprivileged@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+    ports:
+      - "127.0.0.1:8788:8080"
+    volumes:
+      - ./workers/document-processor/local-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - document-processor
+    networks:
+      - processing
+      - signature-updates
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 32m
+    cpus: 0.25
+    pids_limit: 32
+    restart: "no"
+
+  document-processor:
+    build:
+      context: .
+      dockerfile: workers/document-processor/Dockerfile
+    environment:
+      DOCUMENT_PROCESSOR_TOKEN: ${DOCUMENT_PROCESSOR_TOKEN:?Run the local document setup first}
+      CLAMAV_HOST: document-scanner
+      CLAMAV_PORT: "3310"
+      PORT: "8788"
+    depends_on:
+      document-scanner:
+        condition: service_healthy
+    networks:
+      - processing
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    init: true
+    restart: "no"
+
+  document-scanner:
+    image: clamav/clamav@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    networks:
+      - processing
+      - signature-updates
+    volumes:
+      - document-signatures:/var/lib/clamav
+    mem_limit: 4g
+    cpus: 1
+    pids_limit: 128
+    restart: "no"
+
+networks:
+  processing:
+    internal: true
+  signature-updates: {}
+
+volumes:
+  document-signatures:

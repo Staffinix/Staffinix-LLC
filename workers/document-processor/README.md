@@ -1,5 +1,43 @@
 # Isolated document processor
 
+## Temporary local testing (no cloud hosting)
+
+Start Docker Desktop, then run these commands from the repository root:
+
+```sh
+node scripts/setup-local-document-processor.mjs
+docker compose --env-file .env.local -f docker-compose.documents.yml up -d --build
+```
+
+The setup preserves unrelated environment variables and generates a private token in ignored
+`.env.local`. Never commit or share this file. Start the local app with server-only environment
+variables loaded explicitly (the normal Vite command loads only public `VITE_` variables):
+
+```sh
+node --env-file=.env.local node_modules/vite/bin/vite.js --host 127.0.0.1
+```
+
+The gateway listens only on `127.0.0.1:8788`; the parser and scanner have no host ports. The parser
+is on an isolated Docker network with no internet route. The scanner can download virus-signature
+updates. The gateway forwards requests only to the parser, never arbitrary destinations.
+Initial image/signature downloads can take several minutes. Allow about 4 GB RAM for scanning.
+
+Test the full local processing boundary with your PDF (no AI calls or candidate records):
+
+```sh
+node --env-file=.env.local --experimental-strip-types scripts/test-local-document-processor.mjs "C:/path/to/resume.pdf"
+```
+
+To stop testing without deleting signature data:
+
+```sh
+docker compose --env-file .env.local -f docker-compose.documents.yml stop
+```
+
+This does not connect the public Vercel app to your computer. Do not set the Vercel endpoint to
+`localhost`, publish the scanner port, or create a public tunnel without reviewing its security.
+AI extraction still requires the existing configured provider and can incur provider usage charges.
+
 Run this service separately from the web application. It intentionally fails to start unless a
 private bearer token and a reachable ClamAV daemon are configured.
 
