@@ -60,7 +60,7 @@ const QdrantQuerySchema = z.object({
     points: z.array(
       z.object({
         score: z.number().finite(),
-        payload: z.record(z.unknown()).nullable().optional(),
+        payload: z.record(z.string(), z.unknown()).nullable().optional(),
       }),
     ),
   }),
@@ -70,7 +70,7 @@ const QdrantScrollSchema = z.object({
   result: z.object({
     points: z.array(
       z.object({
-        payload: z.record(z.unknown()).nullable().optional(),
+        payload: z.record(z.string(), z.unknown()).nullable().optional(),
       }),
     ),
     next_page_offset: z.union([z.string(), z.number()]).nullable().optional(),
