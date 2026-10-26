@@ -14,7 +14,7 @@
     "preview": "wrangler dev --config .output/server/wrangler.json --local --show-interactive-dev-session=false --compatibility-date=2026-08-31",
     "test:auth": "node --test --experimental-strip-types src/integrations/supabase/auth-header.test.ts src/integrations/supabase/api-key-safety.test.ts src/lib/work-email-policy.test.ts",
     "test:input-validation": "node --test --experimental-strip-types src/integrations/http/request-size.test.ts",
-    "test:security-headers": "node --test --experimental-strip-types src/integrations/http/security-headers.test.ts",
+    "test:security-headers": "node --test --experimental-strip-types src/integrations/http/security-headers.test.ts src/integrations/http/forward-request.test.ts",
     "test:safe-urls": "node --test --experimental-strip-types src/lib/safe-url.test.ts src/lib/server-service-url.test.ts src/lib/profile-avatar.test.ts",
     "security:request-body-limit": "node scripts/check-request-body-limit.mjs",
     "test:error-taxonomy": "node --test --experimental-strip-types src/lib/application-error.test.ts",

@@ -13,6 +13,7 @@ import {
   PayloadTooLargeError,
 } from "./integrations/http/request-size";
 import { applySecurityHeaders, createCspNonce } from "./integrations/http/security-headers";
+import { forwardRequest } from "./integrations/http/forward-request";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -66,7 +67,7 @@ export default {
       const handler = await getServerEntry();
       const headers = new Headers(request.headers);
       headers.set("x-staffinix-csp-nonce", nonce);
-      const response = await handler.fetch(new Request(request, { headers }), env, ctx);
+      const response = await handler.fetch(forwardRequest(request, headers), env, ctx);
       return applySecurityHeaders(request, await normalizeCatastrophicSsrResponse(response), nonce);
     } catch (error) {
       if (error instanceof PayloadTooLargeError) {
