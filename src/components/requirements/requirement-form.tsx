@@ -1,3 +1,4 @@
+import { RequiredRequirementDetailsSchema } from "@/lib/requirement-form-validation";
 import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -133,6 +134,10 @@ export function RequirementForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const details = RequiredRequirementDetailsSchema.safeParse(v);
+      if (!details.success) {
+        throw new Error(details.error.issues.map((issue) => issue.message).join(". "));
+      }
       const locationResult = UsRequisitionLocationSchema.safeParse(v.location);
       if (!locationResult.success)
         throw new Error("Enter a U.S. city and state (Dallas, TX), or Remote, USA.");
@@ -191,6 +196,9 @@ export function RequirementForm({
       }}
       className="space-y-6"
     >
+      <p className="text-xs text-muted-foreground">
+        All fields are required except Rate min and Rate max.
+      </p>
       <Card className="border-border bg-card">
         <CardContent className="grid gap-4 p-6 md:grid-cols-2">
           <Field label="Title" required className="md:col-span-2">
@@ -202,7 +210,7 @@ export function RequirementForm({
             />
           </Field>
 
-          <Field label="Client">
+          <Field label="Client" required>
             <ComboEntity
               value={v.client_id}
               onChange={(id) => setV({ ...v, client_id: id })}
@@ -215,7 +223,7 @@ export function RequirementForm({
               }}
             />
           </Field>
-          <Field label="Vendor Name">
+          <Field label="Vendor Name" required>
             <ComboEntity
               value={v.vendor_id}
               onChange={(id) => {
@@ -237,16 +245,18 @@ export function RequirementForm({
             />
           </Field>
 
-          <Field label="Vendor Contact Email">
+          <Field label="Vendor Contact Email" required>
             <Input
+              required
               type="email"
               value={v.vendor_email}
               onChange={(e) => setV({ ...v, vendor_email: e.target.value })}
               placeholder="account@apexstaffing.io"
             />
           </Field>
-          <Field label="Vendor Contact No.">
+          <Field label="Vendor Contact No." required>
             <Input
+              required
               type="tel"
               value={v.vendor_contact}
               onChange={(e) => setV({ ...v, vendor_contact: e.target.value })}
@@ -254,14 +264,15 @@ export function RequirementForm({
             />
           </Field>
 
-          <Field label="U.S. Location (City, State) *">
+          <Field label="U.S. Location (City, State)" required>
             <Input
+              required
               value={v.location}
               onChange={(e) => setV({ ...v, location: e.target.value })}
               placeholder="Dallas, TX or Remote, USA"
             />
           </Field>
-          <Field label="Work mode">
+          <Field label="Work mode" required>
             <Select
               value={v.work_mode ?? "unset"}
               onValueChange={(x) =>
@@ -282,23 +293,26 @@ export function RequirementForm({
             </Select>
           </Field>
 
-          <Field label="Primary technology">
+          <Field label="Primary technology" required>
             <Input
+              required
               value={v.primary_technology}
               onChange={(e) => setV({ ...v, primary_technology: e.target.value })}
               placeholder="Java · Spring Boot"
             />
           </Field>
-          <Field label="Duration">
+          <Field label="Duration" required>
             <Input
+              required
               value={v.duration}
               onChange={(e) => setV({ ...v, duration: e.target.value })}
               placeholder="6 months + ext."
             />
           </Field>
 
-          <Field label="Min experience (yrs)">
+          <Field label="Min experience (yrs)" required>
             <Input
+              required
               type="number"
               min={0}
               value={v.min_experience_years ?? ""}
@@ -307,8 +321,9 @@ export function RequirementForm({
               }
             />
           </Field>
-          <Field label="Max experience (yrs)">
+          <Field label="Max experience (yrs)" required>
             <Input
+              required
               type="number"
               min={0}
               value={v.max_experience_years ?? ""}
@@ -338,7 +353,7 @@ export function RequirementForm({
               }
             />
           </Field>
-          <Field label="Rate type">
+          <Field label="Rate type" required>
             <Select
               value={v.rate_type ?? "unset"}
               onValueChange={(x) =>
@@ -358,7 +373,7 @@ export function RequirementForm({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Currency (U.S. dollars)">
+          <Field label="Currency (U.S. dollars)" required>
             <Select value={v.currency} onValueChange={(currency) => setV({ ...v, currency })}>
               <SelectTrigger>
                 <SelectValue />
@@ -378,7 +393,7 @@ export function RequirementForm({
             </p>
           </Field>
 
-          <Field label="Visa types" className="md:col-span-2">
+          <Field label="Visa types" required className="md:col-span-2">
             <div className="flex flex-wrap gap-2">
               {VISA_OPTIONS.map((visa) => {
                 const active = v.visa_types.includes(visa);
@@ -386,6 +401,7 @@ export function RequirementForm({
                   <button
                     type="button"
                     key={visa}
+                    aria-pressed={active}
                     onClick={() =>
                       setV({
                         ...v,
@@ -408,7 +424,7 @@ export function RequirementForm({
             </div>
           </Field>
 
-          <Field label="Status">
+          <Field label="Status" required>
             <Select
               value={v.status}
               onValueChange={(x) => setV({ ...v, status: x as RequirementStatus })}
@@ -425,7 +441,7 @@ export function RequirementForm({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Priority">
+          <Field label="Priority" required>
             <Select
               value={v.priority}
               onValueChange={(x) => setV({ ...v, priority: x as RequirementPriority })}
@@ -443,8 +459,9 @@ export function RequirementForm({
             </Select>
           </Field>
 
-          <Field label="Description" className="md:col-span-2">
+          <Field label="Description" required className="md:col-span-2">
             <Textarea
+              required
               rows={5}
               value={v.description}
               onChange={(e) => setV({ ...v, description: e.target.value })}
@@ -452,8 +469,9 @@ export function RequirementForm({
             />
           </Field>
 
-          <Field label="Recruiter notes (internal)" className="md:col-span-2">
+          <Field label="Recruiter notes (internal)" required className="md:col-span-2">
             <Textarea
+              required
               rows={3}
               value={v.recruiter_notes}
               onChange={(e) => setV({ ...v, recruiter_notes: e.target.value })}
@@ -466,9 +484,9 @@ export function RequirementForm({
       <Card className="border-border bg-card">
         <CardContent className="space-y-4 p-6">
           <div>
-            <p className="text-sm font-medium">Skills</p>
+            <p className="text-sm font-medium">Skills *</p>
             <p className="text-xs text-muted-foreground">
-              Tag mandatory skills — the matching engine weights them heavier.
+              Add at least one skill. Tag mandatory skills to give them more weight when matching.
             </p>
           </div>
 

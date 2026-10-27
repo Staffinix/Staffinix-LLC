@@ -45,3 +45,64 @@ test("editing preserves saved priority, zero rates and JD text", () => {
   assert.match(source, /rate_max: data.rate_max != null \? Number\(data.rate_max\) : null/);
   assert.match(source, /description: data.description \?\? ""/);
 });
+
+import { RequiredRequirementDetailsSchema } from "./requirement-form-validation.ts";
+const completeDetails = {
+  title: "Developer",
+  client_id: "client",
+  vendor_id: "vendor",
+  vendor_email: "recruiter@example.com",
+  vendor_contact: "+14155552671",
+  location: "Dallas, TX",
+  work_mode: "remote",
+  primary_technology: "Java",
+  duration: "6 months",
+  min_experience_years: 0,
+  max_experience_years: 5,
+  rate_type: "hourly",
+  currency: "USD",
+  visa_types: ["H1B"],
+  status: "open",
+  priority: "medium",
+  description: "Build APIs",
+  recruiter_notes: "Interview available",
+  skills: [{ skill: "Java", is_mandatory: true }],
+};
+
+test("complete requirements allow missing rates and zero experience", () => {
+  assert.equal(RequiredRequirementDetailsSchema.safeParse(completeDetails).success, true);
+  assert.equal(
+    RequiredRequirementDetailsSchema.safeParse({
+      ...completeDetails,
+      rate_min: null,
+      rate_max: null,
+    }).success,
+    true,
+  );
+});
+test("every requirement detail is mandatory, including selections and skills", () => {
+  for (const key of Object.keys(completeDetails)) {
+    const input = { ...completeDetails } as Record<string, unknown>;
+    delete input[key];
+    assert.equal(RequiredRequirementDetailsSchema.safeParse(input).success, false, key);
+  }
+  for (const key of ["client_id", "vendor_id", "description", "recruiter_notes"]) {
+    assert.equal(
+      RequiredRequirementDetailsSchema.safeParse({ ...completeDetails, [key]: "   " }).success,
+      false,
+      key,
+    );
+  }
+  for (const key of ["visa_types", "skills"]) {
+    assert.equal(
+      RequiredRequirementDetailsSchema.safeParse({ ...completeDetails, [key]: [] }).success,
+      false,
+      key,
+    );
+  }
+  assert.equal(
+    RequiredRequirementDetailsSchema.safeParse({ ...completeDetails, max_experience_years: -1 })
+      .success,
+    false,
+  );
+});
