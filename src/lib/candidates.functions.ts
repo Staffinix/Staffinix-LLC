@@ -913,6 +913,7 @@ export const previewCandidateResume = createServerFn({ method: "POST" })
         requestStructuredAiOutput(
           {
             model: "google/gemini-3-flash-preview",
+            max_tokens: 4096,
             temperature: 0,
             messages: [
               {
@@ -1057,6 +1058,7 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
       requestStructuredAiOutput(
         {
           model: "google/gemini-3-flash-preview",
+          max_tokens: 4096,
           messages: [
             {
               role: "system",

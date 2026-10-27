@@ -14,6 +14,28 @@ const originalApiKey = process.env.LOVABLE_API_KEY;
 const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
 const originalOpenRouterUrl = process.env.OPENROUTER_APP_URL;
 
+test("distinguishes payment rejection causes without exposing provider text", async (t) => {
+  process.env.OPENROUTER_API_KEY = "openrouter-test-only";
+  const logged: unknown[] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => {
+    logged.push(args);
+  });
+  const cases = [
+    [{ metadata: { limit_source: "openrouter_in_flight_budget" } }, /temporarily busy/],
+    [{ metadata: { limit_source: "openrouter_key_limit" } }, /key reached its spending limit/],
+    [{ message: "This request requires more credits, or fewer max_tokens" }, /token budget/],
+    [{ message: "private-provider-detail" }, /payment or spending budget/],
+  ] as const;
+  for (const [error, expected] of cases) {
+    globalThis.fetch = async () => new Response(JSON.stringify({ error }), { status: 402 });
+    await assert.rejects(fetchAiGateway("/v1/chat/completions", {}), expected);
+  }
+  assert.equal(JSON.stringify(logged).includes("private-provider-detail"), false);
+  assert.equal(JSON.stringify(logged).includes("openrouter-test-only"), false);
+  globalThis.fetch = async () => new Response("upstream error", { status: 402 });
+  await assert.rejects(fetchAiGateway("/v1/chat/completions", {}), /payment or spending budget/);
+});
+
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalApiKey === undefined) delete process.env.LOVABLE_API_KEY;

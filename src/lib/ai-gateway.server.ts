@@ -89,7 +89,47 @@ export async function fetchAiGateway(
 
   if (!response.ok) {
     if (response.status === 429) throw new Error("AI rate limit reached — try again shortly");
-    if (response.status === 402) throw new Error("AI credits exhausted");
+    if (response.status === 402) {
+      let details: { message?: string; metadata?: { limit_source?: string; reason?: string } } = {};
+      try {
+        details = JSON.parse(responseText)?.error ?? {};
+      } catch {
+        // Some providers return a non-JSON error page.
+      }
+      const source = details.metadata?.limit_source;
+      const reason = details.metadata?.reason;
+      const knownSources = [
+        "openrouter_in_flight_budget",
+        "openrouter_key_limit",
+        "openrouter_credits",
+      ];
+      // Log only known categories, never provider text, credentials, or resume content.
+      console.warn("AI payment rejection", {
+        provider: openRouterKey ? "OpenRouter" : "Lovable",
+        status: 402,
+        limit_source: knownSources.includes(source ?? "") ? source : "unspecified",
+        output_budget:
+          typeof details.message === "string" && /fewer max_tokens/i.test(details.message),
+      });
+      if (source === "openrouter_in_flight_budget" || reason === "in_flight_budget_exhausted") {
+        throw new Error(
+          "AI request spending capacity is temporarily busy. Wait a minute and retry.",
+        );
+      }
+      if (source === "openrouter_key_limit") {
+        throw new Error(
+          "The AI API key reached its spending limit. Check the key used by this deployment.",
+        );
+      }
+      if (typeof details.message === "string" && /fewer max_tokens/i.test(details.message)) {
+        throw new Error(
+          "The AI provider rejected this request's token budget. The available request budget is too small for this resume.",
+        );
+      }
+      throw new Error(
+        "The AI provider rejected this request's payment or spending budget. Check the account and API key used by this deployment.",
+      );
+    }
     throw new Error(`AI request failed (${response.status})`);
   }
   try {
