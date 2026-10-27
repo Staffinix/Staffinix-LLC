@@ -425,9 +425,9 @@ export const getCandidate = createServerFn({ method: "POST" })
             "id, candidate_id, file_name, file_path, mime_type, size_bytes, source, is_primary, created_at, extracted_text, verification_status, verified_by, verified_at, verified_facts_hash",
           )
           .eq("candidate_id", data.id)
-          .order("is_primary", { ascending: false })
+          .eq("is_primary", true)
           .order("created_at", { ascending: false })
-          .limit(50),
+          .limit(1),
         supabase
           .from("resume_versions")
           .select(
@@ -858,6 +858,31 @@ export const attachCandidateResume = createServerFn({ method: "POST" })
     });
 
     return { id: attached.resume_id };
+  });
+
+export const deleteCandidateResume = createServerFn({ method: "POST" })
+  .middleware([requireCandidatesAccess])
+  .validator((input: unknown) => z.object({
+    candidate_id: z.string().uuid(),
+    resume_id: z.string().uuid(),
+  }).strict().parse(input))
+  .handler(async ({ data, context }) => {
+    const { deleteOriginalResume } = await import("@/lib/delete-original-resume.server");
+    const result = await deleteOriginalResume(context.supabase, data, async (path) => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.storage.from("resumes").remove([path]);
+      if (error) throw error;
+    });
+    const { writeAudit } = await import("@/lib/audit.server");
+    await writeAudit({
+      actorId: context.userId,
+      actorEmail: (context.claims.email as string | undefined) ?? null,
+      action: "candidate.resume_deleted",
+      entityType: "candidate",
+      entityId: data.candidate_id,
+      metadata: { resumeId: data.resume_id, cleanupPending: result.cleanupPending },
+    });
+    return result;
   });
 
 const CandidateResumePreviewSchema = CandidateAiOutputSchema.pick({

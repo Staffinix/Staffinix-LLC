@@ -1,3 +1,4 @@
+import { DeleteResumeButton } from "@/components/candidates/delete-resume-button";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -228,13 +229,15 @@ function BenchConsultantPage() {
               </Card>
             )}
             {cand.resumes.map((r) => (
-              <ResumeRow
-                key={r.id}
-                title={r.file_name}
-                subtitle={`${r.mime_type ?? "—"}${r.size_bytes ? ` · ${(r.size_bytes / 1024).toFixed(0)} KB` : ""}${r.is_primary ? " · Primary" : ""}`}
-                path={r.file_path}
-                createdAt={r.created_at}
-              />
+              <div key={r.id} className="space-y-2">
+                <ResumeRow
+                  title={r.file_name}
+                  subtitle={`${r.mime_type ?? "—"}${r.size_bytes ? ` · ${(r.size_bytes / 1024).toFixed(0)} KB` : ""}${r.is_primary ? " · Primary" : ""}`}
+                  path={r.file_path}
+                  createdAt={r.created_at}
+                />
+                <DeleteResumeButton candidateId={cand.id} resumeId={r.id} fileName={r.file_name} />
+              </div>
             ))}
             {cand.versions.length > 0 && (
               <div>

@@ -1,3 +1,4 @@
+import { DeleteResumeButton } from "@/components/candidates/delete-resume-button";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -370,7 +371,7 @@ function CandidateDetailPage() {
 
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-sm">Resume files</CardTitle>
+              <CardTitle className="text-sm">Original resume</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {candidate.resumes.map((resume) => (
@@ -379,7 +380,12 @@ function CandidateDetailPage() {
                   className="flex items-center gap-2 rounded-md border border-border p-3 text-xs"
                 >
                   <FileText className="h-4 w-4 text-primary" />
-                  <span>{resume.file_name}</span>
+                  <span className="min-w-0 flex-1 break-words">{resume.file_name}</span>
+                  <DeleteResumeButton
+                    candidateId={id}
+                    resumeId={resume.id}
+                    fileName={resume.file_name}
+                  />
                 </div>
               ))}
               {candidate.resumes.length === 0 && <EmptyText>No resume uploaded.</EmptyText>}

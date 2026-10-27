@@ -62,7 +62,7 @@ export function TailoringUpload({ candidateId }: { candidateId: string }) {
   return (
     <div className="space-y-2 rounded-lg border p-4">
       <label className="text-sm font-medium" htmlFor="tailoring-resume">
-        Upload another original resume
+        Upload or replace original resume
       </label>
       <Input
         id="tailoring-resume"
@@ -77,7 +77,7 @@ export function TailoringUpload({ candidateId }: { candidateId: string }) {
       />
       <p className="text-xs text-muted-foreground" role="status">
         {stage ||
-          "PDF or DOCX, up to 10 MiB. Originals are retained; new uploads require verification."}
+          "PDF or DOCX, up to 10 MiB. One current original per candidate. Replacements require verification; prior sources remain in tailored history."}
       </p>
     </div>
   );
