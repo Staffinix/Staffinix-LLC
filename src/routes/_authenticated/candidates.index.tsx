@@ -60,6 +60,7 @@ import {
   Send,
   ChevronDown,
   UsersRound,
+  MoreHorizontal,
 } from "lucide-react";
 import { listCandidates } from "@/lib/candidates.functions";
 import {
@@ -482,8 +483,8 @@ function BenchCandidatesPage() {
 
         {/* Filters Strip */}
         <Card className="border-border bg-card">
-          <CardContent className="grid gap-3 p-4 md:grid-cols-4 xl:grid-cols-9">
-            <div className="md:col-span-2 xl:col-span-1">
+          <CardContent className="flex flex-wrap items-center gap-3 p-4">
+            <div className="min-w-0 flex-1 basis-64">
               <SearchInput
                 placeholder="Search candidate name, email, skills…"
                 className="text-xs"
@@ -498,155 +499,172 @@ function BenchCandidatesPage() {
                 }}
               />
             </div>
-            <Select
-              value={experience}
-              onValueChange={(v) => {
-                setExperience(v);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="text-xs">
-                <SelectValue placeholder="Any experience" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any experience</SelectItem>
-                <SelectItem value="0-3">0–3 Years (Junior)</SelectItem>
-                <SelectItem value="4-7">4–7 Years (Mid Level)</SelectItem>
-                <SelectItem value="8-10">8–10 Years (Senior)</SelectItem>
-                <SelectItem value="10+">10+ Years (Lead / Architect)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={availability}
-              onValueChange={(v) => {
-                setAvailability(v);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="text-xs">
-                <SelectValue placeholder="Availability" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any availability</SelectItem>
-                {AVAILABILITIES.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {AVAILABILITY_LABEL[a]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={visa}
-              onValueChange={(v) => {
-                setVisa(v);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="text-xs">
-                <SelectValue placeholder="Visa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any visa</SelectItem>
-                {VISA_OPTIONS.map((v) => (
-                  <SelectItem key={v} value={v}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={status}
-              onValueChange={(value) => {
-                setStatus(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="text-xs">
-                <SelectValue placeholder="Candidate status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any status</SelectItem>
-                {Object.entries(CANDIDATE_STATUS_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isL2 && (
-              <div
-                className="grid h-10 grid-cols-2 rounded-xl border border-input bg-background/55 p-1"
-                role="group"
-                aria-label="Assignment status filter"
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" className="gap-2">
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                  Filters
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-[calc(100vw-2rem)] max-w-xl max-h-[75vh] overflow-y-auto p-4"
+                aria-label="Candidate filters"
               >
-                {(["assigned", "unassigned"] as const).map((value) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    size="sm"
-                    variant={assignmentState === value ? "secondary" : "ghost"}
-                    className="h-8 px-2 text-xs capitalize"
-                    aria-pressed={assignmentState === value}
-                    onClick={() => {
-                      const nextValue = assignmentState === value ? "" : value;
-                      setAssignmentState(nextValue);
-                      if (nextValue === "unassigned") setAssignedRecruiterIds([]);
+                <h3 className="mb-3 text-sm font-semibold">Filters and sorting</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Select
+                    value={experience}
+                    onValueChange={(v) => {
+                      setExperience(v);
                       setPage(1);
                     }}
                   >
-                    {value}
-                  </Button>
-                ))}
-              </div>
-            )}
-            {isL2 && (
-              <L4RecruiterFilter
-                recruiters={recruiters.data ?? []}
-                selectedIds={assignedRecruiterIds}
-                loading={recruiters.isLoading}
-                onChange={(ids) => {
-                  setAssignedRecruiterIds(ids);
-                  if (ids.length > 0) setAssignmentState("assigned");
-                  setPage(1);
-                }}
-              />
-            )}
-            {isL2 && (
-              <Select
-                value={submissionState}
-                onValueChange={(value) => {
-                  setSubmissionState(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue placeholder="Submission state" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any submission state</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="unsubmitted">Assigned / unsubmitted</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {isL2 && (
-              <Select
-                value={submissionSort}
-                onValueChange={(value) => {
-                  setSubmissionSort(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue placeholder="Submission date" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Newest candidates</SelectItem>
-                  <SelectItem value="desc">Latest submissions</SelectItem>
-                  <SelectItem value="asc">Oldest submissions</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+                    <SelectTrigger className="text-xs" aria-label="Experience">
+                      <SelectValue placeholder="Any experience" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any experience</SelectItem>
+                      <SelectItem value="0-3">0–3 Years (Junior)</SelectItem>
+                      <SelectItem value="4-7">4–7 Years (Mid Level)</SelectItem>
+                      <SelectItem value="8-10">8–10 Years (Senior)</SelectItem>
+                      <SelectItem value="10+">10+ Years (Lead / Architect)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={availability}
+                    onValueChange={(v) => {
+                      setAvailability(v);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="text-xs" aria-label="Availability">
+                      <SelectValue placeholder="Availability" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any availability</SelectItem>
+                      {AVAILABILITIES.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {AVAILABILITY_LABEL[a]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={visa}
+                    onValueChange={(v) => {
+                      setVisa(v);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="text-xs" aria-label="Visa">
+                      <SelectValue placeholder="Visa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any visa</SelectItem>
+                      {VISA_OPTIONS.map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={status}
+                    onValueChange={(value) => {
+                      setStatus(value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="text-xs" aria-label="Candidate status">
+                      <SelectValue placeholder="Candidate status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any status</SelectItem>
+                      {Object.entries(CANDIDATE_STATUS_LABEL).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isL2 && (
+                    <div
+                      className="grid h-10 grid-cols-2 rounded-xl border border-input bg-background/55 p-1"
+                      role="group"
+                      aria-label="Assignment status filter"
+                    >
+                      {(["assigned", "unassigned"] as const).map((value) => (
+                        <Button
+                          key={value}
+                          type="button"
+                          size="sm"
+                          variant={assignmentState === value ? "secondary" : "ghost"}
+                          className="h-8 px-2 text-xs capitalize"
+                          aria-pressed={assignmentState === value}
+                          onClick={() => {
+                            const nextValue = assignmentState === value ? "" : value;
+                            setAssignmentState(nextValue);
+                            if (nextValue === "unassigned") setAssignedRecruiterIds([]);
+                            setPage(1);
+                          }}
+                        >
+                          {value}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  {isL2 && (
+                    <L4RecruiterFilter
+                      recruiters={recruiters.data ?? []}
+                      selectedIds={assignedRecruiterIds}
+                      loading={recruiters.isLoading}
+                      onChange={(ids) => {
+                        setAssignedRecruiterIds(ids);
+                        if (ids.length > 0) setAssignmentState("assigned");
+                        setPage(1);
+                      }}
+                    />
+                  )}
+                  {isL2 && (
+                    <Select
+                      value={submissionState}
+                      onValueChange={(value) => {
+                        setSubmissionState(value);
+                        setPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="text-xs" aria-label="Submission state">
+                        <SelectValue placeholder="Submission state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Any submission state</SelectItem>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="unsubmitted">Assigned / unsubmitted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {isL2 && (
+                    <Select
+                      value={submissionSort}
+                      onValueChange={(value) => {
+                        setSubmissionSort(value);
+                        setPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="text-xs" aria-label="Sort candidates">
+                        <SelectValue placeholder="Submission date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Newest candidates</SelectItem>
+                        <SelectItem value="desc">Latest submissions</SelectItem>
+                        <SelectItem value="asc">Oldest submissions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </CardContent>
         </Card>
 
