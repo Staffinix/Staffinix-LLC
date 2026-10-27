@@ -205,6 +205,7 @@ function BenchCandidatesPage() {
   const [assignedRecruiterIds, setAssignedRecruiterIds] = useState<string[]>([]);
   const [submissionState, setSubmissionState] = useState("all");
   const [submissionSort, setSubmissionSort] = useState("default");
+  const [resumeState, setResumeState] = useState<"all" | "with" | "without">("all");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [assignmentOpen, setAssignmentOpen] = useState(false);
@@ -226,6 +227,7 @@ function BenchCandidatesPage() {
 
     return {
       search: debouncedSearch || undefined,
+      resume_state: resumeState === "all" ? undefined : resumeState,
       min_experience: minimumExperience,
       max_experience: maximumExperience,
       availability:
@@ -249,6 +251,7 @@ function BenchCandidatesPage() {
     };
   }, [
     debouncedSearch,
+    resumeState,
     experience,
     availability,
     visa,
@@ -513,6 +516,23 @@ function BenchCandidatesPage() {
               >
                 <h3 className="mb-3 text-sm font-semibold">Filters and sorting</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
+                  <Select
+                    value={resumeState}
+                    onValueChange={(value: "all" | "with" | "without") => {
+                      setResumeState(value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="text-xs" aria-label="Resume availability">
+                      <SelectValue placeholder="Any resume status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any resume status</SelectItem>
+                      <SelectItem value="with">With resume</SelectItem>
+                      <SelectItem value="without">Without resume</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Select
                     value={experience}
                     onValueChange={(v) => {

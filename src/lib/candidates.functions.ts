@@ -252,6 +252,7 @@ const ListInputSchema = z.object({
   assigned_to_any: z.array(z.string().uuid()).max(100).optional(),
   submission_state: z.enum(["submitted", "unsubmitted"]).optional(),
   submission_sort: z.enum(["asc", "desc"]).optional(),
+  resume_state: z.enum(["with", "without"]).optional(),
   min_experience: z.number().min(0).max(60).optional(),
   max_experience: z.number().min(0).max(60).optional(),
   page: z.number().int().min(1).default(1),
@@ -269,7 +270,10 @@ export const listCandidates = createServerFn({ method: "POST" })
       ? ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills!inner(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const)
       : ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const);
 
-    let q = supabase.from("candidates").select(candidateSelect, { count: "exact" });
+    let q = supabase.from("candidates").select(candidateSelect, { count: "exact" })
+      .eq("resumes.is_primary", true);
+    if (data.resume_state === "with") q = q.not("resumes", "is", null);
+    if (data.resume_state === "without") q = q.is("resumes", null);
     q = data.submission_sort
       ? q.order("last_submitted_at", {
           ascending: data.submission_sort === "asc",
