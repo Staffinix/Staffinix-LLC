@@ -1,3 +1,4 @@
+import { DeleteCandidateButton } from "@/components/candidates/delete-candidate-button";
 import { DeleteResumeButton } from "@/components/candidates/delete-resume-button";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -149,6 +150,10 @@ function CandidateDetailPage() {
           }
           actions={
             <div className="flex flex-wrap gap-2">
+              <DeleteCandidateButton
+                candidateId={id}
+                name={`${candidate.first_name} ${candidate.last_name}`}
+              />
               {isL4 && (
                 <Button asChild size="sm" variant="outline">
                   <Link to="/tailoring" search={{ candidateId: id }}>

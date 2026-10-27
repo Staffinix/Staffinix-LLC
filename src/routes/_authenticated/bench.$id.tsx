@@ -1,3 +1,4 @@
+import { DeleteCandidateButton } from "@/components/candidates/delete-candidate-button";
 import { DeleteResumeButton } from "@/components/candidates/delete-resume-button";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -113,6 +114,10 @@ function BenchConsultantPage() {
           }
           actions={
             <div className="flex items-center gap-2">
+              <DeleteCandidateButton
+                candidateId={id}
+                name={`${cand.first_name} ${cand.last_name}`}
+              />
               {availKey && (
                 <Badge
                   className={cn(

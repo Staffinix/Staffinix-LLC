@@ -25,7 +25,7 @@
     "test:candidate-form": "node --test --experimental-strip-types src/lib/candidate-form.test.ts src/lib/candidate-submission-attribution.test.ts",
     "test:app-shell": "node --test --experimental-strip-types src/components/app-shell/scroll-layout.test.ts src/components/app-shell/nav-visibility.test.ts",
     "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts",
-    "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts src/lib/delete-original-resume.server.test.ts",
+    "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts src/lib/delete-original-resume.server.test.ts src/lib/candidate-resume-cleanup.server.test.ts",
     "document-worker": "node workers/document-processor/server.mjs",
     "test:document-worker": "node --test --experimental-strip-types workers/document-processor/document-job.test.mjs src/lib/document-processing.server.test.ts",
     "test:ai-gateway": "node --test --experimental-strip-types src/lib/ai-gateway.server.test.ts",

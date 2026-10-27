@@ -619,7 +619,7 @@ export const deleteCandidate = createServerFn({ method: "POST" })
       .from("candidates")
       .delete()
       .eq("id", data.id)
-      .select("id")
+      .select("id, tenant_id")
       .maybeSingle();
 
     if (error) {
@@ -630,6 +630,9 @@ export const deleteCandidate = createServerFn({ method: "POST" })
       throw new Error("Candidate not found or access denied");
     }
 
+    const { cleanupCandidateResumeFiles } = await import("@/lib/candidate-resume-cleanup.server");
+    const cleanupPending = await cleanupCandidateResumeFiles(deleted);
+
     const { writeAudit } = await import("@/lib/audit.server");
 
     await writeAudit({
@@ -638,9 +641,10 @@ export const deleteCandidate = createServerFn({ method: "POST" })
       action: "candidate.deleted",
       entityType: "candidate",
       entityId: data.id,
+      metadata: { cleanupPending },
     });
 
-    return { ok: true };
+    return { ok: true, cleanupPending };
   });
 
 // ============ Resume parse + upload ============
