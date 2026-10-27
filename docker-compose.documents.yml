@@ -9,7 +9,7 @@ services:
       - document-processor
     networks:
       - processing
-      - signature-updates
+      - gateway-egress
     read_only: true
     tmpfs:
       - /tmp:size=16m,noexec,nosuid
@@ -26,12 +26,7 @@ services:
       dockerfile: workers/document-processor/Dockerfile
     environment:
       DOCUMENT_PROCESSOR_TOKEN: ${DOCUMENT_PROCESSOR_TOKEN:?Run the local document setup first}
-      CLAMAV_HOST: document-scanner
-      CLAMAV_PORT: "3310"
       PORT: "8788"
-    depends_on:
-      document-scanner:
-        condition: service_healthy
     networks:
       - processing
     read_only: true
@@ -46,22 +41,7 @@ services:
     init: true
     restart: "no"
 
-  document-scanner:
-    image: clamav/clamav@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
-    networks:
-      - processing
-      - signature-updates
-    volumes:
-      - document-signatures:/var/lib/clamav
-    mem_limit: 4g
-    cpus: 1
-    pids_limit: 128
-    restart: "no"
-
 networks:
   processing:
     internal: true
-  signature-updates: {}
-
-volumes:
-  document-signatures:
+  gateway-egress: {}

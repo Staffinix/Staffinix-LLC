@@ -6,7 +6,7 @@ import {
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
-import { processDocumentInIsolatedWorker } from "@/lib/document-processing.server";
+import { processDocumentForExtraction } from "@/lib/document-processing.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "./us-requisition";
 
@@ -548,9 +548,9 @@ export const parseJobDescription = createServerFn({ method: "POST" })
         throw new Error("Uploaded document size mismatch");
       }
 
-      let processed: Awaited<ReturnType<typeof processDocumentInIsolatedWorker>>;
+      let processed: Awaited<ReturnType<typeof processDocumentForExtraction>>;
       try {
-        processed = await processDocumentInIsolatedWorker({
+        processed = await processDocumentForExtraction({
           bytes,
           mimeType: authorized.mime_type,
         });

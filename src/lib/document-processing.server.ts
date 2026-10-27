@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validatePdf } from "../../workers/document-processor/pdf-validation.mjs";
 import { getServerServiceUrl } from "./server-service-url.ts";
 
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -8,7 +9,7 @@ export const DOCUMENT_PROCESSING_TIMEOUT_MS = 15_000;
 const WorkerResultSchema = z
   .object({
     version: z.literal(1),
-    clean: z.literal(true),
+    validated: z.literal(true),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     mime_type: z.enum([
       "application/pdf",
@@ -51,12 +52,25 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   );
 }
 
-export async function processDocumentInIsolatedWorker(input: {
+export async function processDocumentForExtraction(input: {
   bytes: Uint8Array;
   mimeType: string;
 }): Promise<ProcessedDocument> {
   if (input.bytes.byteLength < 1 || input.bytes.byteLength > MAX_DOCUMENT_BYTES) {
     throw new Error("Document is outside the permitted file-size range");
+  }
+
+  // PDF bytes go directly to the AI provider after local structural validation.
+  if (input.mimeType === "application/pdf") {
+    validatePdf(input.bytes);
+    return {
+      version: 1,
+      validated: true,
+      sha256: await sha256Hex(input.bytes),
+      mime_type: "application/pdf",
+      size_bytes: input.bytes.byteLength,
+      extracted_text: null,
+    };
   }
 
   const configuredWorkerUrl = process.env.DOCUMENT_PROCESSOR_URL?.trim();

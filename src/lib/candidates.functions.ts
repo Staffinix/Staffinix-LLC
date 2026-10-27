@@ -10,7 +10,7 @@ import {
 } from "@/lib/ai-gateway.server";
 import { providedCandidateChildKeys } from "@/lib/candidate-child-updates";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
-import { processDocumentInIsolatedWorker } from "@/lib/document-processing.server";
+import { processDocumentForExtraction } from "@/lib/document-processing.server";
 import { isCanonicalResumePathFor } from "@/lib/resume-storage-path";
 import { MARKETING_TYPES } from "@/lib/candidates-constants";
 import { normalizeUsPhone, US_PHONE_ERROR } from "@/lib/us-phone";
@@ -765,7 +765,7 @@ async function readAndValidateResumeUpload(supabase: CandidateSupabase, uploadId
   }
 
   try {
-    const processedDocument = await processDocumentInIsolatedWorker({
+    const processedDocument = await processDocumentForExtraction({
       bytes,
       mimeType: authorized.mime_type,
     });
@@ -1013,9 +1013,9 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
         throw new Error("Uploaded file content does not match its declared resume type");
       }
 
-      let processedDocument: Awaited<ReturnType<typeof processDocumentInIsolatedWorker>>;
+      let processedDocument: Awaited<ReturnType<typeof processDocumentForExtraction>>;
       try {
-        processedDocument = await processDocumentInIsolatedWorker({
+        processedDocument = await processDocumentForExtraction({
           bytes,
           mimeType: authorized.mime_type,
         });

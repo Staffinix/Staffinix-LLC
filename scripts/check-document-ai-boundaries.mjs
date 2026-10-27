@@ -67,7 +67,7 @@ for (const [name, source] of [
   ["candidate parser", candidates],
   ["requirement parser", requirements],
 ]) {
-  assert.match(source, /processDocumentInIsolatedWorker/, `${name} bypasses isolated processing`);
+  assert.match(source, /processDocumentForExtraction/, `${name} bypasses document validation`);
   assert.match(
     source,
     /UNTRUSTED_DOCUMENT_SYSTEM_RULES/,
@@ -122,7 +122,7 @@ assert.equal(
   false,
   "Mammoth external-file access must remain disabled",
 );
-assert.match(worker, /CLAMAV_HOST/, "document worker does not require malware scanning");
+assert.doesNotMatch(worker, /CLAMAV_HOST|scanWithClamAv/, "document worker must not require a malware service");
 assert.match(worker, /resourceLimits/, "document worker lacks a memory limit");
 assert.match(worker, /worker\.terminate/, "document worker lacks a hard job termination path");
 assert.match(worker, /MAX_BODY_BYTES/, "document worker lacks a hard body limit");

@@ -120,7 +120,7 @@ async function createDocx(text) {
 test("accepts a small inert PDF with valid magic bytes and trailer", async () => {
   const bytes = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF", "latin1");
   const result = await runJob(bytes);
-  assert.equal(result.clean, true);
+  assert.equal(result.validated, true);
   assert.equal(result.mime_type, PDF_MIME);
   assert.equal(result.size_bytes, bytes.length);
   assert.match(result.sha256, /^[0-9a-f]{64}$/);
@@ -148,7 +148,7 @@ test("rejects a DOCX-shaped payload without a valid central directory", async ()
 test("extracts DOCX content as plain text only", async () => {
   const bytes = await createDocx("Candidate supplied <script>alert(1)</script> as literal text");
   const result = await runJob(bytes, DOCX_MIME);
-  assert.equal(result.clean, true);
+  assert.equal(result.validated, true);
   assert.equal(result.mime_type, DOCX_MIME);
   assert.equal(
     result.extracted_text,

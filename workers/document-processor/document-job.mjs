@@ -1,3 +1,4 @@
+import { validatePdf } from "./pdf-validation.mjs";
 import { parentPort, workerData } from "node:worker_threads";
 import { createHash } from "node:crypto";
 
@@ -14,31 +15,6 @@ const UNSAFE_PLAIN_TEXT_CONTROLS =
 
 function reject(message) {
   throw new Error(message);
-}
-
-function validatePdf(bytes) {
-  const header = Buffer.from(bytes.subarray(0, Math.min(bytes.length, 1024))).toString("latin1");
-  const trailer = Buffer.from(bytes.subarray(Math.max(0, bytes.length - 4096))).toString("latin1");
-  if (!header.startsWith("%PDF-")) reject("PDF signature is missing");
-  if (!trailer.includes("%%EOF")) reject("PDF end marker is missing");
-
-  const source = Buffer.from(bytes).toString("latin1");
-  const blocked = [
-    /\/JavaScript\b/i,
-    /\/JS\b/i,
-    /\/Launch\b/i,
-    /\/EmbeddedFile\b/i,
-    /\/OpenAction\b/i,
-    /\/RichMedia\b/i,
-    /\/XFA\b/i,
-    /\/Encrypt\b/i,
-  ];
-  if (blocked.some((pattern) => pattern.test(source)))
-    reject("PDF contains active or encrypted content");
-  if ((source.match(/\b\d+\s+\d+\s+obj\b/g) ?? []).length > 10_000)
-    reject("PDF object limit exceeded");
-  if ((source.match(/\bstream[\r\n]/g) ?? []).length > 2_000) reject("PDF stream limit exceeded");
-  return null;
 }
 
 function readDocxDirectory(bytes) {
@@ -152,7 +128,7 @@ async function main() {
 
   parentPort.postMessage({
     version: 1,
-    clean: true,
+    validated: true,
     sha256: createHash("sha256").update(bytes).digest("hex"),
     mime_type: mimeType,
     size_bytes: bytes.length,

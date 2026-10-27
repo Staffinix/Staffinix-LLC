@@ -1,15 +1,11 @@
 import { createServer } from "node:http";
-import { connect } from "node:net";
 import { timingSafeEqual } from "node:crypto";
 import { Worker } from "node:worker_threads";
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const JOB_TIMEOUT_MS = 8_000;
-const SCAN_TIMEOUT_MS = 8_000;
 const PORT = Number(process.env.PORT ?? 8788);
 const TOKEN = process.env.DOCUMENT_PROCESSOR_TOKEN ?? "";
-const CLAMAV_HOST = process.env.CLAMAV_HOST ?? "";
-const CLAMAV_PORT = Number(process.env.CLAMAV_PORT ?? 3310);
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -17,7 +13,6 @@ const ALLOWED_TYPES = new Set([
 
 if (TOKEN.length < 32)
   throw new Error("DOCUMENT_PROCESSOR_TOKEN must contain at least 32 characters");
-if (!CLAMAV_HOST) throw new Error("CLAMAV_HOST is required; malware scanning fails closed");
 
 function authorized(header) {
   if (!header?.startsWith("Bearer ")) return false;
@@ -54,43 +49,6 @@ async function readLimitedBody(request) {
   }
   if (total !== declared) throw new Error("Content length mismatch");
   return Buffer.concat(chunks, total);
-}
-
-function scanWithClamAv(bytes) {
-  return new Promise((resolve, reject) => {
-    const socket = connect({ host: CLAMAV_HOST, port: CLAMAV_PORT });
-    const timer = setTimeout(
-      () => socket.destroy(new Error("Malware scan timed out")),
-      SCAN_TIMEOUT_MS,
-    );
-    let reply = "";
-    socket.setNoDelay(true);
-    socket.on("connect", () => {
-      socket.write("zINSTREAM\0");
-      for (let offset = 0; offset < bytes.length; offset += 64 * 1024) {
-        const chunk = bytes.subarray(offset, Math.min(bytes.length, offset + 64 * 1024));
-        const length = Buffer.allocUnsafe(4);
-        length.writeUInt32BE(chunk.length);
-        socket.write(length);
-        socket.write(chunk);
-      }
-      socket.end(Buffer.alloc(4));
-    });
-    socket.on("data", (chunk) => {
-      reply += chunk.toString("utf8");
-      if (reply.length > 4096) socket.destroy(new Error("Invalid malware scanner response"));
-    });
-    socket.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    socket.on("close", () => {
-      clearTimeout(timer);
-      if (reply.includes(" FOUND")) reject(new Error("Malware detected"));
-      else if (reply.includes(" OK")) resolve();
-      else reject(new Error("Malware scanner did not return a clean result"));
-    });
-  });
 }
 
 function processInConstrainedWorker(bytes, mimeType) {
@@ -136,7 +94,6 @@ createServer(async (request, response) => {
 
   try {
     const bytes = await readLimitedBody(request);
-    await scanWithClamAv(bytes);
     const result = await processInConstrainedWorker(bytes, mimeType);
     return json(response, 200, result);
   } catch {

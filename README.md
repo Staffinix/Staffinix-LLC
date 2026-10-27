@@ -17,7 +17,8 @@ Browser
       -> Supabase Auth + tenant-scoped Postgres/RLS
       -> server-only AI gateway
       -> tenant-filtered Qdrant RAG -> local Ollama embeddings + grounded answers
-      -> private document-processing worker -> ClamAV
+      -> local PDF validation -> AI form extraction
+      -> private DOCX text-extraction worker
 
 Scheduled Nitro task
   -> candidate embedding refresh -> Supabase/Postgres
@@ -51,7 +52,7 @@ src/
   lib/                        authenticated server functions and domain services
   routes/                     TanStack Router route modules
 tasks/                        scheduled server tasks
-workers/document-processor/   isolated untrusted-document parser and malware scan boundary
+workers/document-processor/   isolated DOCX parser and shared PDF format checks
 supabase/migrations/          versioned database, RLS, storage, and RPC changes
 supabase/tests/               adversarial database and query-plan tests
 scripts/                      release-time architecture and security guards
@@ -104,7 +105,7 @@ For the web application:
 | `AUTH_EMAIL_ALLOWLIST`            | Server        | Optional comma-separated exact email exceptions    |
 | `OPENROUTER_API_KEY`              | Server        | Preferred AI gateway credential                    |
 | `LOVABLE_API_KEY`                 | Server        | Optional legacy AI gateway credential              |
-| `DOCUMENT_PROCESSOR_URL`          | Server        | Private URL for the document worker                |
+| `DOCUMENT_PROCESSOR_URL`          | Server        | Private URL for the optional DOCX worker                |
 | `DOCUMENT_PROCESSOR_TOKEN`        | Server/worker | Shared secret of at least 32 random characters     |
 | `QDRANT_URL`                      | Server        | Qdrant REST URL; local default only in development |
 | `QDRANT_API_KEY`                  | Server        | Optional key for a remote Qdrant deployment        |
@@ -117,8 +118,8 @@ Copy `.env.example` to a local ignored environment file and replace placeholders
 secret manager. Production Qdrant, Ollama, and document-worker endpoints must use HTTPS; local
 development may use loopback HTTP. Never place a secret/service-role key in a `VITE_` variable.
 
-The document worker also requires `CLAMAV_HOST`; `CLAMAV_PORT` defaults to `3310` and `PORT`
-defaults to `8788`. See [workers/document-processor/README.md](workers/document-processor/README.md)
+PDF auto-fill requires no document worker or antivirus service. DOCX extraction uses the optional
+worker, whose `PORT` defaults to `8788`. See [workers/document-processor/README.md](workers/document-processor/README.md)
 for its isolation and resource-limit requirements.
 
 Before production launch, enable Supabase Auth leaked-password protection in the project dashboard.

@@ -27,7 +27,7 @@
     "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts",
     "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts",
     "document-worker": "node workers/document-processor/server.mjs",
-    "test:document-worker": "node --test workers/document-processor/document-job.test.mjs",
+    "test:document-worker": "node --test --experimental-strip-types workers/document-processor/document-job.test.mjs src/lib/document-processing.server.test.ts",
     "test:ai-gateway": "node --test --experimental-strip-types src/lib/ai-gateway.server.test.ts",
     "test:ai-usage": "node --test --experimental-strip-types src/lib/ai-usage.server.test.ts",
     "test:copilot": "node --test --experimental-strip-types src/lib/copilot-candidate-count.test.ts",
