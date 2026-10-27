@@ -310,12 +310,27 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (isSubmitting) return;
-    if (!first.trim() || !last.trim() || !currentJob.trim() || !requiredJob.trim()) {
-      toast.error("First name, last name, current job, and required job are required.");
+    const missingDetails = [
+      ["First name", first],
+      ["Last name", last],
+      ["Email address", email],
+      ["US phone number", phone],
+      ["Current job", currentJob],
+      ["Required job", requiredJob],
+      ["Years of experience", expYears],
+      ["Location", location],
+      ["Visa status", visa],
+    ]
+      .filter(([, value]) => !value.trim())
+      .map(([label]) => label);
+    if (missingDetails.length || !skills.length || !marketingTypes.length) {
+      if (!skills.length) missingDetails.push("Tech / skills");
+      if (!marketingTypes.length) missingDetails.push("Marketing type");
+      toast.error(`Complete all required fields: ${missingDetails.join(", ")}.`);
       return;
     }
     const normalizedPhone = validatePhone();
-    if (phone.trim() && !normalizedPhone) {
+    if (!normalizedPhone) {
       formRef.current?.querySelector<HTMLInputElement>('[name="phone"]')?.focus();
       return;
     }
@@ -432,6 +447,9 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
           className="space-y-5"
         >
           <fieldset disabled={isParsing || isSubmitting} className="space-y-5">
+            <p className="text-xs text-muted-foreground">
+              Candidate details marked * are required. Resume and history sections are optional.
+            </p>
             {mode === "create" && (
               <div className="rounded-md border border-dashed border-primary/40 p-4 space-y-3">
                 <Label htmlFor="resume-autofill">
@@ -474,11 +492,17 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
               <Field label="Last Name" required>
                 <Input value={last} onChange={(e) => setLast(e.target.value)} required />
               </Field>
-              <Field label="Email Address">
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </Field>
-              <Field label="US Phone Number" error={phoneError}>
+              <Field required label="Email Address">
                 <Input
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field required label="US Phone Number" error={phoneError}>
+                <Input
+                  required
                   name="phone"
                   type="tel"
                   inputMode="tel"
@@ -511,16 +535,18 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
                 />
               </Field>
             </div>
-            <Field label="Tech / Skills (comma-separated)">
+            <Field required label="Tech / Skills (comma-separated)">
               <Input
+                required
                 value={techSkills}
                 onChange={(e) => setTechSkills(e.target.value)}
                 placeholder="React, TypeScript, Node.js"
               />
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Years of Experience">
+              <Field required label="Years of Experience">
                 <Input
+                  required
                   type="number"
                   min="0"
                   max="60"
@@ -529,11 +555,11 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
                   onChange={(e) => setExpYears(e.target.value)}
                 />
               </Field>
-              <Field label="Location">
-                <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+              <Field required label="Location">
+                <Input required value={location} onChange={(e) => setLocation(e.target.value)} />
               </Field>
               <Field label="Ready to Relocate?" required>
-                <Select value={readyToRelocate} onValueChange={setReadyToRelocate}>
+                <Select required value={readyToRelocate} onValueChange={setReadyToRelocate}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -574,8 +600,8 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
               </Field>
             )}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Work Authorization / Visa Status" required={mode === "create"}>
-                <Select value={visa} onValueChange={setVisa}>
+              <Field label="Work Authorization / Visa Status" required>
+                <Select required value={visa} onValueChange={setVisa}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select visa status" />
                   </SelectTrigger>
@@ -589,13 +615,14 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
                 </Select>
                 {legacyVisa && !visa && (
                   <p className="text-xs text-muted-foreground">
-                    Legacy value “{initialData?.visa_status}” is preserved until you select a
-                    current visa option.
+                    Previous value: {initialData?.visa_status}. Select a current visa option before
+                    saving.
                   </p>
                 )}
               </Field>
               <Field label="Bench Availability" required>
                 <Select
+                  required
                   value={availability}
                   onValueChange={(value) => setAvailability(value as Availability)}
                 >
@@ -612,10 +639,8 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
               </Field>
             </div>
             <fieldset className="space-y-2 rounded-lg border border-border p-4">
-              <legend className="px-1 text-xs font-semibold">Marketing Type</legend>
-              <p className="text-xs text-muted-foreground">
-                Select all engagement types that apply.
-              </p>
+              <legend className="px-1 text-xs font-semibold">Marketing Type *</legend>
+              <p className="text-xs text-muted-foreground">Select at least one engagement type.</p>
               <div className="flex flex-wrap gap-4">
                 {MARKETING_TYPES.map((option) => (
                   <label key={option} className="flex cursor-pointer items-center gap-2 text-sm">
