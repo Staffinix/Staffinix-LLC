@@ -19,9 +19,8 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCandidate, listCandidates } from "@/lib/candidates.functions";
-import { getRequirement, listRequirements } from "@/lib/requirements.functions";
-import { Input } from "@/components/ui/input";
+import { getCandidate } from "@/lib/candidates.functions";
+import { getRequirement } from "@/lib/requirements.functions";
 import {
   TailoringAnalysis,
   TailoringUpload,
@@ -50,24 +49,6 @@ export const Route = createFileRoute("/_authenticated/tailoring")({
 function TailoringPage() {
   const { reqId, candidateId } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const [candidateSearch, setCandidateSearch] = useState("");
-  const [jobSearch, setJobSearch] = useState("");
-  const [candidatePage, setCandidatePage] = useState(1);
-  const [jobPage, setJobPage] = useState(1);
-  const listCandidatesFn = useServerFn(listCandidates);
-  const listRequirementsFn = useServerFn(listRequirements);
-  const candidates = useQuery({
-    queryKey: ["tailoring-candidates", candidateSearch, candidatePage],
-    queryFn: () =>
-      listCandidatesFn({ data: { search: candidateSearch, page: candidatePage, page_size: 10 } }),
-  });
-  const jobs = useQuery({
-    queryKey: ["tailoring-jobs", jobSearch, jobPage],
-    queryFn: () =>
-      listRequirementsFn({
-        data: { search: jobSearch, page: jobPage, page_size: 10, status: ["open"] },
-      }),
-  });
   return (
     <>
       <AppTopbar title="Resume Tailoring" />
@@ -80,7 +61,10 @@ function TailoringPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ search: {} })}>
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: "/matching", search: { candidateId } })}
+            >
               New tailoring
             </Button>
             <Button
@@ -93,150 +77,6 @@ function TailoringPage() {
               Tailoring history
             </Button>
           </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Candidate</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                aria-label="Search candidates"
-                placeholder="Search candidate name, email or role"
-                value={candidateSearch}
-                onChange={(event) => {
-                  setCandidateSearch(event.target.value);
-                  setCandidatePage(1);
-                }}
-              />
-              {candidates.isPending && <p role="status">Loading candidates…</p>}
-              {candidates.isError && (
-                <p role="alert">
-                  Candidates could not be loaded.{" "}
-                  <Button variant="link" onClick={() => candidates.refetch()}>
-                    Retry
-                  </Button>
-                </p>
-              )}
-              <div className="max-h-52 space-y-1 overflow-auto">
-                {candidates.data?.rows.map((candidate) => (
-                  <button
-                    type="button"
-                    key={candidate.id}
-                    aria-pressed={candidateId === candidate.id}
-                    className={`w-full rounded-lg border p-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-primary ${candidateId === candidate.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
-                    onClick={() => navigate({ search: { reqId, candidateId: candidate.id } })}
-                  >
-                    <span className="block font-medium">
-                      {candidate.first_name} {candidate.last_name}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {candidate.current_title || "Role not recorded"} ·{" "}
-                      {candidate.experience_years ?? "Unknown"} years ·{" "}
-                      {candidate.has_resume ? "Resume available" : "Resume needed"}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {candidate.top_skills.join(", ")}
-                    </span>
-                  </button>
-                ))}
-                {candidates.data?.rows.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No accessible candidates found.</p>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={candidatePage === 1 || candidates.isFetching}
-                  onClick={() => setCandidatePage(candidatePage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs">Page {candidatePage}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    !candidates.data ||
-                    candidatePage * 10 >= candidates.data.total ||
-                    candidates.isFetching
-                  }
-                  onClick={() => setCandidatePage(candidatePage + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Open requirements</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                aria-label="Search requirements"
-                placeholder="Search job title"
-                value={jobSearch}
-                onChange={(event) => {
-                  setJobSearch(event.target.value);
-                  setJobPage(1);
-                }}
-              />
-              {jobs.isPending && <p role="status">Loading requirements…</p>}
-              {jobs.isError && (
-                <p role="alert">
-                  Requirements could not be loaded.{" "}
-                  <Button variant="link" onClick={() => jobs.refetch()}>
-                    Retry
-                  </Button>
-                </p>
-              )}
-              <div className="max-h-52 space-y-1 overflow-auto">
-                {jobs.data?.rows.map((job) => (
-                  <button
-                    type="button"
-                    key={job.id}
-                    aria-pressed={reqId === job.id}
-                    className={`w-full rounded-lg border p-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-primary ${reqId === job.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
-                    onClick={() => navigate({ search: { candidateId, reqId: job.id } })}
-                  >
-                    <span className="block font-medium">{job.title}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {job.client_name || "Direct"} · {job.location || "Location not recorded"}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {job.primary_technology || "Technology not recorded"} · {job.id}
-                    </span>
-                  </button>
-                ))}
-                {jobs.data?.rows.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No accessible open requirements found.
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={jobPage === 1 || jobs.isFetching}
-                  onClick={() => setJobPage(jobPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs">Page {jobPage}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!jobs.data || jobPage * 10 >= jobs.data.total || jobs.isFetching}
-                  onClick={() => setJobPage(jobPage + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </section>
       <TailoringWorkspace key={`${candidateId ?? "none"}:${reqId ?? "none"}`} />
@@ -325,7 +165,7 @@ function TailoringWorkspace() {
     return (
       <TailoringState
         title="Select a candidate and requirements"
-        message="Select a candidate and open requirements above to begin. Only records available to your role are shown."
+        message="Open Matching to choose a candidate and requirement, then start resume tailoring."
       />
     );
   }
