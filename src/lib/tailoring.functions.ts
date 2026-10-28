@@ -262,6 +262,7 @@ ${JSON.stringify(compactFactsForSelection(source))}`;
   return requestStructuredAiOutput(
     {
       model: "google/gemini-3-flash-preview",
+      max_tokens: 4096,
       messages: [
         {
           role: "system",

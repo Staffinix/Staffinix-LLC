@@ -141,10 +141,8 @@ function TailoringWorkspace() {
       await queryClient.invalidateQueries({ queryKey: ["candidate", candidateId] });
       toast.success("Fact-validated draft saved");
     },
-    onError: () =>
-      toast.error(
-        "Generation failed. Confirm the source is verified and AI is configured, then retry.",
-      ),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Draft generation failed. Please retry."),
   });
 
   const approveMutation = useMutation({
