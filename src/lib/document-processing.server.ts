@@ -60,16 +60,28 @@ export async function processDocumentForExtraction(input: {
     throw new Error("Document is outside the permitted file-size range");
   }
 
-  // PDF bytes go directly to the AI provider after local structural validation.
+  // Keep source text for verification while still sending the original PDF to AI.
   if (input.mimeType === "application/pdf") {
     validatePdf(input.bytes);
+    const { getDocumentProxy, extractText } = await import("unpdf");
+    const pdf = await getDocumentProxy(Uint8Array.from(input.bytes));
+    let sourceText: string;
+    try {
+      if (pdf.numPages > 100) throw new Error("PDF exceeds the 100-page limit");
+      sourceText = (await extractText(pdf, { mergePages: true })).text.trim();
+      if (sourceText.length > MAX_DOCUMENT_TEXT_CHARS) {
+        throw new Error("PDF contains too much text; upload a shorter resume");
+      }
+    } finally {
+      await pdf.loadingTask.destroy();
+    }
     return {
       version: 1,
       validated: true,
       sha256: await sha256Hex(input.bytes),
       mime_type: "application/pdf",
       size_bytes: input.bytes.byteLength,
-      extracted_text: null,
+      extracted_text: sourceText || null,
     };
   }
 

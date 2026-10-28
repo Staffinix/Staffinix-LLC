@@ -123,9 +123,9 @@ function TailoringWorkspace() {
       await queryClient.invalidateQueries({ queryKey: ["candidate", candidateId] });
       toast.success("Source resume verified");
     },
-    onError: () =>
+    onError: (error) =>
       toast.error(
-        "Source verification failed. Check the current profile and source resume, then retry.",
+        error instanceof Error ? error.message : "Source verification failed. Please retry.",
       ),
   });
 

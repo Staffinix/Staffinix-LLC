@@ -1,3 +1,5 @@
+import { processDocumentForExtraction, MAX_DOCUMENT_BYTES } from "@/lib/document-processing.server";
+import { isCanonicalResumePathFor } from "@/lib/resume-storage-path";
 import { createHash } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -441,7 +443,9 @@ export const verifyCandidateResume = createServerFn({ method: "POST" })
         .order("issued_date", { ascending: false, nullsFirst: false }),
       supabase
         .from("resumes")
-        .select("id, file_name, extracted_text, verification_status")
+        .select(
+          "id, tenant_id, candidate_id, file_name, file_path, mime_type, extracted_text, verification_status",
+        )
         .eq("id", data.resume_id)
         .eq("candidate_id", data.candidate_id)
         .maybeSingle(),
@@ -460,7 +464,42 @@ export const verifyCandidateResume = createServerFn({ method: "POST" })
     const resume = resumeResult.data;
     if (!resume) throw new Error("Resume not found or access denied");
     if (!resume.extracted_text?.trim()) {
-      throw new Error("This resume has no extracted source text and cannot be verified");
+      if (
+        !isCanonicalResumePathFor({
+          path: resume.file_path,
+          tenantId: resume.tenant_id,
+          candidateId: resume.candidate_id,
+          mimeType: resume.mime_type,
+        })
+      ) {
+        throw new Error("Upload the original resume again before verifying it.");
+      }
+      const { data: file, error: downloadError } = await supabase.storage
+        .from("resumes")
+        .download(resume.file_path);
+      if (downloadError || !file)
+        throw new Error("Unable to read the original resume. Upload it again and retry.");
+      if (file.size > MAX_DOCUMENT_BYTES) throw new Error("Resume exceeds the 10 MiB file limit.");
+      const processed = await processDocumentForExtraction({
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        mimeType: resume.mime_type!,
+      });
+      if (!processed.extracted_text?.trim()) {
+        throw new Error(
+          "This PDF has no selectable text. Upload a text-based PDF or DOCX resume, then verify again.",
+        );
+      }
+      const { data: saved, error: saveError } = await supabase
+        .from("resumes")
+        .update({ extracted_text: processed.extracted_text })
+        .eq("id", resume.id)
+        .eq("candidate_id", data.candidate_id)
+        .eq("file_path", resume.file_path)
+        .select("id")
+        .maybeSingle();
+      if (saveError || !saved)
+        throw new Error("Unable to save source text. Check your permission to update this resume.");
+      resume.extracted_text = processed.extracted_text;
     }
 
     const resumeTextHash = createHash("sha256").update(resume.extracted_text, "utf8").digest("hex");
