@@ -62,6 +62,8 @@ function EditRequirementPage() {
     title: data.title,
     client_id: data.client_id,
     vendor_id: data.vendor_id,
+    vendor_email: data.vendor_email ?? "",
+    vendor_contact: data.vendor_contact ?? "",
     location: data.location ?? "",
     work_mode: (data.work_mode as WorkMode | null) ?? undefined,
     visa_types: data.visa_types ?? [],

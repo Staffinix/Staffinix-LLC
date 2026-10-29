@@ -1,6 +1,6 @@
 // Client-safe constants shared by requirement UI.
 
-export const REQ_STATUSES = ["open", "closed", "expired"] as const;
+export const REQ_STATUSES = ["open", "assigned", "closed", "expired"] as const;
 export type RequirementStatus = (typeof REQ_STATUSES)[number];
 
 export const REQ_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -27,6 +27,7 @@ export const VISA_OPTIONS = [
 
 export const STATUS_STYLES: Record<RequirementStatus, string> = {
   open: "bg-primary/15 text-primary border-primary/30",
+  assigned: "bg-primary/15 text-primary border-primary/30",
   closed: "bg-success/15 text-success border-success/30",
   expired: "bg-muted text-muted-foreground border-border",
 };
@@ -40,6 +41,7 @@ export const PRIORITY_STYLES: Record<RequirementPriority, string> = {
 
 export const STATUS_LABEL: Record<RequirementStatus, string> = {
   open: "Open",
+  assigned: "Assigned",
   closed: "Closed",
   expired: "Expired",
 };

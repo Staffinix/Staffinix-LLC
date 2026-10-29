@@ -23,11 +23,15 @@ INSERT INTO public.user_roles (user_id, role) VALUES
   ('4a000000-0000-0000-0000-000000000001', 'recruiter'),
   ('4b000000-0000-0000-0000-000000000002', 'recruiter');
 
+-- Contact integrity triggers require an actor during fixture setup too.
+SET LOCAL "request.jwt.claim.sub" = '4a000000-0000-0000-0000-000000000001';
 INSERT INTO public.candidates (
   id, tenant_id, created_by, first_name, last_name, phone, visa_status, marketing_types
 ) VALUES
   ('4c000000-0000-0000-0000-000000000001', '41000000-0000-0000-0000-000000000001', '4a000000-0000-0000-0000-000000000001', 'Form', 'Candidate', '(317) 555-0188', 'H1B', ARRAY['C2C', 'W2']),
-  ('4c000000-0000-0000-0000-000000000002', '41000000-0000-0000-0000-000000000001', '4a000000-0000-0000-0000-000000000001', 'Legacy', 'Candidate', NULL, 'C2C', ARRAY[]::text[]),
+  ('4c000000-0000-0000-0000-000000000002', '41000000-0000-0000-0000-000000000001', '4a000000-0000-0000-0000-000000000001', 'Legacy', 'Candidate', NULL, 'C2C', ARRAY[]::text[]);
+SET LOCAL "request.jwt.claim.sub" = '4b000000-0000-0000-0000-000000000002';
+INSERT INTO public.candidates (id, tenant_id, created_by, first_name, last_name, phone, visa_status, marketing_types) VALUES
   ('4c000000-0000-0000-0000-000000000003', '42000000-0000-0000-0000-000000000002', '4b000000-0000-0000-0000-000000000002', 'Other', 'Tenant', NULL, 'H1B', ARRAY[]::text[]);
 
 SELECT is(
@@ -41,6 +45,7 @@ SELECT is(
   'multiple marketing types are stored without flattening'
 );
 
+SET LOCAL "request.jwt.claim.sub" = '';
 UPDATE public.candidates SET assigned_to = created_by;
 
 SET LOCAL ROLE authenticated;

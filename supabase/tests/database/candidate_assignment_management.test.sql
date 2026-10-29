@@ -31,6 +31,8 @@ INSERT INTO public.user_roles (user_id, role) VALUES
   ('ca300000-0000-0000-0000-000000000003', 'recruiter'),
   ('cb200000-0000-0000-0000-000000000002', 'recruiter');
 
+-- Contact integrity triggers require an actor during fixture setup too.
+SET LOCAL "request.jwt.claim.sub" = 'ca100000-0000-0000-0000-000000000001';
 INSERT INTO public.candidates (
   id, first_name, last_name, tenant_id, created_by, status
 ) VALUES

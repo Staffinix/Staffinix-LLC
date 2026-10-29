@@ -9,7 +9,7 @@ export default tseslint.config(
   // `My-Version` is a legacy gitlink checkout, not part of this application's
   // source tree. Excluding it prevents tools from recursively linting another
   // repository with its own configuration and dependencies.
-  { ignores: ["dist", ".output", ".vinxi", "My-Version/**", "supabase/.temp/**"] },
+  { ignores: ["dist", ".output", ".vercel/**", ".vinxi", "My-Version/**", "supabase/.temp/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

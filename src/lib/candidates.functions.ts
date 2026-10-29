@@ -15,6 +15,11 @@ import { isCanonicalResumePathFor } from "@/lib/resume-storage-path";
 import { MARKETING_TYPES } from "@/lib/candidates-constants";
 import { normalizeUsPhone, US_PHONE_ERROR } from "@/lib/us-phone";
 import { z } from "zod";
+import {
+  finishResumeStorageBestEffort,
+  recordValidatedResumeUpload,
+} from "./resume-storage-jobs.server";
+import { validateRequiredCandidateDetails } from "./candidate-required-details";
 
 export { createDocumentUpload as createCandidateResumeUpload } from "@/lib/document-upload.functions";
 
@@ -235,6 +240,10 @@ export const CandidateInputSchema = CandidateInputObjectSchema.superRefine(
   validateCandidateCrossFields,
 );
 
+const CompleteCandidateInputSchema = CandidateInputSchema.superRefine((value, context) =>
+  validateRequiredCandidateDetails(value, context),
+);
+
 export type CandidateInput = z.infer<typeof CandidateInputSchema>;
 
 // ============ List / filter / paginate ============
@@ -270,7 +279,9 @@ export const listCandidates = createServerFn({ method: "POST" })
       ? ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills!inner(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const)
       : ("id,first_name,last_name,email,phone,location,current_employer,current_title,primary_technology,visa_status,marketing_types,availability,experience_years,min_rate,max_rate,rate_type,currency,status,created_at,updated_at,created_by,assigned_to,assigned_at,assigned_by,last_submitted_at,last_submitted_by,candidate_skills(skill,is_primary),resumes(candidate_id),submissions(candidate_id,stage,submitted_by,submitted_at,created_at,created_by)" as const);
 
-    let q = supabase.from("candidates").select(candidateSelect, { count: "exact" })
+    let q = supabase
+      .from("candidates")
+      .select(candidateSelect, { count: "exact" })
       .eq("resumes.is_primary", true);
     if (data.resume_state === "with") q = q.not("resumes", "is", null);
     if (data.resume_state === "without") q = q.is("resumes", null);
@@ -378,7 +389,11 @@ export const listCandidates = createServerFn({ method: "POST" })
 
 export const getCandidate = createServerFn({ method: "POST" })
   .middleware([requireCandidatesAccess])
-  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({ id: z.string().uuid(), view: z.enum(["full", "profile"]).default("full") })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: cand, error } = await supabase
@@ -423,23 +438,32 @@ export const getCandidate = createServerFn({ method: "POST" })
           )
           .eq("candidate_id", data.id)
           .order("issued_date", { ascending: false, nullsFirst: false }),
-        supabase
-          .from("resumes")
-          .select(
-            "id, candidate_id, file_name, file_path, mime_type, size_bytes, source, is_primary, created_at, extracted_text, verification_status, verified_by, verified_at, verified_facts_hash",
-          )
+        (data.view === "profile"
+          ? supabase
+              .from("resumes")
+              .select(
+                "id, candidate_id, file_name, file_path, mime_type, size_bytes, source, is_primary, created_at, verification_status, verified_by, verified_at, verified_facts_hash",
+              )
+          : supabase
+              .from("resumes")
+              .select(
+                "id, candidate_id, file_name, file_path, mime_type, size_bytes, source, is_primary, created_at, extracted_text, verification_status, verified_by, verified_at, verified_facts_hash",
+              )
+        )
           .eq("candidate_id", data.id)
           .eq("is_primary", true)
           .order("created_at", { ascending: false })
           .limit(1),
-        supabase
-          .from("resume_versions")
-          .select(
-            "id, candidate_id, requirement_id, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
-          )
-          .eq("candidate_id", data.id)
-          .order("created_at", { ascending: false })
-          .limit(100),
+        data.view === "profile"
+          ? Promise.resolve({ data: [], error: null })
+          : supabase
+              .from("resume_versions")
+              .select(
+                "id, candidate_id, requirement_id, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
+              )
+              .eq("candidate_id", data.id)
+              .order("created_at", { ascending: false })
+              .limit(100),
       ]);
 
     const childQueries = [
@@ -465,7 +489,13 @@ export const getCandidate = createServerFn({ method: "POST" })
       education: education.data ?? [],
       projects: projects.data ?? [],
       certifications: certifications.data ?? [],
-      resumes: resumes.data ?? [],
+      resumes: (resumes.data ?? []).map((resume) => ({
+        ...resume,
+        extracted_text:
+          "extracted_text" in resume && typeof resume.extracted_text === "string"
+            ? resume.extracted_text
+            : null,
+      })),
       versions: versions.data ?? [],
     };
   });
@@ -542,7 +572,7 @@ async function createCandidateGraphFromResumeUpload(
 
 export const createCandidate = createServerFn({ method: "POST" })
   .middleware([requireCandidatesAccess])
-  .validator((input: unknown) => CandidateInputSchema.parse(input))
+  .validator((input: unknown) => CompleteCandidateInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -562,7 +592,8 @@ export const createCandidate = createServerFn({ method: "POST" })
 const UpdateSchema = CandidateInputObjectSchema.omit({ status: true })
   .partial()
   .extend({ id: z.string().uuid() })
-  .superRefine(validateCandidateCrossFields);
+  .superRefine(validateCandidateCrossFields)
+  .superRefine((value, context) => validateRequiredCandidateDetails(value, context, true));
 
 export const updateCandidate = createServerFn({ method: "POST" })
   .middleware([requireCandidatesAccess])
@@ -723,7 +754,7 @@ const CandidateAiOutputSchema = CandidateInputObjectSchema.pick({
 
 const CreateCandidateWithResumeSchema = z
   .object({
-    candidate: CandidateInputSchema,
+    candidate: CompleteCandidateInputSchema,
     upload_id: z.string().uuid(),
   })
   .strict();
@@ -796,6 +827,7 @@ export const createCandidateWithResume = createServerFn({ method: "POST" })
 
     const { getUserRoles } = await import("@/lib/rbac.server");
     const assignedTo = (await getUserRoles(supabase, userId)).includes("recruiter") ? userId : null;
+    await recordValidatedResumeUpload(data.upload_id, blob);
     const created = await createCandidateGraphFromResumeUpload(
       supabase,
       data.candidate,
@@ -803,18 +835,8 @@ export const createCandidateWithResume = createServerFn({ method: "POST" })
       extractedText,
       assignedTo,
     );
-    const { error: storeError } = await supabase.storage
-      .from("resumes")
-      .upload(created.resume_path, blob, {
-        contentType: authorized.mime_type,
-        upsert: false,
-      });
-    if (storeError) {
-      throw new Error(`Candidate was created but resume storage failed: ${storeError.message}`);
-    }
-
-    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
-    return { id: created.candidate_id };
+    const resumePending = await finishResumeStorageBestEffort(data.upload_id);
+    return { id: created.candidate_id, resumePending };
   });
 
 export const attachCandidateResume = createServerFn({ method: "POST" })
@@ -827,6 +849,7 @@ export const attachCandidateResume = createServerFn({ method: "POST" })
       data.upload_id,
     );
 
+    await recordValidatedResumeUpload(data.upload_id, blob);
     const { data: attached, error: attachError } = await supabase
       .rpc("attach_candidate_resume_from_upload", {
         _candidate_id: data.candidate_id,
@@ -838,17 +861,7 @@ export const attachCandidateResume = createServerFn({ method: "POST" })
       throw new Error(`Failed to update resume: ${attachError?.message ?? "not found"}`);
     }
 
-    const { error: storeError } = await supabase.storage
-      .from("resumes")
-      .upload(attached.resume_path, blob, {
-        contentType: authorized.mime_type,
-        upsert: false,
-      });
-    if (storeError) {
-      throw new Error(`Resume record was updated but file storage failed: ${storeError.message}`);
-    }
-
-    await supabase.storage.from("resume-uploads").remove([authorized.staging_path]);
+    const resumePending = await finishResumeStorageBestEffort(data.upload_id);
 
     const { writeAudit } = await import("@/lib/audit.server");
     await writeAudit({
@@ -865,15 +878,20 @@ export const attachCandidateResume = createServerFn({ method: "POST" })
       await refreshCandidateEmbedding(supabase, data.candidate_id);
     });
 
-    return { id: attached.resume_id };
+    return { id: attached.resume_id, resumePending };
   });
 
 export const deleteCandidateResume = createServerFn({ method: "POST" })
   .middleware([requireCandidatesAccess])
-  .validator((input: unknown) => z.object({
-    candidate_id: z.string().uuid(),
-    resume_id: z.string().uuid(),
-  }).strict().parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({
+        candidate_id: z.string().uuid(),
+        resume_id: z.string().uuid(),
+      })
+      .strict()
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { deleteOriginalResume } = await import("@/lib/delete-original-resume.server");
     const result = await deleteOriginalResume(context.supabase, data, async (path) => {
@@ -1105,7 +1123,7 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
       ),
     );
 
-    const input: CandidateInput = CandidateInputSchema.parse({
+    const parsedInput = CompleteCandidateInputSchema.safeParse({
       ...p,
       status: "active",
       source: uploadedResume
@@ -1116,11 +1134,19 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
       currency: "USD",
     });
 
+    if (!parsedInput.success) {
+      throw new Error(
+        "Review the resume in Add Candidate and complete all required details before saving.",
+      );
+    }
+    const input: CandidateInput = parsedInput.data;
+
     const { getUserRoles } = await import("@/lib/rbac.server");
     const assignedTo = (await getUserRoles(supabase, userId)).includes("recruiter") ? userId : null;
 
     let created: { candidate_id: string; resume_path?: string };
     if (uploadedResume) {
+      await recordValidatedResumeUpload(uploadedResume.upload_id, uploadedResume.blob);
       created = await createCandidateGraphFromResumeUpload(
         supabase,
         input,
@@ -1129,19 +1155,7 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
         assignedTo,
       );
 
-      const { error: storeError } = await supabase.storage
-        .from("resumes")
-        .upload(created.resume_path!, uploadedResume.blob, {
-          contentType: uploadedResume.mime_type,
-          upsert: false,
-        });
-      if (storeError) {
-        throw new Error(`Candidate was created but resume storage failed: ${storeError.message}`);
-      }
-
-      // Cleanup is not part of the business transaction. The staging object is
-      // already expired and inaccessible if this best-effort removal fails.
-      await supabase.storage.from("resume-uploads").remove([uploadedResume.staging_path]);
+      await finishResumeStorageBestEffort(uploadedResume.upload_id);
     } else {
       created = await createCandidateGraph(
         supabase,

@@ -68,8 +68,8 @@ function CandidateDetailPage() {
   const [statusDraft, setStatusDraft] = useState("");
   const getCandidateFn = useServerFn(getCandidate);
   const candidateQuery = useQuery({
-    queryKey: ["candidate", id],
-    queryFn: () => getCandidateFn({ data: { id } }),
+    queryKey: ["candidate", id, "profile"],
+    queryFn: () => getCandidateFn({ data: { id, view: "profile" } }),
   });
   const managementFn = useServerFn(getCandidateManagement);
   const managementQuery = useQuery({
@@ -80,7 +80,7 @@ function CandidateDetailPage() {
   const recruitersQuery = useQuery({
     queryKey: ["eligible-l4-recruiters"],
     queryFn: () => recruitersFn(),
-    enabled: isL2,
+    enabled: isL2 && assignmentOpen,
   });
   const assignFn = useServerFn(assignCandidatesToRecruiter);
   const assignmentMutation = useMutation({

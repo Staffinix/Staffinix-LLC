@@ -6,6 +6,8 @@ INSERT INTO public.tenants(id,name,slug) VALUES ('97000000-0000-0000-0000-000000
 INSERT INTO auth.users(id,email) VALUES ('97000000-0000-0000-0000-000000000002','pipeline-test@example.invalid');
 UPDATE public.profiles SET tenant_id='97000000-0000-0000-0000-000000000001',is_active=true WHERE id='97000000-0000-0000-0000-000000000002';
 INSERT INTO public.user_roles(user_id,role) VALUES ('97000000-0000-0000-0000-000000000002','admin');
+-- Contact integrity triggers require an actor during fixture setup too.
+SET LOCAL "request.jwt.claim.sub" = '97000000-0000-0000-0000-000000000002';
 INSERT INTO public.candidates(id,first_name,last_name,tenant_id,created_by) VALUES ('97000000-0000-0000-0000-000000000003','Pipeline','Test','97000000-0000-0000-0000-000000000001','97000000-0000-0000-0000-000000000002');
 INSERT INTO public.requirements(id,title,tenant_id,created_by) VALUES ('97000000-0000-0000-0000-000000000004','Pipeline test','97000000-0000-0000-0000-000000000001','97000000-0000-0000-0000-000000000002');
 SET LOCAL ROLE authenticated;

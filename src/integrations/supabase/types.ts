@@ -1476,6 +1476,8 @@ export type Database = {
           title: string;
           updated_at: string;
           vendor_id: string | null;
+          vendor_email: string | null;
+          vendor_contact: string | null;
           visa_types: string[];
           work_mode: Database["public"]["Enums"]["requirement_work_mode"] | null;
         };
@@ -1505,6 +1507,8 @@ export type Database = {
           title: string;
           updated_at?: string;
           vendor_id?: string | null;
+          vendor_email?: string | null;
+          vendor_contact?: string | null;
           visa_types?: string[];
           work_mode?: Database["public"]["Enums"]["requirement_work_mode"] | null;
         };
@@ -1534,6 +1538,8 @@ export type Database = {
           title?: string;
           updated_at?: string;
           vendor_id?: string | null;
+          vendor_email?: string | null;
+          vendor_contact?: string | null;
           visa_types?: string[];
           work_mode?: Database["public"]["Enums"]["requirement_work_mode"] | null;
         };
@@ -2229,6 +2235,35 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      record_validated_resume_upload: {
+        Args: { _id: string; _sha256: string };
+        Returns: undefined;
+      };
+      claim_resume_storage_jobs: {
+        Args: { _upload_id?: string; _limit?: number };
+        Returns: {
+          id: string;
+          kind: string;
+          upload_id: string | null;
+          resume_id: string | null;
+          tenant_id: string;
+          candidate_id: string;
+          final_path: string;
+          staging_path: string | null;
+          mime_type: string | null;
+          size_bytes: number | null;
+          lease: string | null;
+          content_sha256: string | null;
+        }[];
+      };
+      complete_resume_storage_job: { Args: { _id: string; _lease: string }; Returns: boolean };
+      retry_resume_storage_job: { Args: { _id: string; _lease: string }; Returns: undefined };
+
+      save_requirement: {
+        Args: { _id: string | null; _fields: Json; _skills?: Json | null };
+        Returns: string;
+      };
+
       attach_candidate_resume_from_upload: {
         Args: {
           _candidate_id: string;

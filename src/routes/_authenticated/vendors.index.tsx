@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { collectVendorExport } from "@/lib/vendor-export";
 import { exportVendors, importVendors, listVendors } from "@/lib/vendors.functions";
 import { createVendorCsv, parseVendorCsv } from "@/lib/vendor-csv";
 import {
@@ -88,7 +89,7 @@ function VendorsListPage() {
   });
 
   const exportMutation = useMutation({
-    mutationFn: () => exportFn(),
+    mutationFn: () => collectVendorExport((data) => exportFn({ data })),
     onSuccess: (rows) => {
       const blob = new Blob(["\uFEFF", createVendorCsv(rows)], {
         type: "text/csv;charset=utf-8",

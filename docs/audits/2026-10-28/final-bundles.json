@@ -1,0 +1,74 @@
+{
+  "note": "Build artifact gzip sizes; static import closures exclude dynamic chunks and are not browser transfer or CWV measurements.",
+  "js_files": 187,
+  "js_gzip_bytes": 965191,
+  "css_gzip_bytes": 20958,
+  "largest_js": [
+    [
+      "jspdf.es.min-CxGBdlzV.js",
+      128646
+    ],
+    [
+      "dist-D3-sm9OK.js",
+      117948
+    ],
+    [
+      "dashboard-Bn2NaOZY.js",
+      106229
+    ],
+    [
+      "index-Dkjw6MEO.js",
+      83473
+    ],
+    [
+      "client-DVxMwhhs.js",
+      53617
+    ],
+    [
+      "index.es-DsyT9RAh.js",
+      48522
+    ],
+    [
+      "html2canvas-BTnHhQlH.js",
+      46524
+    ],
+    [
+      "page-transition-C8NoYLER.js",
+      39957
+    ]
+  ],
+  "routes": {
+    "client-": {
+      "files": 2,
+      "gzip_bytes": 54144
+    },
+    "candidates._id-": {
+      "files": 69,
+      "gzip_bytes": 292099
+    },
+    "candidates.index-": {
+      "files": 68,
+      "gzip_bytes": 293814
+    },
+    "tailoring-": {
+      "files": 52,
+      "gzip_bytes": 282153
+    },
+    "dashboard-": {
+      "files": 52,
+      "gzip_bytes": 415924
+    },
+    "matching-": {
+      "files": 53,
+      "gzip_bytes": 282413
+    },
+    "requirements.new-": {
+      "files": 52,
+      "gzip_bytes": 281746
+    },
+    "vendors.index-": {
+      "files": 52,
+      "gzip_bytes": 281494
+    }
+  }
+}

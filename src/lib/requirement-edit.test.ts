@@ -106,3 +106,17 @@ test("every requirement detail is mandatory, including selections and skills", (
     false,
   );
 });
+
+import { Constants } from "../integrations/supabase/types.ts";
+import { REQ_STATUSES, STATUS_STYLES, STATUS_LABEL } from "./requirements-constants.ts";
+import { z } from "zod";
+
+test("saved database requirement states remain editable and filterable", () => {
+  const schema = z.enum(REQ_STATUSES);
+  for (const status of Constants.public.Enums.requirement_status) {
+    assert.equal(schema.safeParse(status).success, true, status);
+    assert.ok(STATUS_STYLES[status]);
+    assert.ok(STATUS_LABEL[status]);
+  }
+  assert.equal(schema.safeParse("unexpected").success, false);
+});

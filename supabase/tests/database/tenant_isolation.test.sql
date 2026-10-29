@@ -45,12 +45,17 @@ INSERT INTO public.platform_access_requests (user_id, user_email, requested_tier
     'Inactive-profile access probe'
   );
 
+-- Contact integrity triggers require an actor during fixture setup too.
+SET LOCAL "request.jwt.claim.sub" = 'aaaaaaaa-0000-0000-0000-000000000002';
 INSERT INTO public.candidates (id, first_name, last_name, email, tenant_id, created_by, assigned_to) VALUES
   ('a1000000-0000-0000-0000-000000000001', 'Tenant', 'A', 'candidate-a@example.invalid', '10000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001'),
-  ('a1000000-0000-0000-0000-000000000002', 'Delete', 'A', 'delete-a@example.invalid', '10000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001'),
+  ('a1000000-0000-0000-0000-000000000002', 'Delete', 'A', 'delete-a@example.invalid', '10000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001');
+SET LOCAL "request.jwt.claim.sub" = 'bbbbbbbb-0000-0000-0000-000000000003';
+INSERT INTO public.candidates (id, first_name, last_name, email, tenant_id, created_by, assigned_to) VALUES
   ('b2000000-0000-0000-0000-000000000002', 'Tenant', 'B', 'candidate-b@example.invalid', '20000000-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000002'),
   ('b2000000-0000-0000-0000-000000000003', 'Delete', 'B', 'delete-b@example.invalid', '20000000-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000002');
 
+SET LOCAL "request.jwt.claim.sub" = '';
 INSERT INTO public.candidate_skills (candidate_id, skill) VALUES
   ('a1000000-0000-0000-0000-000000000001', 'A-only'), ('b2000000-0000-0000-0000-000000000002', 'B-only');
 INSERT INTO public.candidate_employment (candidate_id, company) VALUES

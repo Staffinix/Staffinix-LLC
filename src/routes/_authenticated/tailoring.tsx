@@ -142,7 +142,9 @@ function TailoringWorkspace() {
       toast.success("Fact-validated draft saved");
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Draft generation failed. Please retry."),
+      toast.error(
+        error instanceof Error ? error.message : "Draft generation failed. Please retry.",
+      ),
   });
 
   const approveMutation = useMutation({

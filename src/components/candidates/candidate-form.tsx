@@ -390,9 +390,13 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
         await updateFn({ data: { id: initialData.id, ...common } });
         if (resumeFile) {
           const grant = await uploadResumeToStaging(resumeFile, createUploadFn);
-          await attachResumeFn({
+          const attached = await attachResumeFn({
             data: { candidate_id: initialData.id, upload_id: grant.upload_id },
           });
+          if (attached.resumePending)
+            toast.warning(
+              "Candidate saved. Resume storage is pending and will retry automatically.",
+            );
         }
         toast.success("Candidate updated successfully.");
         onSaved(initialData.id);
@@ -407,7 +411,7 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
         projects: [],
         certifications: [],
       };
-      let created: { id: string };
+      let created: { id: string; resumePending?: boolean };
       if (resumeFile) {
         const grant =
           previewUpload?.file === resumeFile
@@ -417,7 +421,9 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
       } else {
         created = await createFn({ data: candidate });
       }
-      toast.success("Bench candidate added.");
+      if (created.resumePending)
+        toast.warning("Candidate saved. Resume storage is pending and will retry automatically.");
+      else toast.success("Bench candidate added.");
       onSaved(created.id);
     } catch (error) {
       setPreviewUpload(null);

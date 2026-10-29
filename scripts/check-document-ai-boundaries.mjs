@@ -122,7 +122,11 @@ assert.equal(
   false,
   "Mammoth external-file access must remain disabled",
 );
-assert.doesNotMatch(worker, /CLAMAV_HOST|scanWithClamAv/, "document worker must not require a malware service");
+assert.doesNotMatch(
+  worker,
+  /CLAMAV_HOST|scanWithClamAv/,
+  "document worker must not require a malware service",
+);
 assert.match(worker, /resourceLimits/, "document worker lacks a memory limit");
 assert.match(worker, /worker\.terminate/, "document worker lacks a hard job termination path");
 assert.match(worker, /MAX_BODY_BYTES/, "document worker lacks a hard body limit");

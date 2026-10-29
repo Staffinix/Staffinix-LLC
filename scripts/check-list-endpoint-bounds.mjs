@@ -10,7 +10,11 @@ const checks = [
   ["src/lib/access-requests.functions.ts", "listAccessRequests", /\.limit\(100\)/],
   ["src/lib/users.functions.ts", "listUsers", /\.limit\(100\)/],
   ["src/lib/dashboard.functions.ts", "getRecentActivity", /\.limit\(15\)/],
-  ["src/lib/candidates.functions.ts", "getCandidate", /\.limit\(50\)[\s\S]*\.limit\(100\)/],
+  [
+    "src/lib/candidates.functions.ts",
+    "getCandidate",
+    /\.eq\("is_primary", true\)[\s\S]*\.limit\(1\)[\s\S]*\.limit\(100\)/,
+  ],
   ["src/lib/candidates.functions.ts", "semanticSearchCandidates", /\.limit\(data\.limit\)/],
 ];
 

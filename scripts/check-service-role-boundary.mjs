@@ -99,10 +99,10 @@ if (/console\.(?:log|info|warn|error|debug)/.test(adminSource)) {
   failures.push(`${adminModule}: privileged client module must not log`);
 }
 
-const publicDir = join(root, ".output/public");
+const publicDir = join(root, process.env.CLIENT_BUNDLE_DIR || ".output/public");
 if (process.argv.includes("--bundle")) {
   if (!existsSync(publicDir) || !statSync(publicDir).isDirectory()) {
-    failures.push(".output/public: production client bundle is missing");
+    failures.push(`${publicDir}: production client bundle is missing`);
   } else {
     const forbiddenBundleText = [
       "SERVICE_ROLE_CLIENT_BUNDLE_CANARY",

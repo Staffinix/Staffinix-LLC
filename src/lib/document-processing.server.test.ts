@@ -7,7 +7,12 @@ import { processDocumentForExtraction } from "./document-processing.server.ts";
 // jsPDF adds a page-navigation OpenAction; omit it without changing xref offsets.
 function inertPdf(doc: jsPDF) {
   const raw = Buffer.from(doc.output("arraybuffer")).toString("latin1");
-  return new Uint8Array(Buffer.from(raw.replace(/\/OpenAction[^\r\n]*/g, (value) => " ".repeat(value.length)), "latin1"));
+  return new Uint8Array(
+    Buffer.from(
+      raw.replace(/\/OpenAction[^\r\n]*/g, (value) => " ".repeat(value.length)),
+      "latin1",
+    ),
+  );
 }
 
 test("PDF auto-fill validates locally without contacting a document service", async (t) => {

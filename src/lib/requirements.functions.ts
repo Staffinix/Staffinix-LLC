@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireRequirementsAccess } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { RequiredRequirementDetailsSchema } from "./requirement-form-validation";
+import { REQ_STATUSES as STATUSES } from "./requirements-constants";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import {
   requestStructuredAiOutput,
@@ -12,14 +14,13 @@ import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "./us-r
 
 // ------------- shared schemas -------------
 
-const STATUSES = ["open", "closed", "expired"] as const;
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 const WORK_MODES = ["onsite", "remote", "hybrid"] as const;
 const RATE_TYPES = ["hourly", "annual", "monthly"] as const;
 const SOURCES = ["manual", "paste", "pdf", "docx", "email"] as const;
 
 const REQUIREMENT_DETAIL_FIELDS =
-  "id, title, client_id, vendor_id, location, work_mode, visa_types, rate_min, rate_max, rate_type, currency, min_experience_years, max_experience_years, primary_technology, description, recruiter_notes, status, priority, source, duration, assigned_to, assigned_at, created_by, created_at, updated_at";
+  "id, title, client_id, vendor_id, vendor_email, vendor_contact, location, work_mode, visa_types, rate_min, rate_max, rate_type, currency, min_experience_years, max_experience_years, primary_technology, description, recruiter_notes, status, priority, source, duration, assigned_to, assigned_at, created_by, created_at, updated_at";
 
 const SkillSchema = z.object({
   skill: z.string().trim().min(1).max(80),
@@ -30,6 +31,8 @@ const RequirementInputSchema = z.object({
   title: z.string().trim().min(2).max(200),
   client_id: z.string().uuid().nullable().optional(),
   vendor_id: z.string().uuid().nullable().optional(),
+  vendor_email: z.string().trim().email().max(255),
+  vendor_contact: z.string().trim().min(1).max(40),
   location: UsRequisitionLocationSchema,
   work_mode: z.enum(WORK_MODES).nullable().optional(),
   visa_types: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
@@ -213,31 +216,22 @@ export const getRequirement = createServerFn({ method: "POST" })
 
 export const createRequirement = createServerFn({ method: "POST" })
   .middleware([requireRequirementsAccess])
-  .validator((input: unknown) => RequirementInputSchema.parse(input))
+  .validator((input: unknown) => {
+    RequiredRequirementDetailsSchema.parse(input);
+    return RequirementInputSchema.parse(input);
+  })
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
     const { skills, ...fields } = data;
 
-    const insertPayload = {
-      ...fields,
-      created_by: userId,
-      assigned_at: fields.assigned_to ? new Date().toISOString() : null,
-    };
-
-    const { data: created, error } = await supabase
-      .from("requirements")
-      .insert(insertPayload)
-      .select("id")
-      .maybeSingle();
+    const { data: createdId, error } = await supabase.rpc("save_requirement", {
+      _id: null,
+      _fields: fields,
+      _skills: skills,
+    });
     if (error) throw new Error(error.message);
-    if (!created) throw new Error("Failed to create requirement");
-
-    if (skills.length) {
-      const { error: sErr } = await supabase
-        .from("requirement_skills")
-        .insert(skills.map((s) => ({ ...s, requirement_id: created.id })));
-      if (sErr) throw new Error(sErr.message);
-    }
+    if (!createdId) throw new Error("Failed to create requirement");
+    const created = { id: createdId };
 
     const { writeAudit } = await import("@/lib/audit.server");
     await writeAudit({
@@ -266,29 +260,12 @@ export const updateRequirement = createServerFn({ method: "POST" })
     const { supabase, userId, claims } = context;
     const { id, skills, ...fields } = data;
 
-    // If assigning for the first time, stamp assigned_at and flip status.
-    const patch: TablesUpdate<"requirements"> = { ...fields };
-    if (fields.assigned_to !== undefined) {
-      patch.assigned_at = fields.assigned_to ? new Date().toISOString() : null;
-      if (fields.assigned_to && !fields.status) patch.status = "assigned";
-    }
-
-    const { error } = await supabase.from("requirements").update(patch).eq("id", id);
+    const { error } = await supabase.rpc("save_requirement", {
+      _id: id,
+      _fields: fields,
+      _skills: skills ?? null,
+    });
     if (error) throw new Error(error.message);
-
-    if (skills) {
-      const { error: dErr } = await supabase
-        .from("requirement_skills")
-        .delete()
-        .eq("requirement_id", id);
-      if (dErr) throw new Error(dErr.message);
-      if (skills.length) {
-        const { error: iErr } = await supabase
-          .from("requirement_skills")
-          .insert(skills.map((s) => ({ ...s, requirement_id: id })));
-        if (iErr) throw new Error(iErr.message);
-      }
-    }
 
     const { writeAudit } = await import("@/lib/audit.server");
     await writeAudit({
@@ -387,9 +364,8 @@ export const listLookups = createServerFn({ method: "GET" })
   .middleware([requireRequirementsAccess])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const [clients, vendors, recruiters] = await Promise.all([
+    const [clients, recruiters] = await Promise.all([
       supabase.from("clients").select("id, name").order("name"),
-      supabase.from("vendors").select("id, name, contact_email, contact_phone").order("name"),
       supabase
         .from("profiles")
         .select("id, full_name, email, is_active")
@@ -398,8 +374,46 @@ export const listLookups = createServerFn({ method: "GET" })
     ]);
     return {
       clients: clients.data ?? [],
-      vendors: vendors.data ?? [],
+      vendors: [],
       recruiters: recruiters.data ?? [],
+    };
+  });
+
+export const searchRequirementVendors = createServerFn({ method: "POST" })
+  .middleware([requireRequirementsAccess])
+  .validator((input: unknown) =>
+    z
+      .object({
+        search: z.string().trim().max(120).default(""),
+        page: z.number().int().min(1).max(10000).default(1),
+        selectedId: z.string().uuid().nullable().optional(),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    let query = supabase
+      .from("vendors")
+      .select("id, name, contact_email, contact_phone")
+      .order("name")
+      .order("id")
+      .range((data.page - 1) * 50, data.page * 50);
+    if (data.search) query = query.ilike("name", `%${data.search.replace(/[%_]/g, "")}%`);
+    const [result, selected] = await Promise.all([
+      query,
+      data.selectedId
+        ? supabase
+            .from("vendors")
+            .select("id, name, contact_email, contact_phone")
+            .eq("id", data.selectedId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (result.error || selected.error) throw new Error("Unable to load vendors");
+    return {
+      rows: (result.data ?? []).slice(0, 50),
+      hasMore: (result.data?.length ?? 0) > 50,
+      selected: selected.data,
     };
   });
 

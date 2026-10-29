@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { createAuthCacheHandler } from "@/lib/auth-query-cache";
 import { SessionProvider } from "@/hooks/use-session";
 
 function NotFoundComponent() {
@@ -134,11 +135,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-    });
+    const { data } = supabase.auth.onAuthStateChange(
+      createAuthCacheHandler(queryClient, () => void router.invalidate()),
+    );
     return () => {
       data.subscription.unsubscribe();
     };

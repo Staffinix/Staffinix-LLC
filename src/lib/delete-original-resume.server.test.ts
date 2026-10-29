@@ -36,7 +36,7 @@ function client(data: unknown, error: unknown = null) {
         assert.equal(table, "resumes");
         return query;
       },
-    } as any,
+    } as unknown as Parameters<typeof deleteOriginalResume>[0],
     filters,
   };
 }

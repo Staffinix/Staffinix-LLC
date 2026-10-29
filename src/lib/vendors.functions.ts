@@ -96,27 +96,29 @@ export const listVendors = createServerFn({ method: "POST" })
     return { rows: rows ?? [], total: count ?? 0 };
   });
 
-export const listVendorsLite = createServerFn({ method: "GET" })
+export const exportVendors = createServerFn({ method: "POST" })
   .middleware([requireVendorsAccess])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+  .validator((input: unknown) =>
+    z
+      .object({ cursor: z.string().uuid().optional(), asOf: z.string().datetime().optional() })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const asOf = data.asOf ?? new Date().toISOString();
+    let query = context.supabase
       .from("vendors")
-      .select("id, name, status")
-      .order("name");
-    if (error) throw new Error(`Failed to load vendors: ${error.message}`);
-    return data ?? [];
-  });
-
-export const exportVendors = createServerFn({ method: "GET" })
-  .middleware([requireVendorsAccess])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("vendors")
-      .select(VENDOR_EXPORT_FIELDS)
-      .order("name")
-      .limit(5000);
+      .select(`id, ${VENDOR_EXPORT_FIELDS}`)
+      .lte("created_at", asOf)
+      .order("id")
+      .limit(500);
+    if (data.cursor) query = query.gt("id", data.cursor);
+    const { data: rows, error } = await query;
     if (error) throw new Error(`Failed to export vendors: ${error.message}`);
-    return data ?? [];
+    return {
+      rows: rows ?? [],
+      asOf,
+      nextCursor: rows?.length === 500 ? rows[rows.length - 1].id : null,
+    };
   });
 
 export const importVendors = createServerFn({ method: "POST" })

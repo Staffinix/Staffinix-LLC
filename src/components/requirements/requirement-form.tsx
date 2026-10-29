@@ -1,6 +1,6 @@
 import { RequiredRequirementDetailsSchema } from "@/lib/requirement-form-validation";
 import { useState, useMemo } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
@@ -33,10 +33,12 @@ import {
 } from "@/lib/requirements-constants";
 import {
   createRequirement,
+  searchRequirementVendors,
   updateRequirement,
   createClient as createClientFn,
   createVendor as createVendorFn,
 } from "@/lib/requirements.functions";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { UsRequisitionLocationSchema, UsRequisitionCurrencySchema } from "@/lib/us-requisition";
 
@@ -128,6 +130,24 @@ export function RequirementForm({
   const updateFn = useServerFn(updateRequirement);
   const clientFn = useServerFn(createClientFn);
   const vendorFn = useServerFn(createVendorFn);
+
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorPage, setVendorPage] = useState(1);
+  const debouncedVendorSearch = useDebouncedValue(vendorSearch, 250);
+  const searchVendorsFn = useServerFn(searchRequirementVendors);
+  const vendorQuery = useQuery({
+    queryKey: ["requirement-vendors", debouncedVendorSearch, vendorPage, v.vendor_id],
+    queryFn: () =>
+      searchVendorsFn({
+        data: { search: debouncedVendorSearch, page: vendorPage, selectedId: v.vendor_id },
+      }),
+  });
+  const vendorOptions = vendorQuery.data?.rows ?? [];
+  const selectedVendor = vendorQuery.data?.selected;
+  const visibleVendors =
+    selectedVendor && !vendorOptions.some((item) => item.id === selectedVendor.id)
+      ? [selectedVendor, ...vendorOptions]
+      : vendorOptions;
 
   const [newSkill, setNewSkill] = useState("");
   const [newSkillMandatory, setNewSkillMandatory] = useState(true);
@@ -224,25 +244,65 @@ export function RequirementForm({
             />
           </Field>
           <Field label="Vendor Name" required>
+            <Input
+              aria-label="Search vendors"
+              placeholder="Search vendors"
+              value={vendorSearch}
+              onChange={(event) => {
+                setVendorSearch(event.target.value);
+                setVendorPage(1);
+              }}
+            />
             <ComboEntity
               value={v.vendor_id}
               onChange={(id) => {
-                const found = (lookups?.vendors ?? []).find((x) => x.id === id);
+                const found = visibleVendors.find((x) => x.id === id);
                 setV({
                   ...v,
                   vendor_id: id,
-                  vendor_email: v.vendor_email || found?.contact_email || "",
-                  vendor_contact: v.vendor_contact || found?.contact_phone || "",
+                  vendor_email: found?.contact_email || "",
+                  vendor_contact: found?.contact_phone || "",
                 });
               }}
-              options={lookups?.vendors ?? []}
+              options={visibleVendors}
               placeholder="Select vendor"
               onCreate={async (name) => {
                 const c = await vendorFn({ data: { name } });
-                qc.invalidateQueries({ queryKey: ["req-lookups"] });
+                qc.invalidateQueries({ queryKey: ["requirement-vendors"] });
                 return c;
               }}
             />
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={vendorPage === 1 || vendorQuery.isFetching}
+                onClick={() => setVendorPage((page) => page - 1)}
+              >
+                Previous
+              </Button>
+              <span role="status">
+                {vendorQuery.isFetching ? "Loading vendors…" : `Page ${vendorPage}`}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={!vendorQuery.data?.hasMore || vendorQuery.isFetching}
+                onClick={() => setVendorPage((page) => page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+            {vendorQuery.error && (
+              <p role="alert" className="text-xs text-destructive">
+                Unable to load vendors.{" "}
+                <button type="button" onClick={() => void vendorQuery.refetch()}>
+                  Retry
+                </button>
+              </p>
+            )}
           </Field>
 
           <Field label="Vendor Contact Email" required>

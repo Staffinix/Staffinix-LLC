@@ -94,6 +94,9 @@ SELECT throws_ok(
   'legacy candidate RPC cannot persist a caller-selected storage path'
 );
 
+RESET ROLE;
+SELECT public.record_validated_resume_upload((SELECT upload_id FROM issued_upload), repeat('a',64));
+SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE created_resume AS
 SELECT *
 FROM public.create_candidate_graph_from_resume_upload(
@@ -126,6 +129,9 @@ GRANT SELECT ON replacement_upload TO authenticated;
 
 SELECT is((SELECT count(*) FROM replacement_upload), 1::bigint, 'replacement upload grant is issued');
 
+RESET ROLE;
+SELECT public.record_validated_resume_upload((SELECT upload_id FROM replacement_upload), repeat('a',64));
+SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE attached_resume AS
 SELECT *
 FROM public.attach_candidate_resume_from_upload(
@@ -147,8 +153,8 @@ SELECT is(
 );
 SELECT is(
   (SELECT count(*) FROM public.resumes WHERE candidate_id = (SELECT candidate_id FROM created_resume) AND is_primary),
-  1::bigint,
-  'exactly one replacement resume is primary'
+  0::bigint,
+  'pending files are not exposed as current originals before storage finalization'
 );
 SELECT throws_ok(
   format(

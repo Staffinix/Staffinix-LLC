@@ -164,8 +164,9 @@ assert.deepEqual(
 );
 
 if (process.argv.includes("--bundle")) {
-  assert.ok(existsSync(".output/public"), "Build output is missing; run npm run build first");
-  const bundle = listFiles(".output/public", new Set([".js", ".mjs"]))
+  const publicDir = process.env.CLIENT_BUNDLE_DIR || ".output/public";
+  assert.ok(existsSync(publicDir), "Build output is missing; run npm run build first");
+  const bundle = listFiles(publicDir, new Set([".js", ".mjs"]))
     .map((path) => readFileSync(path, "utf8"))
     .join("\n");
 

@@ -42,9 +42,7 @@ if (process.argv[2]) {
     mimeType: "application/pdf",
   });
   assert.equal(pdf.validated, true);
-  console.log(
-    "Provided PDF passed structural validation and response-integrity checks.",
-  );
+  console.log("Provided PDF passed structural validation and response-integrity checks.");
 }
 console.log(
   "Local integration checks passed: authentication, file-type restriction, invalid-document rejection, and DOCX extraction. No AI calls or candidate records created.",
