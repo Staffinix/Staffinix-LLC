@@ -37,7 +37,9 @@ Do not reset a production database. Local verification used the isolated Supabas
 
 Browser automation is disabled in Work settings, so authenticated UI/Lighthouse/CWV verification remains unavailable. AI billing/provider availability cannot be repaired by code or verified without a funded provider account; no billing changes, key changes, or provider charges were made. Shared-motion/dashboard bundle work and region changes remain measurement-dependent opportunities, not demonstrated fixes. No dependency upgrade was introduced without evidence of benefit.
 
-The code changes require an approved migration/deployment before users of the live site receive them. The attached brief explicitly says “Do not deploy without explicit approval.”
+The user approved testing and deployment on 2026-10-29. Release `e7e2be4` was built with production settings before migration, both migrations were applied successfully to the Staffinix production database, and deployment `dpl_GfRcL7wpCnvsDkbJZt4vVBx2xY73` was promoted to https://staffinix-llc.vercel.app/. The commit was pushed to `main`.
+
+Post-release checks: the live site returned HTTP 200; the requirement RPC and private storage job table exist; worker claims are permitted for service_role and denied for authenticated users; both resume buckets remain private. All 33 existing resume rows retained ready status, with zero pending jobs at verification time. The ten-minute runtime warning/error query returned no records. Authenticated upload/form workflows and provider billing remain outside this verification; no customer records were created or deleted for smoke testing.
 
 ## Final validation
 
