@@ -51,14 +51,20 @@ import { STAGE_LABEL } from "@/lib/submissions-constants";
 import { useRoleLevel } from "@/hooks/use-role-level";
 import { RecruiterPicker } from "@/components/candidates/recruiter-picker";
 import { PipelineTracker } from "@/components/submissions/pipeline-tracker";
-
 export const Route = createFileRoute("/_authenticated/candidates/$id")({
+ validateSearch: (search: Record<string, unknown>) => ({
+  from: search.from === "ai-matching" ? "ai-matching" as const : undefined,
+  reqId: typeof search.reqId === "string" ? search.reqId : undefined,
+  candidateId: typeof search.candidateId === "string" ? search.candidateId : undefined,
+  emailId: typeof search.emailId === "string" ? search.emailId : undefined,
+}),
   head: () => ({ meta: [{ title: "Candidate Profile — Staffinix" }] }),
   component: CandidateDetailPage,
 });
 
 function CandidateDetailPage() {
   const { id } = Route.useParams();
+  const { from, reqId, candidateId, emailId } = Route.useSearch();
   const { level } = useRoleLevel();
   const isL2 = level === "L2";
   const isL4 = level === "L4";
@@ -136,11 +142,21 @@ function CandidateDetailPage() {
     <>
       <AppTopbar title={`${candidate.first_name} ${candidate.last_name}`} />
       <main className="flex-1 space-y-6 p-6 md:p-8">
-        <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-          <Link to="/candidates">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Bench Candidates
-          </Link>
-        </Button>
+       <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
+  <Link
+  to={from === "ai-matching" ? "/matching" : "/candidates"}
+  search={
+    from === "ai-matching"
+      ? { reqId, candidateId, emailId }
+      : undefined
+  }
+>
+  <ArrowLeft className="h-3.5 w-3.5" />
+  {from === "ai-matching"
+    ? "Back to AI Matching"
+    : "Back to Bench Candidates"}
+</Link>
+</Button>
 
         <PageHeader
           title={`${candidate.first_name} ${candidate.last_name}`}
