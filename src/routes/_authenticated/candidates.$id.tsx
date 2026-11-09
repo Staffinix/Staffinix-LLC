@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   Briefcase,
+  Download,
+  Eye,
   FileText,
   GraduationCap,
   Loader2,
@@ -39,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getCandidate } from "@/lib/candidates.functions";
+import { getCandidate, getResumeSignedUrl } from "@/lib/candidates.functions";
 import {
   assignCandidatesToRecruiter,
   getCandidateManagement,
@@ -82,6 +84,7 @@ function CandidateDetailPage() {
     queryKey: ["candidate-management", id],
     queryFn: () => managementFn({ data: { candidateId: id } }),
   });
+   const getResumeSignedUrlFn = useServerFn(getResumeSignedUrl);
   const recruitersFn = useServerFn(listEligibleL4Recruiters);
   const recruitersQuery = useQuery({
     queryKey: ["eligible-l4-recruiters"],
@@ -137,7 +140,76 @@ function CandidateDetailPage() {
   }
 
   const candidate = candidateQuery.data;
+  const handleResumeDownload = async (path: string) => {
+  const newWindow = window.open("about:blank", "_blank");
 
+  try {
+    const result = await getResumeSignedUrlFn({
+      data: { path },
+    });
+
+    if (!result.url) {
+      newWindow?.close();
+      toast.error("Resume download is unavailable.");
+      return;
+    }
+
+    if (newWindow) {
+      newWindow.location.href = result.url;
+    } else {
+      window.location.href = result.url;
+    }
+  } catch (error) {
+    newWindow?.close();
+    toast.error(
+      error instanceof Error ? error.message : "Failed to download resume.",
+    );
+  }
+};
+ 
+const handleResumeFileDownload = async (
+  path: string,
+  fileName: string,
+) => {
+  try {
+    const result = await getResumeSignedUrlFn({
+      data: {
+        path,
+        download: true,
+      },
+    });
+
+    if (!result.url) {
+      toast.error("Resume download is unavailable.");
+      return;
+    }
+
+    const response = await fetch(result.url);
+
+    if (!response.ok) {
+      throw new Error("Failed to download resume.");
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Failed to download resume.",
+    );
+  }
+};
   return (
     <>
       <AppTopbar title={`${candidate.first_name} ${candidate.last_name}`} />
@@ -396,18 +468,37 @@ function CandidateDetailPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {candidate.resumes.map((resume) => (
-                <div
-                  key={resume.id}
-                  className="flex items-center gap-2 rounded-md border border-border p-3 text-xs"
-                >
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="min-w-0 flex-1 break-words">{resume.file_name}</span>
-                  <DeleteResumeButton
-                    candidateId={id}
-                    resumeId={resume.id}
-                    fileName={resume.file_name}
-                  />
-                </div>
+               <div className="flex flex-wrap items-center gap-3">
+  <FileText className="h-4 w-4 text-primary" />
+
+  <span className="min-w-0 flex-1 break-words">
+    {resume.file_name}
+  </span>
+
+ <Button
+  type="button"
+  size="sm"
+  variant="outline"
+  onClick={() => void handleResumeDownload(resume.file_path)}
+>
+  <Eye className="mr-2 h-4 w-4" />
+  View Resume
+</Button>
+
+<Button
+  type="button"
+  size="sm"
+  onClick={() =>
+    void handleResumeFileDownload(
+      resume.file_path,
+      resume.file_name,
+    )
+  }
+>
+  <Download className="mr-2 h-4 w-4" />
+  Download
+</Button>
+</div>
               ))}
               {candidate.resumes.length === 0 && <EmptyText>No resume uploaded.</EmptyText>}
             </CardContent>
