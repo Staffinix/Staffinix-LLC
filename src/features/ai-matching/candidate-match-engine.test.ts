@@ -179,3 +179,12 @@ test("returns stable match levels at requested boundaries", () => {
   assert.ok(["excellent", "strong", "good", "partial", "low"].includes(result.level));
   assert.equal(Number.isInteger(result.overall), true);
 });
+
+test("treats a whitespace-only location as missing for an on-site role", () => {
+  const result = evaluate({
+    requirement: { work_mode: "onsite", location: "Dallas, TX" },
+    candidate: { location: "   " },
+  });
+  assert.equal(result.eligibility, "needs_review");
+  assert.ok(result.review_notes.includes("Candidate location is not recorded"));
+});
