@@ -157,35 +157,45 @@ export function normalizeMatchConcept(value: string) {
     .trim();
 }
 
-function conceptTokens(value: string) {
-  return normalizeMatchConcept(value)
+function normalizedConceptTokens(value: string) {
+  return value
     .split(" ")
     .filter((token) => token.length > 1 && !LOW_SIGNAL_ROLE_WORDS.has(token))
     .map((token) => (token.length > 4 && token.endsWith("s") ? token.slice(0, -1) : token));
 }
 
-function containsConcept(haystack: string, needle: string) {
-  const normalizedHaystack = ` ${normalizeMatchConcept(haystack)} `;
-  const normalizedNeedle = normalizeMatchConcept(needle);
-  if (!normalizedNeedle) return false;
-  if (normalizedHaystack.includes(` ${normalizedNeedle} `)) return true;
-  const evidenceTokens = new Set(conceptTokens(haystack));
-  const needleTokens = conceptTokens(needle);
-  return needleTokens.length > 0 && needleTokens.every((token) => evidenceTokens.has(token));
+function conceptTokens(value: string) {
+  return normalizedConceptTokens(normalizeMatchConcept(value));
+}
+
+function conceptMatcher(text: string) {
+  const normalized = normalizeMatchConcept(text);
+  const haystack = ` ${normalized} `;
+  const tokens = new Set(normalizedConceptTokens(normalized));
+  return (needle: string) => {
+    const concept = normalizeMatchConcept(needle);
+    if (!concept) return false;
+    if (haystack.includes(` ${concept} `)) return true;
+    const needleTokens = normalizedConceptTokens(concept);
+    return needleTokens.length > 0 && needleTokens.every((token) => tokens.has(token));
+  };
 }
 
 export function inferPreferredSkills(description: string | null | undefined) {
   if (!description?.trim()) return [];
-  return KNOWN_SKILLS.filter((skill) =>
-    skill.aliases.some((alias) => containsConcept(description, alias)),
-  ).map((skill) => skill.label);
+  const matches = conceptMatcher(description);
+  return KNOWN_SKILLS.filter((skill) => skill.aliases.some(matches)).map((skill) => skill.label);
 }
 
-function matchSkills(required: MatchSkill[], evidenceText: string) {
-  const matched = required.filter((skill) => containsConcept(evidenceText, skill.skill));
+function matchSkills(required: MatchSkill[], matches: (skill: string) => boolean) {
+  const matched: string[] = [];
+  const missing: string[] = [];
+  for (const { skill } of required) {
+    (matches(skill) ? matched : missing).push(skill);
+  }
   return {
-    matched: matched.map((skill) => skill.skill),
-    missing: required.filter((skill) => !matched.includes(skill)).map((skill) => skill.skill),
+    matched,
+    missing,
     score: required.length ? (matched.length / required.length) * 100 : 100,
   };
 }
@@ -205,7 +215,7 @@ function roleRelevance(
         requiredTokens.size) *
       100
     : 0;
-  const phraseMatch = containsConcept(candidateText, requirement.title) ? 100 : deterministic;
+  const phraseMatch = conceptMatcher(candidateText)(requirement.title) ? 100 : deterministic;
   const semanticScore = typeof semantic === "number" ? clampScore(semantic * 100) : 0;
   return clampScore(Math.max(phraseMatch, semanticScore * 0.85));
 }
@@ -298,9 +308,9 @@ export function evaluateCandidateMatch(input: {
       ...(item.technologies ?? []),
     ]),
   ].filter((value): value is string => Boolean(value?.trim()));
-  const evidenceText = evidenceParts.join(" ");
-  const requiredSkillMatch = matchSkills(requiredSkills, evidenceText);
-  const preferredSkillMatch = matchSkills(preferredSkills, evidenceText);
+  const matchesEvidence = conceptMatcher(evidenceParts.join(" "));
+  const requiredSkillMatch = matchSkills(requiredSkills, matchesEvidence);
+  const preferredSkillMatch = matchSkills(preferredSkills, matchesEvidence);
   const roleText = [
     candidate.current_title,
     candidate.required_job,
@@ -352,13 +362,15 @@ export function evaluateCandidateMatch(input: {
       evidence: preferredSkillMatch.matched,
     });
   }
+  const candidateLocation = candidate.location?.trim();
+  const locationFit = locationScore(requirement, candidateLocation);
   if (requirement.location || requirement.work_mode) {
     factors.push({
       key: "location",
       label: "Location and work mode",
-      score: locationScore(requirement, candidate.location),
+      score: locationFit,
       base_weight: 10,
-      evidence: [candidate.location, requirement.work_mode].filter((value): value is string =>
+      evidence: [candidateLocation, requirement.work_mode].filter((value): value is string =>
         Boolean(value),
       ),
     });
@@ -373,7 +385,7 @@ export function evaluateCandidateMatch(input: {
     const educationMatched =
       requiredEducation === "degree"
         ? Boolean(educationText)
-        : containsConcept(educationText, requiredEducation);
+        : conceptMatcher(educationText)(requiredEducation);
     factors.push({
       key: "education_certifications",
       label: "Education and certifications",
@@ -439,8 +451,8 @@ export function evaluateCandidateMatch(input: {
     }
   }
   if (requirement.work_mode && requirement.work_mode !== "remote" && requirement.location) {
-    if (!candidate.location) reviewNotes.push("Candidate location is not recorded");
-    else if (locationScore(requirement, candidate.location) === 0) {
+    if (!candidateLocation) reviewNotes.push("Candidate location is not recorded");
+    else if (locationFit === 0) {
       hardConstraintReasons.push("Recorded location does not match the on-site/hybrid requirement");
     }
   }
