@@ -151,7 +151,11 @@ export const createTenant = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (created) {
-      await supabase.from("workflow_settings").insert({ tenant_id: created.id });
+      const { error: settingsError } = await supabase
+        .from("workflow_settings")
+        .insert({ tenant_id: created.id });
+      if (settingsError)
+        console.error("[tenancy] default workflow settings failed", settingsError.code);
     }
 
     const { writeAudit } = await import("@/lib/audit.server");

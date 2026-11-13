@@ -20,7 +20,7 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
       .eq("id", entry.actorId)
       .maybeSingle();
 
-    await supabaseAdmin.from("audit_logs").insert({
+    const { error } = await supabaseAdmin.from("audit_logs").insert({
       tenant_id: actor?.tenant_id ?? null,
       actor_id: entry.actorId,
 
@@ -32,6 +32,8 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
       ip_address: entry.ipAddress ?? null,
       user_agent: entry.userAgent ?? null,
     });
+    // supabase-js returns rejected writes instead of throwing; log the code only.
+    if (error) console.error("[audit] write rejected", error.code);
   } catch {
     // Never let audit failure break the primary operation.
     // Do not log the Supabase error object: transport errors may contain

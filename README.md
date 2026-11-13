@@ -101,12 +101,15 @@ For the web application:
 | `VITE_SUPABASE_PUBLISHABLE_KEY`   | Browser       | Supabase publishable key; never use a secret key   |
 | `SUPABASE_URL`                    | Server        | Supabase project URL                               |
 | `SUPABASE_PUBLISHABLE_KEY`        | Server        | Publishable key used with the caller's session     |
+| `SUPABASE_SECRET_KEY`             | Server        | Secret key for invites, audit logs, and jobs       |
 | `AUTH_ALLOWED_WORK_EMAIL_DOMAINS` | Server        | Optional comma-separated strict work-domain list   |
 | `AUTH_EMAIL_ALLOWLIST`            | Server        | Optional comma-separated exact email exceptions    |
 | `OPENROUTER_API_KEY`              | Server        | Preferred AI gateway credential                    |
+| `OPENROUTER_CHAT_MODEL`           | Server        | Optional model for all chat features               |
 | `LOVABLE_API_KEY`                 | Server        | Optional legacy AI gateway credential              |
-| `DOCUMENT_PROCESSOR_URL`          | Server        | Private URL for the optional DOCX worker                |
+| `DOCUMENT_PROCESSOR_URL`          | Server        | Private URL for the optional DOCX worker           |
 | `DOCUMENT_PROCESSOR_TOKEN`        | Server/worker | Shared secret of at least 32 random characters     |
+| `REDIS_URL`                       | Server        | Optional read cache; `rediss://` in production     |
 | `QDRANT_URL`                      | Server        | Qdrant REST URL; local default only in development |
 | `QDRANT_API_KEY`                  | Server        | Optional key for a remote Qdrant deployment        |
 | `QDRANT_COLLECTION`               | Server        | Collection name; defaults to `staffinix_knowledge` |

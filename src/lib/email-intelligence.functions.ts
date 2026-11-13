@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireEmailIntelligenceAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { serverFunctionAuth } from "@/integrations/supabase/server-function-auth";
 import { ApplicationError } from "@/lib/application-error";
 import { isAiGatewayConfigured } from "@/lib/ai-gateway.server";
@@ -103,7 +104,7 @@ async function getTenantId(supabase: AuthenticatedClient, userId: string): Promi
 }
 
 export const getEmailDashboard = createServerFn({ method: "POST" })
-  .middleware([requireEmailIntelligenceAccess])
+  .middleware([requireEmailIntelligenceAccess, readOnlyServerFn])
   .validator((input: unknown) =>
     z
       .object({

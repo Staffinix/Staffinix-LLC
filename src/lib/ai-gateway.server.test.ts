@@ -4,6 +4,7 @@ import test from "node:test";
 import { z } from "zod";
 
 import {
+  aiChatModel,
   fetchAiGateway,
   isAiGatewayConfigured,
   requestStructuredAiOutput,
@@ -57,6 +58,25 @@ test("detects either supported AI gateway provider", () => {
   delete process.env.OPENROUTER_API_KEY;
   process.env.LOVABLE_API_KEY = "lovable-test-only";
   assert.equal(isAiGatewayConfigured(), true);
+});
+
+test("the chat model setting applies only with the OpenRouter key", (t) => {
+  const originalModel = process.env.OPENROUTER_CHAT_MODEL;
+  t.after(() => {
+    if (originalModel === undefined) delete process.env.OPENROUTER_CHAT_MODEL;
+    else process.env.OPENROUTER_CHAT_MODEL = originalModel;
+    delete process.env.OPENROUTER_API_KEY;
+  });
+
+  delete process.env.OPENROUTER_CHAT_MODEL;
+  process.env.OPENROUTER_API_KEY = "openrouter-test-only";
+  assert.equal(aiChatModel("vendor/default"), "vendor/default");
+
+  process.env.OPENROUTER_CHAT_MODEL = " vendor/override:free ";
+  assert.equal(aiChatModel("vendor/default"), "vendor/override:free");
+
+  delete process.env.OPENROUTER_API_KEY;
+  assert.equal(aiChatModel("vendor/default"), "vendor/default");
 });
 
 test("uses OpenRouter server credentials without exposing them in the request body", async () => {

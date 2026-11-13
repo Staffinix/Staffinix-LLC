@@ -9,6 +9,7 @@ import { z } from "zod";
 import { requireTailoringAccess } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -261,7 +262,7 @@ ${JSON.stringify(compactFactsForSelection(source))}`;
 
   return requestStructuredAiOutput(
     {
-      model: "google/gemini-3-flash-preview",
+      model: aiChatModel("google/gemini-3-flash-preview"),
       max_tokens: 4096,
       messages: [
         {

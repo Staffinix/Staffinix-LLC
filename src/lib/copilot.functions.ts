@@ -3,9 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireDashboardAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   isAiGatewayConfigured,
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -24,7 +26,7 @@ import {
   type RagRetrievedChunk,
 } from "@/lib/rag.server";
 
-const COPILOT_MODEL = "google/gemini-3-flash-preview";
+const COPILOT_MODEL = aiChatModel("google/gemini-3-flash-preview");
 const COPILOT_PROMPT_VERSION = "copilot-qdrant-rag-v3";
 
 const CopilotSourceSchema = z
@@ -442,7 +444,7 @@ function localGroundedAnswer(question: string, snapshot: ContextSnapshot) {
 }
 
 export const listCopilotMessages = createServerFn({ method: "POST" })
-  .middleware([requireDashboardAccess])
+  .middleware([requireDashboardAccess, readOnlyServerFn])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("copilot_messages")

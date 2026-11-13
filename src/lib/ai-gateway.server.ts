@@ -9,6 +9,17 @@ export function isAiGatewayConfigured(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY?.trim() || process.env.LOVABLE_API_KEY?.trim());
 }
 
+/**
+ * Chat model for an AI feature. OPENROUTER_CHAT_MODEL replaces the built-in
+ * default, but only while the OpenRouter key is in use: the Lovable gateway
+ * uses different model names.
+ */
+export function aiChatModel(defaultModel: string): string {
+  const override =
+    process.env.OPENROUTER_API_KEY?.trim() && process.env.OPENROUTER_CHAT_MODEL?.trim();
+  return override || defaultModel;
+}
+
 const ChatEnvelopeSchema = z
   .object({
     choices: z

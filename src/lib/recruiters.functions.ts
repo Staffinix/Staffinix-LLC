@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireRecruitersAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { resolveProfileAvatarUrl, resolveProfileAvatarUrls } from "@/lib/profile-avatar.server";
 
@@ -67,7 +68,7 @@ export interface RecruiterPlacementItem {
 }
 
 export const getRecruiter = createServerFn({ method: "POST" })
-  .middleware([requireRecruitersAccess])
+  .middleware([requireRecruitersAccess, readOnlyServerFn])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: profile, error: profileError } = await context.supabase

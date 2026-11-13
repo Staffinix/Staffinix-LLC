@@ -25,34 +25,12 @@ export async function getUserRoles(
     .eq("id", userId)
     .maybeSingle();
 
-  let activeProfile = profile;
-  if (!activeProfile) {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: adminProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("tenant_id, is_active")
-      .eq("id", userId)
-      .maybeSingle();
-    activeProfile = adminProfile;
-  }
+  if (!profile?.is_active) return [];
 
-  if (!activeProfile?.is_active) return [];
+  // Caller-scoped only: RLS decides which roles this session may see.
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
 
-  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-
-  let rolesData = data;
-  if (error || !rolesData?.length) {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: adminRoles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    rolesData = adminRoles;
-  }
-
-  return (rolesData ?? [])
-    .map((row) => row.role as AppRole)
-    .filter((role) => VALID_ROLES.has(role));
+  return (data ?? []).map((row) => row.role as AppRole).filter((role) => VALID_ROLES.has(role));
 }
 
 export function isAdminRole(roles: AppRole[]): boolean {

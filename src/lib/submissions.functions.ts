@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSubmissionsAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 import { writeAudit } from "./audit.server";
@@ -76,7 +77,7 @@ const ListInputSchema = z.object({
 });
 
 export const listSubmissions = createServerFn({ method: "POST" })
-  .middleware([requireSubmissionsAccess])
+  .middleware([requireSubmissionsAccess, readOnlyServerFn])
   .validator((input: unknown) => ListInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -131,7 +132,7 @@ export const listSubmissions = createServerFn({ method: "POST" })
 
 // ------- get -------
 export const getSubmission = createServerFn({ method: "POST" })
-  .middleware([requireSubmissionsAccess])
+  .middleware([requireSubmissionsAccess, readOnlyServerFn])
   .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -288,7 +289,7 @@ export const updateSubmission = createServerFn({ method: "POST" })
 
 // ------- change stage -------
 export const listApprovedSubmissionResumes = createServerFn({ method: "POST" })
-  .middleware([requireSubmissionsAccess])
+  .middleware([requireSubmissionsAccess, readOnlyServerFn])
   .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;

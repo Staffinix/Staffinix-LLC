@@ -1,5 +1,5 @@
 import { createMiddleware } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseStatus } from "@tanstack/react-start/server";
 import { createClient, type JwtPayload, type User } from "@supabase/supabase-js";
 
 import type { Database } from "./types";
@@ -7,7 +7,9 @@ import { extractAccessToken, UnauthorizedError } from "./auth-header";
 import { ForbiddenError } from "@/lib/authorization-policy";
 import { canAccessFeature, type Feature } from "@/lib/feature-access";
 import { assertPublishableSupabaseKey, isOpaquePublishableKey } from "./api-key-safety";
-import { setAuthenticatedRequestContext } from "@/lib/request-observability";
+import { setAuthenticatedRequestContext, setRequestErrorCode } from "@/lib/request-observability";
+import { toApplicationError } from "@/lib/application-error";
+import { invalidateTenantCache } from "@/lib/cache.server";
 import { isAllowedWorkEmail, parseEmailPolicyList } from "@/lib/work-email-policy";
 
 export { UnauthorizedError } from "./auth-header";
@@ -117,6 +119,11 @@ export interface SupabaseAuthContext {
    * This value comes ONLY from the validated Supabase access token.
    */
   userId: string;
+
+  /**
+   * Tenant of the caller's active profile, loaded from the database.
+   */
+  tenantId: string | null;
 
   /**
    * Complete authenticated Supabase user.
@@ -283,6 +290,7 @@ async function authenticateRequest(request: Request): Promise<SupabaseAuthContex
   return {
     supabase,
     userId,
+    tenantId: profile.tenant_id,
     user,
     claims,
   };
@@ -304,20 +312,54 @@ async function authenticateRequest(request: Request): Promise<SupabaseAuthContex
  * No fallback user.
  * No fake authentication.
  */
+const readOnlyRequests = new WeakSet<Request>();
+
+/**
+ * Add after the access middleware on a POST server function that only reads
+ * (a list or search that takes its filters in the body), so calling it does
+ * not invalidate the tenant's cached reads. Never add it to a function that
+ * writes: src/lib/read-only-server-fns.test.ts enforces this.
+ */
+export const readOnlyServerFn = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  readOnlyRequests.add(getRequest());
+  return next();
+});
+
 export const requireSupabaseAuth = createMiddleware({
   type: "function",
 }).server(async ({ next }) => {
   const request = getRequest();
-  const authContext = await authenticateRequest(request);
+  let tenantId: string | null = null;
 
-  return next({
-    context: {
-      supabase: authContext.supabase,
-      userId: authContext.userId,
-      user: authContext.user,
-      claims: authContext.claims,
-    },
-  });
+  try {
+    const authContext = await authenticateRequest(request);
+    tenantId = authContext.tenantId;
+    return await next({
+      context: {
+        supabase: authContext.supabase,
+        userId: authContext.userId,
+        tenantId: authContext.tenantId,
+        user: authContext.user,
+        claims: authContext.claims,
+      },
+    });
+  } catch (error) {
+    // The framework sends a failed server function as HTTP 200 with the error in
+    // the body. Record the real outcome so logs and monitoring can see denials
+    // and failures; the client reads the body either way.
+    if (!(error instanceof Response)) {
+      const publicError = toApplicationError(error);
+      setResponseStatus(publicError.status);
+      setRequestErrorCode(request, publicError.code);
+    }
+    throw error;
+  } finally {
+    // Any non-GET server function may have written tenant data, even if it later
+    // failed, so drop the tenant's cached reads. No-op when Redis is not configured.
+    if (request.method !== "GET" && !readOnlyRequests.has(request)) {
+      await invalidateTenantCache(tenantId);
+    }
+  }
 });
 
 /**

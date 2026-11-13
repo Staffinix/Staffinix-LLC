@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireClientsAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { isSafeHttpUrl } from "@/lib/safe-url";
 
@@ -54,7 +55,7 @@ const ListSchema = z.object({
 });
 
 export const listClients = createServerFn({ method: "POST" })
-  .middleware([requireClientsAccess])
+  .middleware([requireClientsAccess, readOnlyServerFn])
   .validator((input: unknown) => ListSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const from = (data.page - 1) * data.page_size;
@@ -87,7 +88,7 @@ export const listClientsLite = createServerFn({ method: "GET" })
   });
 
 export const getClient = createServerFn({ method: "POST" })
-  .middleware([requireClientsAccess])
+  .middleware([requireClientsAccess, readOnlyServerFn])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: client, error } = await context.supabase

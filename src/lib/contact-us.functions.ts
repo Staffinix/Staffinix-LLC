@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import { ApplicationError } from "@/lib/application-error";
 
 const ContactUsSchema = z.object({
   name: z.string().trim().min(2, "Enter your name.").max(120),
@@ -38,6 +39,8 @@ export const submitContactUs = createServerFn({ method: "POST" })
       description: data.description,
     });
 
+    // Raised by the contact_us_rate_limit trigger.
+    if (error?.code === "PT429") throw new ApplicationError("RATE_LIMITED");
     if (error) {
       console.error("Unable to save contact request:", error.code);
       throw new Error("We could not send your message. Please try again.");

@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireRequirementsAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { RequiredRequirementDetailsSchema } from "./requirement-form-validation";
 import { REQ_STATUSES as STATUSES } from "./requirements-constants";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import {
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -66,7 +68,7 @@ const ListInputSchema = z.object({
 });
 
 export const listRequirements = createServerFn({ method: "POST" })
-  .middleware([requireRequirementsAccess])
+  .middleware([requireRequirementsAccess, readOnlyServerFn])
   .validator((input: unknown) => ListInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -155,7 +157,7 @@ export const listRequirements = createServerFn({ method: "POST" })
 // ------------- get one -------------
 
 export const getRequirement = createServerFn({ method: "POST" })
-  .middleware([requireRequirementsAccess])
+  .middleware([requireRequirementsAccess, readOnlyServerFn])
   .validator((input: unknown) => z.object({ id: z.string() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -602,7 +604,7 @@ export const parseJobDescription = createServerFn({ method: "POST" })
     return runWithAiUsageGuard(context.supabase, context.userId, "requirement_parse", () =>
       requestStructuredAiOutput(
         {
-          model: "google/gemini-3-flash-preview",
+          model: aiChatModel("google/gemini-3-flash-preview"),
           messages: [
             {
               role: "system",

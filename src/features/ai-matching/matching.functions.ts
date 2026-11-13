@@ -12,6 +12,7 @@ import {
 import { isAiGatewayConfigured } from "@/lib/ai-gateway.server";
 import { z } from "zod";
 import {
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -26,7 +27,9 @@ import {
 
 const MATCH_RATIONALE_MODEL =
   process.env.OPENROUTER_MATCH_MODEL?.trim() ||
-  (process.env.OPENROUTER_API_KEY?.trim() ? "openai/gpt-4o-mini" : "google/gemini-3-flash-preview");
+  aiChatModel(
+    process.env.OPENROUTER_API_KEY?.trim() ? "openai/gpt-4o-mini" : "google/gemini-3-flash-preview",
+  );
 const MATCH_RATIONALE_PROMPT_VERSION = "match-rationale-human-review-v1";
 
 // ============ Scoring helpers ============

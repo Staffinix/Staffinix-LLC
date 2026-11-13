@@ -145,16 +145,24 @@ export const inviteUser = createServerFn({ method: "POST" })
     if (inviteError || !invited.user) throw new Error("Failed to invite user.");
 
     const userId = invited.user.id;
-    const { error: profileError } = await supabaseAdmin
+    // Remove the just-created account so a failed invite leaves no tenant-less or role-less user.
+    const rollback = async (message: string): Promise<never> => {
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+      throw new Error(message);
+    };
+
+    const { data: updated, error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({ full_name: data.full_name, tenant_id: tenantId })
-      .eq("id", userId);
-    if (profileError) throw new Error("Failed to assign invited user to tenant.");
+      .eq("id", userId)
+      .select("id");
+    if (profileError || !updated?.length)
+      await rollback("Failed to assign invited user to tenant.");
 
     const { error: roleError } = await supabaseAdmin
       .from("user_roles")
       .insert({ user_id: userId, role: data.role });
-    if (roleError) throw new Error("Failed to assign invited user role.");
+    if (roleError) await rollback("Failed to assign invited user role.");
 
     return { id: userId, email: data.email };
   });

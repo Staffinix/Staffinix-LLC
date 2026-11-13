@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -29,7 +30,7 @@ export class GatewayEmailClassifier implements EmailClassifier {
     return ClassificationSchema.parse(
       await requestStructuredAiOutput(
         {
-          model: "google/gemini-2.5-flash-lite",
+          model: aiChatModel("google/gemini-2.5-flash-lite"),
           temperature: 0,
           response_format: { type: "json_object" },
           messages: [

@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 // Aggregates the pipeline artefacts + availability history for a bench consultant.
 export const getBenchConsultantActivity = createServerFn({ method: "POST" })
-  .middleware([requireCandidatesAccess])
+  .middleware([requireCandidatesAccess, readOnlyServerFn])
   .validator((i: unknown) => z.object({ candidate_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;

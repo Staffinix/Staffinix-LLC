@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseAuthContext } from "@/integrations/supabase/auth-middleware";
 import { ForbiddenError } from "@/lib/authorization-policy";
 
@@ -97,7 +98,7 @@ export const assignCandidatesToRecruiter = createServerFn({ method: "POST" })
 const CandidateManagementSchema = z.object({ candidateId: z.string().uuid() }).strict();
 
 export const getCandidateManagement = createServerFn({ method: "POST" })
-  .middleware([requireCandidatesAccess])
+  .middleware([requireCandidatesAccess, readOnlyServerFn])
   .validator((input: unknown) => CandidateManagementSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { data: candidate, error: candidateError } = await context.supabase

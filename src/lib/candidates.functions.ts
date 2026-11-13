@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { refreshCandidateEmbeddingBestEffort } from "@/lib/candidate-embedding-refresh";
 import { buildCandidateSearchOrGroups } from "@/lib/candidate-search";
 import { getCandidateSubmissionAttribution } from "@/lib/candidate-submission-attribution";
 import type { Json } from "@/integrations/supabase/types";
 import {
+  aiChatModel,
   requestStructuredAiOutput,
   UNTRUSTED_DOCUMENT_SYSTEM_RULES,
 } from "@/lib/ai-gateway.server";
@@ -269,7 +271,7 @@ const ListInputSchema = z.object({
 });
 
 export const listCandidates = createServerFn({ method: "POST" })
-  .middleware([requireCandidatesAccess])
+  .middleware([requireCandidatesAccess, readOnlyServerFn])
   .validator((input: unknown) => ListInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -963,7 +965,7 @@ export const previewCandidateResume = createServerFn({ method: "POST" })
       () =>
         requestStructuredAiOutput(
           {
-            model: "google/gemini-3-flash-preview",
+            model: aiChatModel("google/gemini-3-flash-preview"),
             max_tokens: 4096,
             temperature: 0,
             messages: [
@@ -1108,7 +1110,7 @@ export const parseAndCreateCandidate = createServerFn({ method: "POST" })
     const p = await runWithAiUsageGuard(supabase, userId, "candidate_parse", () =>
       requestStructuredAiOutput(
         {
-          model: "google/gemini-3-flash-preview",
+          model: aiChatModel("google/gemini-3-flash-preview"),
           max_tokens: 4096,
           messages: [
             {

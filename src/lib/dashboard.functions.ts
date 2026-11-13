@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { requireDashboardAccess } from "@/integrations/supabase/auth-middleware";
 import { resolveProfileAvatarUrls } from "@/lib/profile-avatar.server";
+import { cached } from "@/lib/cache.server";
+
+// Aggregates tolerate a minute of staleness; writes in the tenant invalidate sooner.
+const DASHBOARD_CACHE_TTL_SECONDS = 60;
 
 const CountSchema = z.number().int().nonnegative();
 const NamedCountSchema = z
@@ -123,9 +127,21 @@ const CandidateAssignmentKpisSchema = z
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireDashboardAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.rpc("dashboard_overview");
-    if (error) throw new Error(`Unable to load dashboard overview: ${error.message}`);
-    if (!data) throw new Error("Dashboard overview is unavailable for this user");
+    const data = await cached(
+      {
+        tenantId: context.tenantId,
+        userId: context.userId,
+        name: "dashboard:overview",
+        ttlSeconds: DASHBOARD_CACHE_TTL_SECONDS,
+      },
+      async () => {
+        const { data, error } = await context.supabase.rpc("dashboard_overview");
+        if (error) throw new Error(`Unable to load dashboard overview: ${error.message}`);
+        if (!data) throw new Error("Dashboard overview is unavailable for this user");
+        return data;
+      },
+    );
+    // Parsed after the cache so a cached payload is validated like a fresh one.
     const overview = DashboardOverviewSchema.parse(data);
     return {
       ...overview,
@@ -136,8 +152,19 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
 export const getCandidateAssignmentKpis = createServerFn({ method: "GET" })
   .middleware([requireDashboardAccess])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.rpc("candidate_assignment_kpis");
-    if (error) throw new Error("Unable to load assigned-candidate metrics.");
+    const data = await cached(
+      {
+        tenantId: context.tenantId,
+        userId: context.userId,
+        name: "dashboard:candidate-assignment-kpis",
+        ttlSeconds: DASHBOARD_CACHE_TTL_SECONDS,
+      },
+      async () => {
+        const { data, error } = await context.supabase.rpc("candidate_assignment_kpis");
+        if (error) throw new Error("Unable to load assigned-candidate metrics.");
+        return data;
+      },
+    );
     return CandidateAssignmentKpisSchema.parse(data);
   });
 

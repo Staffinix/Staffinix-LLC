@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireInterviewsAccess } from "@/integrations/supabase/auth-middleware";
+import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { isSafeHttpUrl } from "@/lib/safe-url";
 
@@ -40,7 +41,7 @@ const InterviewInputSchema = z.object({
 
 // list — optional filter by submission_id or upcoming
 export const listInterviews = createServerFn({ method: "POST" })
-  .middleware([requireInterviewsAccess])
+  .middleware([requireInterviewsAccess, readOnlyServerFn])
   .validator((i: unknown) =>
     z
       .object({
@@ -97,13 +98,15 @@ export const scheduleInterview = createServerFn({ method: "POST" })
       .eq("id", data.submission_id)
       .maybeSingle();
     if (sub && ["submitted", "vendor_review", "client_review"].includes(sub.stage)) {
-      await supabase
+      const { error: stageError } = await supabase
         .from("submissions")
         .update({ stage: "interview" })
         .eq("id", data.submission_id);
+      // The interview is already saved; surface the failed follow-up instead of dropping it.
+      if (stageError) console.error("[interviews] stage update failed", stageError.code);
     }
 
-    await supabase.from("submission_events").insert({
+    const { error: eventError } = await supabase.from("submission_events").insert({
       submission_id: data.submission_id,
       event_type: "interview_scheduled",
       actor_id: userId,
@@ -111,6 +114,7 @@ export const scheduleInterview = createServerFn({ method: "POST" })
       message: `${data.round.toUpperCase()} scheduled${data.scheduled_at ? ` for ${data.scheduled_at}` : ""}`,
       metadata: { interview_id: row.id, round: data.round },
     });
+    if (eventError) console.error("[interviews] timeline event failed", eventError.code);
 
     return { id: row.id };
   });
@@ -139,7 +143,7 @@ export const updateInterview = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (data.values.outcome && data.values.outcome !== current.outcome) {
-      await supabase.from("submission_events").insert({
+      const { error: eventError } = await supabase.from("submission_events").insert({
         submission_id: current.submission_id,
         event_type: "interview_updated",
         actor_id: userId,
@@ -147,6 +151,7 @@ export const updateInterview = createServerFn({ method: "POST" })
         message: `${current.round.toUpperCase()} outcome: ${data.values.outcome}`,
         metadata: { interview_id: data.id, outcome: data.values.outcome },
       });
+      if (eventError) console.error("[interviews] timeline event failed", eventError.code);
     }
     return { ok: true };
   });
