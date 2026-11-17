@@ -112,7 +112,8 @@ export async function processDocumentForExtraction(input: {
     });
     responseText = await readLimitedWorkerResponse(response);
   } catch (error) {
-    if (controller.signal.aborted) throw new Error("Document processing timed out");
+    if (controller.signal.aborted)
+      throw new Error("Document processing timed out", { cause: error });
     throw new Error("Isolated document processing failed", { cause: error });
   } finally {
     clearTimeout(timeout);

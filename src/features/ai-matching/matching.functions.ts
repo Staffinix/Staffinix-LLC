@@ -946,6 +946,7 @@ Return ONLY JSON:
     } catch (error) {
       throw new Error(
         `Unable to generate match rationale: ${error instanceof Error ? error.message : "unknown error"}`,
+        { cause: error },
       );
     }
   });

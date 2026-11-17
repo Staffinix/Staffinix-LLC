@@ -476,7 +476,7 @@ function SignInForm({ redirect }: { redirect: string }) {
     }
 
     setLoading(true);
-    let postAuthRedirect = redirect;
+    let postAuthRedirect: string;
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({

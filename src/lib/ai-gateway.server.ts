@@ -92,7 +92,7 @@ export async function fetchAiGateway(
     });
     responseText = await readLimitedText(response, MAX_AI_RESPONSE_BYTES);
   } catch (error) {
-    if (controller.signal.aborted) throw new Error("AI request timed out");
+    if (controller.signal.aborted) throw new Error("AI request timed out", { cause: error });
     throw new Error("AI request failed", { cause: error });
   } finally {
     clearTimeout(timeout);
