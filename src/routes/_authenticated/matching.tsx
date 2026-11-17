@@ -544,7 +544,16 @@ function MatchingPage() {
                           </Button>
                         )}
                         <Button asChild size="sm">
-                          <Link to="/candidates/$id" params={{ id: row.candidate.id }}>
+                          <Link
+                            to="/candidates/$id"
+                            params={{ id: row.candidate.id }}
+                            search={{
+                              from: "ai-matching",
+                              reqId,
+                              candidateId: row.candidate.id,
+                              emailId,
+                            }}
+                          >
                             View candidate
                           </Link>
                         </Button>
