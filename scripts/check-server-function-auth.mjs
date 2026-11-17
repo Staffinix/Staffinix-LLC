@@ -14,6 +14,10 @@ const violations = [];
 let serverFunctionCount = 0;
 const intentionallyPublicFunctions = new Set(["src/lib/contact-us.functions.ts:submitContactUs"]);
 const authMiddlewareSource = readFileSync("src/integrations/supabase/auth-middleware.ts", "utf8");
+const authenticateSource = readFileSync(
+  "src/integrations/supabase/authenticate-request.ts",
+  "utf8",
+);
 const profileFunctionsSource = readFileSync("src/lib/profile.functions.ts", "utf8");
 const authenticatedMiddlewareNames = new Set([
   "requireSupabaseAuth",
@@ -88,8 +92,8 @@ for (const [file, guards] of Object.entries(privilegedGuards)) {
   }
 }
 
-const selectsActiveProfile = /\.select\("[^"]*\bis_active\b[^"]*"\)/.test(authMiddlewareSource);
-const deniesInactiveProfile = authMiddlewareSource.includes("profile?.is_active !== true");
+const selectsActiveProfile = /\.select\("[^"]*\bis_active\b[^"]*"\)/.test(authenticateSource);
+const deniesInactiveProfile = authenticateSource.includes("profile?.is_active !== true");
 if (!selectsActiveProfile || !deniesInactiveProfile) {
   violations.push("Authentication middleware does not enforce active profiles");
 }

@@ -44,6 +44,8 @@ export default tseslint.config(
         "warn",
         {
           allowConstantExport: true,
+          // TanStack Router route modules export `Route = createFileRoute(...)({ component })`.
+          extraHOCs: ["createFileRoute", "createRootRoute", "createRootRouteWithContext"],
           allowExportNames: [
             "badgeVariants",
             "buttonVariants",
