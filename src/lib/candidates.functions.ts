@@ -1181,9 +1181,9 @@ export const getResumeSignedUrl = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
     z
       .object({
-  path: z.string().trim().min(1).max(1000),
-  download: z.boolean().optional().default(false),
-})
+        path: z.string().trim().min(1).max(1000),
+        download: z.boolean().optional().default(false),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -1228,14 +1228,10 @@ export const getResumeSignedUrl = createServerFn({ method: "POST" })
     }
 
     const { data: signed, error } = await supabase.storage
-  .from("resumes")
-  .createSignedUrl(
-    data.path,
-    60 * 10,
-    {
-      download: data.download ? resume.file_name : false,
-    },
-  );
+      .from("resumes")
+      .createSignedUrl(data.path, 60 * 10, {
+        download: data.download ? resume.file_name : false,
+      });
 
     if (error) {
       throw new Error(`Failed to create resume URL: ${error.message}`);

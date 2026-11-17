@@ -83,10 +83,7 @@ function MatchingPage() {
   const { reqId, candidateId, emailId } = Route.useSearch();
   const hasSource = Boolean(reqId || emailId);
   const navigate = useNavigate();
- const [search, setSearch] = useState(() => {
-  const saved = sessionStorage.getItem("ai-matching-filters");
-  return saved ? JSON.parse(saved).search ?? "" : "";
-});
+  const [search, setSearch] = useState("");
   const [minimumScore, setMinimumScore] = useState("0");
   const [technologyFilter, setTechnologyFilter] = useState("all");
   const [visaFilters, setVisaFilters] = useState<string[]>([]);
@@ -548,15 +545,15 @@ function MatchingPage() {
                         )}
                         <Button asChild size="sm">
                           <Link
-                                   to="/candidates/$id"
-                                  params={{ id: row.candidate.id }}
-                                 search={{
-                                         from: "ai-matching",
-                                         reqId,
-                                         candidateId: row.candidate.id,
-                                         emailId,
-                                        }}
-                                   >
+                            to="/candidates/$id"
+                            params={{ id: row.candidate.id }}
+                            search={{
+                              from: "ai-matching",
+                              reqId,
+                              candidateId: row.candidate.id,
+                              emailId,
+                            }}
+                          >
                             View candidate
                           </Link>
                         </Button>
