@@ -30,7 +30,7 @@ import {
   Phone,
   Globe,
   MapPin,
-  Linkedin,
+  Link2,
   Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -165,7 +165,7 @@ function VendorDetailPage() {
                   value={v.contact_role ?? "—"}
                 />
                 <Row
-                  icon={<Linkedin className="h-4 w-4" />}
+                  icon={<Link2 className="h-4 w-4" />}
                   label="LinkedIn"
                   value={v.linkedin_id ?? "—"}
                 />
