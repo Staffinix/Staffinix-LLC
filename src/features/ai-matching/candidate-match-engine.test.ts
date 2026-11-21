@@ -188,3 +188,17 @@ test("treats a whitespace-only location as missing for an on-site role", () => {
   assert.equal(result.eligibility, "needs_review");
   assert.ok(result.review_notes.includes("Candidate location is not recorded"));
 });
+
+test("splits comma-separated requirement skills into individual skills", () => {
+  const result = evaluate({
+    requirementSkills: [
+      { skill: "Python, Kubernetes,", is_mandatory: true, source: "structured" },
+      { skill: "SQL, Terraform", is_mandatory: false, source: "structured" },
+    ],
+    candidateSkills: ["Python", "SQL"],
+  });
+  assert.ok(result.matched_required_skills.includes("Python"));
+  assert.ok(result.missing_required_skills.includes("Kubernetes"));
+  assert.ok(result.matched_preferred_skills.includes("SQL"));
+  assert.ok(result.missing_preferred_skills.includes("Terraform"));
+});

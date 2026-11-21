@@ -274,24 +274,24 @@ export function evaluateCandidateMatch(input: {
 }): CandidateMatchEvaluation {
   const { requirement, candidate, evidence } = input;
   const structuredMandatory = input.requirementSkills
-  .filter((skill) => skill.is_mandatory)
-  .flatMap((skill) =>
-    skill.skill
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .map((name) => ({ ...skill, skill: name })),
-  );
+    .filter((skill) => skill.is_mandatory)
+    .flatMap((skill) =>
+      skill.skill
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => ({ ...skill, skill: name })),
+    );
 
-const structuredPreferred = input.requirementSkills
-  .filter((skill) => !skill.is_mandatory)
-  .flatMap((skill) =>
-    skill.skill
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .map((name) => ({ ...skill, skill: name })),
-  );
+  const structuredPreferred = input.requirementSkills
+    .filter((skill) => !skill.is_mandatory)
+    .flatMap((skill) =>
+      skill.skill
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => ({ ...skill, skill: name })),
+    );
   const primarySkill =
     structuredMandatory.length === 0 && requirement.primary_technology
       ? [

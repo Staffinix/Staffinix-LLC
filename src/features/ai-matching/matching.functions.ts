@@ -279,23 +279,21 @@ export function computeSingleMatchScore(
   cand: CandidateScoringInput | null | undefined,
 ): number {
   if (!req || !cand) return 0;
-  console.log("Raw requirement skills:", req.skills);
   const reqSkillsRows: SkillRow[] =
-  req.skills && Array.isArray(req.skills)
-    ? req.skills.flatMap((s) => {
-        const skillText = typeof s === "string" ? s : s.skill;
-        const is_mandatory =
-          typeof s === "object" ? Boolean(s.is_mandatory) : true;
+    req.skills && Array.isArray(req.skills)
+      ? req.skills.flatMap((s) => {
+          const skillText = typeof s === "string" ? s : s.skill;
+          const is_mandatory = typeof s === "object" ? Boolean(s.is_mandatory) : true;
 
-        return skillText
-          .split(",")
-          .map((skill) => skill.trim())
-          .filter(Boolean)
-          .map((skill) => ({ skill, is_mandatory }));
-      })
-    : req.primary_technology
-      ? [{ skill: req.primary_technology, is_mandatory: true }]
-      : [];
+          return skillText
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+            .map((skill) => ({ skill, is_mandatory }));
+        })
+      : req.primary_technology
+        ? [{ skill: req.primary_technology, is_mandatory: true }]
+        : [];
   const candSkillList: string[] = Array.isArray(cand.skills)
     ? cand.skills.map((skill: string | SkillRow) =>
         typeof skill === "string" ? skill : skill.skill,
