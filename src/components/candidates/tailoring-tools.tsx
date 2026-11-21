@@ -90,24 +90,26 @@ export function TailoringAnalysis({
   candidate: Candidate;
   requirement: Requirement;
 }) {
-  const analysis = useMemo(
-    () =>
-      evaluateCandidateMatch({
-        candidate,
-        requirement,
-        requirementSkills: requirement.skills,
-        evidence: {
-          skills: candidate.skills,
-          employment: candidate.employment,
-          education: candidate.education,
-          projects: candidate.projects,
-          certifications: candidate.certifications,
-          resumeText: candidate.resumes.find((resume) => resume.verification_status === "verified")
-            ?.extracted_text,
-        },
-      }),
-    [candidate, requirement],
-  );
+  
+  const analysis = useMemo(() => {
+  console.log("Requirement skills:", requirement.skills);
+
+  return evaluateCandidateMatch({
+    candidate,
+    requirement,
+    requirementSkills: requirement.skills,
+    evidence: {
+      skills: candidate.skills,
+      employment: candidate.employment,
+      education: candidate.education,
+      projects: candidate.projects,
+      certifications: candidate.certifications,
+      resumeText: candidate.resumes.find(
+        (resume) => resume.verification_status === "verified"
+      )?.extracted_text,
+    },
+  });
+}, [candidate, requirement]);
   return (
     <Card>
       <CardHeader>

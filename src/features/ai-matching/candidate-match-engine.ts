@@ -273,8 +273,25 @@ export function evaluateCandidateMatch(input: {
   evidence: CandidateMatchEvidence;
 }): CandidateMatchEvaluation {
   const { requirement, candidate, evidence } = input;
-  const structuredMandatory = input.requirementSkills.filter((skill) => skill.is_mandatory);
-  const structuredPreferred = input.requirementSkills.filter((skill) => !skill.is_mandatory);
+  const structuredMandatory = input.requirementSkills
+  .filter((skill) => skill.is_mandatory)
+  .flatMap((skill) =>
+    skill.skill
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .map((name) => ({ ...skill, skill: name })),
+  );
+
+const structuredPreferred = input.requirementSkills
+  .filter((skill) => !skill.is_mandatory)
+  .flatMap((skill) =>
+    skill.skill
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .map((name) => ({ ...skill, skill: name })),
+  );
   const primarySkill =
     structuredMandatory.length === 0 && requirement.primary_technology
       ? [
@@ -308,9 +325,11 @@ export function evaluateCandidateMatch(input: {
       ...(item.technologies ?? []),
     ]),
   ].filter((value): value is string => Boolean(value?.trim()));
+
   const matchesEvidence = conceptMatcher(evidenceParts.join(" "));
   const requiredSkillMatch = matchSkills(requiredSkills, matchesEvidence);
   const preferredSkillMatch = matchSkills(preferredSkills, matchesEvidence);
+
   const roleText = [
     candidate.current_title,
     candidate.required_job,
