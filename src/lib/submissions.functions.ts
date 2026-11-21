@@ -4,6 +4,7 @@ import { requireSubmissionsAccess } from "@/integrations/supabase/auth-middlewar
 import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
+import { getTeamMemberNames } from "@/lib/team-member-names";
 import { writeAudit } from "./audit.server";
 import { hasValidSubmissionResumeEvidence } from "./submission-resume-evidence";
 import { PipelineStageChangeSchema } from "./pipeline-stages";
@@ -116,7 +117,13 @@ export const listSubmissions = createServerFn({ method: "POST" })
       : { data: [], error: null };
     if (profilesError)
       throw new Error(`Unable to load submission actors: ${profilesError.message}`);
-    const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+    // Recruiters can read only their own profile, so colleagues resolve to a name alone.
+    const names = await getTeamMemberNames(supabase, actorIds);
+    const profileMap = new Map<
+      string,
+      { id: string; full_name: string | null; email: string | null }
+    >([...names].map(([id, full_name]) => [id, { id, full_name, email: null }]));
+    for (const profile of profiles ?? []) profileMap.set(profile.id, profile);
 
     return {
       rows: (rows ?? []).map((row) => ({

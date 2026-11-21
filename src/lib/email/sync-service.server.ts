@@ -209,6 +209,7 @@ export async function synchronizeEmailAccount(options: {
       const result = await evaluateEmail(message, rules, classifier);
       let status: "selected" | "ignored" | "duplicate" = result.relevant ? "selected" : "ignored";
       if (result.relevant) {
+        const body = (message.textBody ?? message.htmlBody?.replace(/<[^>]*>/g, " ") ?? "").trim();
         const { data: stored, error } = await supabase
           .from("selected_emails")
           .upsert(
@@ -222,10 +223,7 @@ export async function synchronizeEmailAccount(options: {
               sender_email: message.from.email,
               recipient_emails: message.to.map((recipient) => recipient.email),
               subject: message.subject.slice(0, 2000),
-              preview: (message.textBody ?? message.htmlBody?.replace(/<[^>]*>/g, " ") ?? "")
-                .replace(/\s+/g, " ")
-                .trim()
-                .slice(0, 1000),
+              preview: body.replace(/\s+/g, " ").slice(0, 1000),
               received_at: message.receivedAt,
               has_attachments: message.hasAttachments,
               matched_rule_id: result.matchedRuleId ?? null,
@@ -243,6 +241,14 @@ export async function synchronizeEmailAccount(options: {
         if (!stored) status = "duplicate";
         else {
           selected += 1;
+          // A failed import must not block the mailbox; a full rescan retries it.
+          const { error: requirementError } = await supabase.rpc("create_requirement_from_email", {
+            _selected_email_id: stored.id,
+            _description: body.slice(0, 20_000),
+          });
+          if (requirementError) {
+            console.error("[email-sync] requirement import failed", requirementError.code);
+          }
           if (message.attachments.length > 0) {
             const { error: attachmentError } = await supabase.from("email_attachments").upsert(
               message.attachments.map((attachment) => ({

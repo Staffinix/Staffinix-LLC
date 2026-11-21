@@ -1471,6 +1471,10 @@ export type Database = {
           rate_type: Database["public"]["Enums"]["requirement_rate_type"] | null;
           recruiter_notes: string | null;
           source: Database["public"]["Enums"]["requirement_source"];
+          source_email_id: string | null;
+          source_email_received_at: string | null;
+          source_email_sender_address: string | null;
+          source_email_sender_name: string | null;
           status: Database["public"]["Enums"]["requirement_status"];
           tenant_id: string;
           title: string;
@@ -1585,6 +1589,8 @@ export type Database = {
           source_hash: string | null;
           source_resume_id: string | null;
           status: string;
+          target_domain: string | null;
+          target_technology: string | null;
           tailored_content: string | null;
           tailored_summary: string | null;
           version_no: number;
@@ -1606,6 +1612,8 @@ export type Database = {
           source_hash?: string | null;
           source_resume_id?: string | null;
           status?: string;
+          target_domain?: string | null;
+          target_technology?: string | null;
           tailored_content?: string | null;
           tailored_summary?: string | null;
           version_no?: number;
@@ -1627,6 +1635,8 @@ export type Database = {
           source_hash?: string | null;
           source_resume_id?: string | null;
           status?: string;
+          target_domain?: string | null;
+          target_technology?: string | null;
           tailored_content?: string | null;
           tailored_summary?: string | null;
           version_no?: number;
@@ -2295,6 +2305,14 @@ export type Database = {
         }[];
       };
       candidate_assignment_kpis: { Args: never; Returns: Json };
+      create_requirement_from_email: {
+        Args: { _description: string; _selected_email_id: string };
+        Returns: string | null;
+      };
+      get_team_member_names: {
+        Args: { _user_ids: string[] };
+        Returns: { id: string; full_name: string }[];
+      };
       claim_candidate_embedding_jobs: {
         Args: { _limit?: number };
         Returns: {

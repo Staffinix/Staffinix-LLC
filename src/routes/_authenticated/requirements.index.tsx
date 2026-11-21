@@ -242,6 +242,8 @@ function RequisitionsListPage() {
                   <TableHead>Target Rate</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Priority</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Created by</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,6 +320,33 @@ function RequisitionsListPage() {
                       >
                         {getPriorityLabel(r.priority)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] text-xs">
+                      {r.source_email_sender_address ? (
+                        <>
+                          <Badge variant="secondary" className="text-[10px] font-normal">
+                            From mail
+                          </Badge>
+                          {r.source_email_sender_name && (
+                            <p className="mt-1 truncate font-medium text-foreground">
+                              {r.source_email_sender_name}
+                            </p>
+                          )}
+                          <p className="truncate text-muted-foreground">
+                            {r.source_email_sender_address}
+                          </p>
+                        </>
+                      ) : (
+                        <span className="capitalize text-muted-foreground">{r.source}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <p className="font-medium text-foreground">
+                        {r.creator?.full_name ?? "Not recorded"}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </p>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">

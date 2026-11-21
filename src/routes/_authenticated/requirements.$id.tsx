@@ -78,6 +78,25 @@ function RequirementDetailPage() {
 
         <Card className="border-border bg-card">
           <CardContent className="grid gap-4 p-6 md:grid-cols-4">
+            <Detail label="Created by" value={requirement.creator?.full_name ?? null} />
+            {requirement.source_email_sender_address ? (
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Source
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  From mail
+                  {requirement.source_email_sender_name
+                    ? `: ${requirement.source_email_sender_name}`
+                    : ""}
+                </p>
+                <p className="break-all text-xs text-muted-foreground">
+                  {requirement.source_email_sender_address}
+                </p>
+              </div>
+            ) : (
+              <Detail label="Source" value={requirement.source} />
+            )}
             <Detail label="Status" value={requirement.status} />
             <Detail label="Priority" value={requirement.priority} />
             <Detail label="Work mode" value={requirement.work_mode} />

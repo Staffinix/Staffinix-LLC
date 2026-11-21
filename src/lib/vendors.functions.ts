@@ -2,10 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireVendorsAccess } from "@/integrations/supabase/auth-middleware";
 import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { isSafeHttpUrl } from "@/lib/safe-url";
-
-const STATUSES = ["prospect", "active", "inactive"] as const;
-const TIERS = ["a", "b", "c"] as const;
+import { importVendorRows } from "@/lib/vendor-import";
+import {
+  VENDOR_STATUSES as STATUSES,
+  VENDOR_TIERS as TIERS,
+  VendorInputSchema,
+} from "@/lib/vendor-schema";
 
 const VENDOR_LIST_FIELDS =
   "id, name, status, tier, contact_name, contact_email, contact_phone, linkedin_id, contact_role, city, state, country, payment_terms_days, created_at";
@@ -13,42 +15,6 @@ const VENDOR_DETAIL_FIELDS =
   "id, name, status, tier, contact_name, contact_email, contact_phone, linkedin_id, contact_role, website, address, city, state, country, postal_code, tax_id, payment_terms_days, msa_signed_at, notes";
 const VENDOR_EXPORT_FIELDS =
   "name, contact_name, contact_email, contact_phone, linkedin_id, contact_role, website, status, tier, payment_terms_days, address, city, state, country, postal_code, tax_id, msa_signed_at, notes";
-
-const VendorInputSchema = z.object({
-  name: z.string().trim().min(2).max(160),
-  status: z.enum(STATUSES).default("active"),
-  tier: z.enum(TIERS).nullable().optional(),
-  contact_name: z.string().trim().max(120).nullable().optional(),
-  contact_email: z
-    .string()
-    .trim()
-    .email()
-    .max(255)
-    .nullable()
-    .optional()
-    .or(z.literal("").transform(() => null)),
-  contact_phone: z.string().trim().max(40).nullable().optional(),
-  linkedin_id: z.string().trim().max(255).nullable().optional(),
-  contact_role: z.string().trim().max(120).nullable().optional(),
-  website: z
-    .string()
-    .trim()
-    .max(255)
-    .url()
-    .refine(isSafeHttpUrl, "Website must use HTTP or HTTPS")
-    .nullable()
-    .optional()
-    .or(z.literal("").transform(() => null)),
-  address: z.string().trim().max(240).nullable().optional(),
-  city: z.string().trim().max(120).nullable().optional(),
-  state: z.string().trim().max(120).nullable().optional(),
-  country: z.string().trim().max(120).nullable().optional(),
-  postal_code: z.string().trim().max(24).nullable().optional(),
-  tax_id: z.string().trim().max(60).nullable().optional(),
-  payment_terms_days: z.number().int().min(0).max(365).nullable().optional(),
-  msa_signed_at: z.string().trim().max(20).nullable().optional(),
-  notes: z.string().trim().max(5000).nullable().optional(),
-});
 
 const ListSchema = z.object({
   search: z.string().trim().max(120).optional(),
@@ -98,7 +64,7 @@ export const listVendors = createServerFn({ method: "POST" })
   });
 
 export const exportVendors = createServerFn({ method: "POST" })
-  .middleware([requireVendorsAccess])
+  .middleware([requireVendorsAccess, readOnlyServerFn])
   .validator((input: unknown) =>
     z
       .object({ cursor: z.string().uuid().optional(), asOf: z.string().datetime().optional() })
@@ -125,16 +91,27 @@ export const exportVendors = createServerFn({ method: "POST" })
 export const importVendors = createServerFn({ method: "POST" })
   .middleware([requireVendorsAccess])
   .validator((input: unknown) =>
-    z.object({ rows: z.array(VendorInputSchema).min(1).max(1000) }).parse(input),
+    z.object({ rows: z.array(VendorInputSchema).min(1).max(100) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const payload = data.rows.map((row) => ({ ...row, created_by: context.userId }));
-    const { data: inserted, error } = await context.supabase
-      .from("vendors")
-      .insert(payload)
-      .select("id");
-    if (error) throw new Error(`Failed to import vendors: ${error.message}`);
-    return { imported: inserted?.length ?? 0 };
+    const contactlessNames = payload
+      .filter((row) => !row.contact_email && !row.contact_phone)
+      .map((row) => row.name);
+    let existingNames = new Set<string>();
+    if (contactlessNames.length) {
+      const { data: existing, error } = await context.supabase
+        .from("vendors")
+        .select("name")
+        .in("name", contactlessNames)
+        .limit(1000);
+      if (error) throw new Error(`Failed to check existing vendors: ${error.message}`);
+      existingNames = new Set((existing ?? []).map((row) => row.name));
+    }
+    return importVendorRows(payload, existingNames, async (rows) => {
+      const { error } = await context.supabase.from("vendors").insert(rows);
+      return error;
+    });
   });
 
 export const getVendor = createServerFn({ method: "POST" })

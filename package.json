@@ -24,7 +24,7 @@
     "test:candidate-updates": "node --test --experimental-strip-types src/lib/candidate-child-updates.test.ts src/lib/candidate-search.test.ts",
     "test:candidate-form": "node --test --experimental-strip-types src/lib/candidate-form.test.ts src/lib/candidate-required-details.test.ts src/lib/candidate-submission-attribution.test.ts",
     "test:app-shell": "node --test --experimental-strip-types src/components/app-shell/scroll-layout.test.ts src/components/app-shell/nav-visibility.test.ts",
-    "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts src/lib/vendor-export.test.ts",
+    "test:vendor-csv": "node --test --experimental-strip-types src/lib/vendor-csv.test.ts src/lib/vendor-export.test.ts src/lib/vendor-import.test.ts",
     "test:resume-paths": "node --test --experimental-strip-types src/lib/resume-storage-path.test.ts src/lib/delete-original-resume.server.test.ts src/lib/candidate-resume-cleanup.server.test.ts src/lib/resume-storage-job.test.ts",
     "document-worker": "node workers/document-processor/server.mjs",
     "test:document-worker": "node --test --experimental-strip-types workers/document-processor/document-job.test.mjs src/lib/document-processing.server.test.ts",
@@ -32,7 +32,7 @@
     "test:ai-usage": "node --test --experimental-strip-types src/lib/ai-usage.server.test.ts",
     "test:copilot": "node --test --experimental-strip-types src/lib/copilot-candidate-count.test.ts",
     "test:matching-filters": "node --test --experimental-strip-types src/features/ai-matching/matching-visa-filter.test.ts",
-    "test:matching-engine": "node --test --experimental-strip-types src/features/ai-matching/candidate-match-engine.test.ts src/features/ai-matching/email-match-input.test.ts src/lib/tailoring-selection.test.ts",
+    "test:matching-engine": "node --test --experimental-strip-types src/features/ai-matching/candidate-match-engine.test.ts src/features/ai-matching/email-match-input.test.ts src/lib/tailoring-selection.test.ts src/lib/tailoring-targets.test.ts",
     "test:email": "node --test --experimental-strip-types src/lib/email/connection-health.test.ts src/lib/email/filter-engine.test.ts src/lib/email/providers.server.test.ts src/lib/email/sync-cursor.test.ts src/lib/email/rule-form-validation.test.ts src/lib/email/token-crypto.server.test.ts",
     "test:rag": "node --test --experimental-strip-types src/lib/rag.server.test.ts",
     "test:rag:integration": "node --experimental-strip-types scripts/smoke-rag.mts",
@@ -116,6 +116,7 @@
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",
     "react-resizable-panels": "^4.14.3",
+    "read-excel-file": "9.3.20",
     "recharts": "^2.15.4",
     "redis": "^6.3.1",
     "sonner": "^2.0.8",
@@ -125,6 +126,7 @@
     "unpdf": "1.9.1",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
+    "write-excel-file": "4.1.1",
     "zod": "^4.6.6"
   },
   "devDependencies": {

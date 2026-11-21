@@ -17,6 +17,7 @@ import { isCanonicalResumePathFor } from "@/lib/resume-storage-path";
 import { MARKETING_TYPES } from "@/lib/candidates-constants";
 import { normalizeUsPhone, US_PHONE_ERROR } from "@/lib/us-phone";
 import { z } from "zod";
+import { getTeamMemberNames } from "@/lib/team-member-names";
 import {
   finishResumeStorageBestEffort,
   recordValidatedResumeUpload,
@@ -261,6 +262,7 @@ const ListInputSchema = z.object({
   skill: z.string().trim().max(80).optional(),
   assignment_state: z.enum(["assigned", "unassigned"]).optional(),
   assigned_to_any: z.array(z.string().uuid()).max(100).optional(),
+  assigned_to_me: z.boolean().optional(),
   submission_state: z.enum(["submitted", "unsubmitted"]).optional(),
   submission_sort: z.enum(["asc", "desc"]).optional(),
   resume_state: z.enum(["with", "without"]).optional(),
@@ -317,6 +319,7 @@ export const listCandidates = createServerFn({ method: "POST" })
     if (data.assignment_state === "assigned") q = q.not("assigned_to", "is", null);
     if (data.assignment_state === "unassigned") q = q.is("assigned_to", null);
     if (data.assigned_to_any?.length) q = q.in("assigned_to", data.assigned_to_any);
+    if (data.assigned_to_me) q = q.eq("assigned_to", context.userId);
     if (data.submission_state === "submitted") q = q.not("last_submitted_at", "is", null);
     if (data.submission_state === "unsubmitted") q = q.is("last_submitted_at", null);
     if (data.min_experience != null) q = q.gte("experience_years", data.min_experience);
@@ -334,6 +337,7 @@ export const listCandidates = createServerFn({ method: "POST" })
       ...new Set(
         candidateRows
           .flatMap((candidate) => [
+            candidate.created_by,
             candidate.assigned_to,
             candidate.submissions[0]?.submitted_by,
             getCandidateSubmissionAttribution(candidate).userId,
@@ -349,9 +353,18 @@ export const listCandidates = createServerFn({ method: "POST" })
       : { data: [], error: null };
     if (profilesResult.error) throw new Error("Unable to resolve assigned recruiters.");
 
-    const profileById = new Map(
-      (profilesResult.data ?? []).map((profile) => [profile.id, profile]),
+    // Recruiters can read only their own profile, so colleagues resolve to a name alone.
+    const nameById = await getTeamMemberNames(supabase, profileIds);
+    const profileById = new Map<
+      string,
+      { id: string; full_name: string | null; email: string | null; avatar_url: string | null }
+    >(
+      profileIds.map((id) => [
+        id,
+        { id, full_name: nameById.get(id) ?? null, email: null, avatar_url: null },
+      ]),
     );
+    for (const profile of profilesResult.data ?? []) profileById.set(profile.id, profile);
 
     return {
       rows: candidateRows.map(({ candidate_skills, resumes, submissions, ...candidate }) => {
@@ -362,6 +375,9 @@ export const listCandidates = createServerFn({ method: "POST" })
             kind: attribution.kind,
             profile: attribution.userId ? (profileById.get(attribution.userId) ?? null) : null,
           },
+          created_by_name: candidate.created_by
+            ? (profileById.get(candidate.created_by)?.full_name ?? null)
+            : null,
           assigned_recruiter: candidate.assigned_to
             ? (profileById.get(candidate.assigned_to) ?? null)
             : null,
@@ -401,7 +417,7 @@ export const getCandidate = createServerFn({ method: "POST" })
     const { data: cand, error } = await supabase
       .from("candidates")
       .select(
-        "id, first_name, last_name, email, phone, location, current_title, current_employer, required_job, ready_to_relocate, preferred_location, primary_technology, experience_years, visa_status, marketing_types, availability, status, summary, linkedin_url, github_url, portfolio_url, min_rate, max_rate, rate_type, currency, source, assigned_to, assigned_at, assigned_by, ats_score, ai_notes, created_at, updated_at",
+        "id, created_by, first_name, last_name, email, phone, location, current_title, current_employer, required_job, ready_to_relocate, preferred_location, primary_technology, experience_years, visa_status, marketing_types, availability, status, summary, linkedin_url, github_url, portfolio_url, min_rate, max_rate, rate_type, currency, source, assigned_to, assigned_at, assigned_by, ats_score, ai_notes, created_at, updated_at",
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -461,7 +477,7 @@ export const getCandidate = createServerFn({ method: "POST" })
           : supabase
               .from("resume_versions")
               .select(
-                "id, candidate_id, requirement_id, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
+                "id, candidate_id, requirement_id, target_technology, target_domain, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
               )
               .eq("candidate_id", data.id)
               .order("created_at", { ascending: false })
@@ -484,8 +500,13 @@ export const getCandidate = createServerFn({ method: "POST" })
       }
     }
 
+    const creatorNames = cand.created_by
+      ? await getTeamMemberNames(supabase, [cand.created_by])
+      : new Map<string, string>();
+
     return {
       ...cand,
+      created_by_name: cand.created_by ? (creatorNames.get(cand.created_by) ?? null) : null,
       skills: skills.data ?? [],
       employment: employment.data ?? [],
       education: education.data ?? [],

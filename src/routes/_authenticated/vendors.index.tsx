@@ -24,7 +24,15 @@ import {
 } from "@/components/ui/select";
 import { collectVendorExport } from "@/lib/vendor-export";
 import { exportVendors, importVendors, listVendors } from "@/lib/vendors.functions";
-import { createVendorCsv, parseVendorCsv } from "@/lib/vendor-csv";
+import type { VendorCsvRow } from "@/lib/vendor-csv";
+import { downloadVendors, readVendorFile, type VendorFileFormat } from "@/lib/vendor-file";
+import { chunkVendorRows } from "@/lib/vendor-import";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   CRM_STATUSES,
   CRM_TIERS,
@@ -81,33 +89,54 @@ function VendorsListPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
 
   const importMutation = useMutation({
-    mutationFn: (rows: ReturnType<typeof parseVendorCsv>) => importFn({ data: { rows } }),
-    onSuccess: ({ imported }) => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
-      toast.success(`${imported} vendor${imported === 1 ? "" : "s"} imported`);
+    mutationFn: async (rows: VendorCsvRow[]) => {
+      let imported = 0;
+      let skipped = 0;
+      const failedRows: number[] = [];
+      for (const chunk of chunkVendorRows(rows)) {
+        try {
+          const result = await importFn({ data: { rows: chunk.rows } });
+          imported += result.imported;
+          skipped += result.skipped;
+          // Spreadsheet row numbers: the header is row 1.
+          failedRows.push(...result.failed.map((index) => chunk.start + index + 2));
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "Import failed";
+          if (!imported && !skipped) throw new Error(reason, { cause: error });
+          throw new Error(
+            `Import stopped after ${imported} new vendors. Import the file again; existing vendors are skipped. ${reason}`,
+            { cause: error },
+          );
+        }
+      }
+      return { imported, skipped, failedRows };
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["vendors"] }),
+    onSuccess: ({ imported, skipped, failedRows }) => {
+      const summary = `${imported} vendor${imported === 1 ? "" : "s"} imported${skipped ? `, ${skipped} already existed` : ""}`;
+      if (failedRows.length) {
+        const shown = failedRows.slice(0, 10).join(", ");
+        toast.warning(
+          `${summary}. Could not save row${failedRows.length === 1 ? "" : "s"} ${shown}${failedRows.length > 10 ? "…" : ""}.`,
+        );
+      } else {
+        toast.success(summary);
+      }
     },
   });
 
   const exportMutation = useMutation({
-    mutationFn: () => collectVendorExport((data) => exportFn({ data })),
-    onSuccess: (rows) => {
-      const blob = new Blob(["\uFEFF", createVendorCsv(rows)], {
-        type: "text/csv;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `vendors-${new Date().toISOString().slice(0, 10)}.csv`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      toast.success(`${rows.length} vendor${rows.length === 1 ? "" : "s"} exported`);
+    mutationFn: async (format: VendorFileFormat) => {
+      const rows = await collectVendorExport((data) => exportFn({ data }));
+      await downloadVendors(rows, format);
+      return rows.length;
     },
+    onSuccess: (count) => toast.success(`${count} vendor${count === 1 ? "" : "s"} exported`),
     onError: (error) => toast.error(error instanceof Error ? error.message : "Export failed"),
   });
 
   const handleImportFile = async (file: File) => {
-    if (file.size > 1024 * 1024) throw new Error("CSV file must be 1 MB or smaller.");
-    const rows = parseVendorCsv(await file.text());
+    const rows = await readVendorFile(file);
     if (rows.length > 1000) throw new Error("A single import can contain at most 1,000 vendors.");
     await importMutation.mutateAsync(rows);
   };
@@ -124,7 +153,7 @@ function VendorsListPage() {
               <input
                 ref={importInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="hidden"
                 onChange={async (event) => {
                   const input = event.currentTarget;
@@ -149,20 +178,28 @@ function VendorsListPage() {
                 ) : (
                   <Upload className="mr-2 h-4 w-4" />
                 )}
-                Import CSV
+                Import CSV / Excel
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => exportMutation.mutate()}
-                disabled={exportMutation.isPending}
-              >
-                {exportMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Export CSV
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={exportMutation.isPending}>
+                    {exportMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => exportMutation.mutate("xlsx")}>
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => exportMutation.mutate("csv")}>
+                    CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button onClick={() => navigate({ to: "/vendors/new" })}>
                 <Plus className="mr-2 h-4 w-4" /> New vendor
               </Button>

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireRequirementsAccess } from "@/integrations/supabase/auth-middleware";
 import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { getTeamMemberNames } from "@/lib/team-member-names";
 import { RequiredRequirementDetailsSchema } from "./requirement-form-validation";
 import { REQ_STATUSES as STATUSES } from "./requirements-constants";
 import type { TablesUpdate } from "@/integrations/supabase/types";
@@ -22,7 +23,7 @@ const RATE_TYPES = ["hourly", "annual", "monthly"] as const;
 const SOURCES = ["manual", "paste", "pdf", "docx", "email"] as const;
 
 const REQUIREMENT_DETAIL_FIELDS =
-  "id, title, client_id, vendor_id, vendor_email, vendor_contact, location, work_mode, visa_types, rate_min, rate_max, rate_type, currency, min_experience_years, max_experience_years, primary_technology, description, recruiter_notes, status, priority, source, duration, assigned_to, assigned_at, created_by, created_at, updated_at";
+  "id, title, client_id, vendor_id, vendor_email, vendor_contact, location, work_mode, visa_types, rate_min, rate_max, rate_type, currency, min_experience_years, max_experience_years, primary_technology, description, recruiter_notes, status, priority, source, source_email_sender_name, source_email_sender_address, source_email_received_at, duration, assigned_to, assigned_at, created_by, created_at, updated_at";
 
 const SkillSchema = z.object({
   skill: z.string().trim().min(1).max(80),
@@ -78,7 +79,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     let q = supabase
       .from("requirements")
       .select(
-        "id, title, status, priority, location, work_mode, primary_technology, rate_min, rate_max, rate_type, currency, visa_types, min_experience_years, max_experience_years, duration, created_at, updated_at, assigned_to, created_by, client_id, vendor_id",
+        "id, title, status, priority, location, work_mode, primary_technology, rate_min, rate_max, rate_type, currency, visa_types, min_experience_years, max_experience_years, duration, source, source_email_sender_name, source_email_sender_address, created_at, updated_at, assigned_to, created_by, client_id, vendor_id",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -127,6 +128,7 @@ export const listRequirements = createServerFn({ method: "POST" })
     const clientMap = new Map(clients.data?.map((c) => [c.id, c.name]));
     const vendorMap = new Map(vendors.data?.map((v) => [v.id, v.name]));
     const profileMap = new Map(profiles.data?.map((p) => [p.id, p]));
+    const nameMap = await getTeamMemberNames(supabase, userIds);
 
     return {
       rows: (rows ?? []).map((r) => ({
@@ -136,14 +138,16 @@ export const listRequirements = createServerFn({ method: "POST" })
         assignee: r.assigned_to
           ? {
               id: r.assigned_to,
-              full_name: profileMap.get(r.assigned_to)?.full_name ?? null,
+              full_name:
+                nameMap.get(r.assigned_to) ?? profileMap.get(r.assigned_to)?.full_name ?? null,
               email: profileMap.get(r.assigned_to)?.email ?? null,
             }
           : null,
         creator: r.created_by
           ? {
               id: r.created_by,
-              full_name: profileMap.get(r.created_by)?.full_name ?? null,
+              full_name:
+                nameMap.get(r.created_by) ?? profileMap.get(r.created_by)?.full_name ?? null,
               email: profileMap.get(r.created_by)?.email ?? null,
             }
           : null,
@@ -190,6 +194,10 @@ export const getRequirement = createServerFn({ method: "POST" })
     ]);
 
     const profileMap = new Map(profiles.data?.map((p) => [p.id, p]));
+    const nameMap = await getTeamMemberNames(
+      supabase,
+      [req.assigned_to, req.created_by].filter(Boolean) as string[],
+    );
     return {
       ...req,
       client_name: client.data?.name ?? null,
@@ -200,14 +208,16 @@ export const getRequirement = createServerFn({ method: "POST" })
       assignee: req.assigned_to
         ? {
             id: req.assigned_to,
-            full_name: profileMap.get(req.assigned_to)?.full_name ?? null,
+            full_name:
+              nameMap.get(req.assigned_to) ?? profileMap.get(req.assigned_to)?.full_name ?? null,
             email: profileMap.get(req.assigned_to)?.email ?? null,
           }
         : null,
       creator: req.created_by
         ? {
             id: req.created_by,
-            full_name: profileMap.get(req.created_by)?.full_name ?? null,
+            full_name:
+              nameMap.get(req.created_by) ?? profileMap.get(req.created_by)?.full_name ?? null,
             email: profileMap.get(req.created_by)?.email ?? null,
           }
         : null,

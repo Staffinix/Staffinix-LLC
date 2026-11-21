@@ -5,6 +5,7 @@ import { requireCandidatesAccess } from "@/integrations/supabase/auth-middleware
 import { readOnlyServerFn } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseAuthContext } from "@/integrations/supabase/auth-middleware";
 import { ForbiddenError } from "@/lib/authorization-policy";
+import { getTeamMemberNames } from "@/lib/team-member-names";
 
 const CandidateStatusSchema = z.enum(["active", "submitted", "placed", "on_hold", "inactive"]);
 
@@ -161,7 +162,13 @@ export const getCandidateManagement = createServerFn({ method: "POST" })
       : { data: [], error: null };
     if (profilesError) throw new Error("Unable to resolve candidate activity users.");
 
-    const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+    // Recruiters can read only their own profile, so colleagues resolve to a name alone.
+    const names = await getTeamMemberNames(context.supabase, [...profileIds]);
+    const profileById = new Map<
+      string,
+      { id: string; full_name: string | null; email: string | null; avatar_url: string | null }
+    >([...names].map(([id, full_name]) => [id, { id, full_name, email: null, avatar_url: null }]));
+    for (const profile of profiles ?? []) profileById.set(profile.id, profile);
     const resolveProfile = (id: string | null) => (id ? (profileById.get(id) ?? null) : null);
 
     return {

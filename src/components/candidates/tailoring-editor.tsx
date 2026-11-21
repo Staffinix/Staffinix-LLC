@@ -42,7 +42,9 @@ export function TailoringEditor({
       save({
         data: {
           candidate_id: candidate.id,
-          requirement_id: version.requirement_id!,
+          requirement_id: version.requirement_id ?? undefined,
+          target_technology: version.target_technology ?? undefined,
+          target_domain: version.target_domain ?? undefined,
           selection,
           expected_source_hash: version.source_hash!,
           source_resume_id: version.source_resume_id ?? undefined,
@@ -151,7 +153,11 @@ export function TailoringEditor({
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
-          disabled={!version.source_hash || !version.requirement_id || saveMutation.isPending}
+          disabled={
+            !version.source_hash ||
+            (!version.requirement_id && !version.target_technology) ||
+            saveMutation.isPending
+          }
           onClick={() => saveMutation.mutate(undefined)}
         >
           {saveMutation.isPending ? "Saving…" : "Save as new draft"}

@@ -51,6 +51,8 @@ SELECT results_eq(
   $$,
   $$ VALUES
     ('assign_candidates_to_recruiter'::name),
+    ('create_requirement_from_email'::name),
+    ('get_team_member_names'::name),
     ('mark_candidate_placed_from_submission'::name),
     ('match_candidates_for_requirement'::name),
     ('match_requirements_for_candidate'::name),

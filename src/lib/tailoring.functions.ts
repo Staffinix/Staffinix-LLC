@@ -16,14 +16,12 @@ import {
 import { writeAudit } from "@/lib/audit.server";
 import { runWithAiUsageGuard } from "@/lib/ai-usage.server";
 import { validateFactSelection } from "@/lib/tailoring-selection";
+import { buildTailoringRequirement, isValidTailoringTarget } from "@/lib/tailoring-targets";
 import { evaluateCandidateMatch } from "@/features/ai-matching/candidate-match-engine";
 
 type AppSupabase = SupabaseClient<Database>;
 
-const IdPairSchema = z.object({
-  candidate_id: z.string().uuid(),
-  requirement_id: z.string().uuid(),
-});
+type TailoringTarget = { requirementId: string } | { technology: string; domain: string };
 
 const SelectionSchema = z
   .object({
@@ -40,9 +38,12 @@ type FactSelection = z.infer<typeof SelectionSchema>;
 async function loadTailoringSource(
   supabase: AppSupabase,
   candidateId: string,
-  requirementId: string,
+  target: TailoringTarget,
   sourceResumeId?: string,
 ) {
+  const catalogTarget =
+    "technology" in target ? buildTailoringRequirement(target.technology, target.domain) : null;
+  const requirementId = "requirementId" in target ? target.requirementId : "";
   const resumeQuery = supabase
     .from("resumes")
     .select(
@@ -75,19 +76,23 @@ async function loadTailoringSource(
       )
       .eq("id", candidateId)
       .maybeSingle(),
-    supabase
-      .from("requirements")
-      .select(
-        "id, title, description, primary_technology, location, work_mode, visa_types, min_experience_years, max_experience_years",
-      )
-      .eq("id", requirementId)
-      .maybeSingle(),
-    supabase
-      .from("requirement_skills")
-      .select("id, skill, is_mandatory")
-      .eq("requirement_id", requirementId)
-      .order("is_mandatory", { ascending: false })
-      .order("skill"),
+    catalogTarget
+      ? { data: catalogTarget.requirement, error: null }
+      : supabase
+          .from("requirements")
+          .select(
+            "id, title, description, primary_technology, location, work_mode, visa_types, min_experience_years, max_experience_years",
+          )
+          .eq("id", requirementId)
+          .maybeSingle(),
+    catalogTarget
+      ? { data: catalogTarget.skills, error: null }
+      : supabase
+          .from("requirement_skills")
+          .select("id, skill, is_mandatory")
+          .eq("requirement_id", requirementId)
+          .order("is_mandatory", { ascending: false })
+          .order("skill"),
     supabase
       .from("candidate_skills")
       .select("id, skill, years, is_primary")
@@ -560,18 +565,36 @@ export const verifyCandidateResume = createServerFn({ method: "POST" })
 export const generateFactPreservingResume = createServerFn({ method: "POST" })
   .middleware([requireTailoringAccess])
   .validator((input: unknown) =>
-    IdPairSchema.extend({
-      selection: SelectionSchema.optional(),
-      expected_source_hash: z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
-        .optional(),
-      source_resume_id: z.string().uuid().optional(),
-      regenerate_section: z
-        .enum(["skill_ids", "employment_ids", "education_ids", "project_ids", "certification_ids"])
-        .optional(),
-    })
+    z
+      .object({
+        candidate_id: z.string().uuid(),
+        requirement_id: z.string().uuid().optional(),
+        target_technology: z.string().max(60).optional(),
+        target_domain: z.string().max(80).optional(),
+        selection: SelectionSchema.optional(),
+        expected_source_hash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        source_resume_id: z.string().uuid().optional(),
+        regenerate_section: z
+          .enum([
+            "skill_ids",
+            "employment_ids",
+            "education_ids",
+            "project_ids",
+            "certification_ids",
+          ])
+          .optional(),
+      })
       .strict()
+      .refine(
+        (value) =>
+          value.requirement_id
+            ? !value.target_technology && !value.target_domain
+            : isValidTailoringTarget(value.target_technology, value.target_domain),
+        "Select a requirement or a valid technology and domain.",
+      )
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -579,7 +602,9 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
     const source = await loadTailoringSource(
       supabase,
       data.candidate_id,
-      data.requirement_id,
+      data.requirement_id
+        ? { requirementId: data.requirement_id }
+        : { technology: data.target_technology!, domain: data.target_domain! },
       data.source_resume_id,
     );
     if (data.regenerate_section && !data.selection)
@@ -615,7 +640,9 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
       .from("resume_versions")
       .insert({
         candidate_id: data.candidate_id,
-        requirement_id: data.requirement_id,
+        requirement_id: data.requirement_id ?? null,
+        target_technology: data.requirement_id ? null : data.target_technology,
+        target_domain: data.requirement_id ? null : data.target_domain,
         source_resume_id: source.sourceResume.id,
         version_no: (latest?.version_no ?? 0) + 1,
         status: "draft",
@@ -632,7 +659,7 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
         created_by: userId,
       })
       .select(
-        "id, candidate_id, requirement_id, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
+        "id, candidate_id, requirement_id, target_technology, target_domain, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
       )
       .single();
     if (error) throw new Error(error.message);
@@ -645,7 +672,9 @@ export const generateFactPreservingResume = createServerFn({ method: "POST" })
       entityId: version.id,
       metadata: {
         candidate_id: data.candidate_id,
-        requirement_id: data.requirement_id,
+        requirement_id: data.requirement_id ?? null,
+        target_technology: data.requirement_id ? null : data.target_technology,
+        target_domain: data.requirement_id ? null : data.target_domain,
         source_resume_id: source.sourceResume.id,
         claim_count: claimValidation.claim_count,
       },
@@ -734,14 +763,18 @@ export const approveFactPreservingResume = createServerFn({ method: "POST" })
     const { data: current, error: currentError } = await supabase
       .from("resume_versions")
       .select(
-        "id, candidate_id, requirement_id, source_resume_id, source_hash, status, claim_validation",
+        "id, candidate_id, requirement_id, target_technology, target_domain, source_resume_id, source_hash, status, claim_validation",
       )
       .eq("id", data.version_id)
       .maybeSingle();
     if (currentError) throw new Error(currentError.message);
     if (!current) throw new Error("Tailored resume not found or access denied");
     if (current.status !== "draft") throw new Error("Only a draft can be approved");
-    if (!current.requirement_id || !current.source_resume_id || !current.source_hash) {
+    if (
+      (!current.requirement_id && !(current.target_technology && current.target_domain)) ||
+      !current.source_resume_id ||
+      !current.source_hash
+    ) {
       throw new Error("Draft is missing source evidence and cannot be approved");
     }
     const validation = current.claim_validation as { valid?: boolean } | null;
@@ -750,7 +783,9 @@ export const approveFactPreservingResume = createServerFn({ method: "POST" })
     const source = await loadTailoringSource(
       supabase,
       current.candidate_id,
-      current.requirement_id,
+      current.requirement_id
+        ? { requirementId: current.requirement_id }
+        : { technology: current.target_technology!, domain: current.target_domain! },
       current.source_resume_id,
     );
     if (source.sourceHash !== current.source_hash) {
@@ -763,7 +798,7 @@ export const approveFactPreservingResume = createServerFn({ method: "POST" })
       .eq("id", current.id)
       .eq("status", "draft")
       .select(
-        "id, candidate_id, requirement_id, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
+        "id, candidate_id, requirement_id, target_technology, target_domain, source_resume_id, version_no, status, file_path, tailored_summary, tailored_content, ats_score, match_score, notes, source_hash, claim_validation, approved_by, approved_at, created_at",
       )
       .maybeSingle();
     if (error) throw new Error(error.message);

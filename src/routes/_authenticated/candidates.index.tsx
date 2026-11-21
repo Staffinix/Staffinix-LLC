@@ -83,6 +83,7 @@ export const Route = createFileRoute("/_authenticated/candidates/")({
 
 import { useProfile } from "@/hooks/use-profile";
 import { useRoleLevel } from "@/hooks/use-role-level";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type L4RecruiterOption = {
   id: string;
@@ -188,11 +189,14 @@ function L4RecruiterFilter({
 }
 
 function BenchCandidatesPage() {
-  const { data: profile } = useProfile();
+  const profileQuery = useProfile();
+  const profile = profileQuery.data;
   const { level } = useRoleLevel();
   const isL2 = level === "L2";
   const isL4 = level === "L4";
   const queryClient = useQueryClient();
+  const [candidateView, setCandidateView] = useState<"assigned" | "all">("assigned");
+  const assignedToMe = isL4 && candidateView === "assigned";
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -242,6 +246,7 @@ function BenchCandidatesPage() {
         ? (assignmentState as "assigned" | "unassigned")
         : undefined,
       assigned_to_any: assignedRecruiterIds.length ? assignedRecruiterIds : undefined,
+      assigned_to_me: assignedToMe || undefined,
       submission_state:
         submissionState !== "all" ? (submissionState as "submitted" | "unsubmitted") : undefined,
       submission_sort:
@@ -259,6 +264,7 @@ function BenchCandidatesPage() {
     status,
     assignmentState,
     assignedRecruiterIds,
+    assignedToMe,
     submissionState,
     submissionSort,
     page,
@@ -267,6 +273,8 @@ function BenchCandidatesPage() {
   const list = useQuery({
     queryKey: ["candidates", filters],
     queryFn: () => listFn({ data: filters }),
+    // The Assigned view depends on the role, so wait for it before the first request.
+    enabled: !profileQuery.isLoading,
   });
   const recruitersFn = useServerFn(listEligibleL4Recruiters);
   const recruiters = useQuery({
@@ -365,6 +373,21 @@ function BenchCandidatesPage() {
             </Button>
           }
         />
+
+        {isL4 && (
+          <Tabs
+            value={candidateView}
+            onValueChange={(value) => {
+              setCandidateView(value as "assigned" | "all");
+              setPage(1);
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="assigned">Assigned</TabsTrigger>
+              <TabsTrigger value="all">Candidates</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Dynamic Analytics & Bench Insights KPI Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -729,6 +752,7 @@ function BenchCandidatesPage() {
                   <TableHead className="p-3 font-semibold text-center">Location</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Availability</TableHead>
                   <TableHead className="p-3 font-semibold text-center">Status</TableHead>
+                  <TableHead className="p-3 font-semibold text-center">Created by</TableHead>
                   <TableHead className="p-3 font-semibold text-center">
                     Assigned Recruiter
                   </TableHead>
@@ -815,6 +839,14 @@ function BenchCandidatesPage() {
                           ] ?? r.status}
                         </Badge>
                       </TableCell>
+                      <TableCell className="p-3 text-center text-xs">
+                        <p className="font-medium text-foreground">
+                          {r.created_by_name ?? "Not recorded"}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {new Date(r.created_at).toLocaleDateString()}
+                        </p>
+                      </TableCell>
                       <TableCell className="p-3 text-xs text-center">
                         {r.assigned_recruiter?.full_name ||
                           r.assigned_recruiter?.email ||
@@ -894,7 +926,7 @@ function BenchCandidatesPage() {
                 {list.isLoading && (
                   <TableRow>
                     <TableCell
-                      colSpan={14}
+                      colSpan={15}
                       className="p-10 text-center text-xs text-muted-foreground"
                     >
                       <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading candidates…
@@ -904,7 +936,7 @@ function BenchCandidatesPage() {
                 {list.isError && (
                   <TableRow>
                     <TableCell
-                      colSpan={14}
+                      colSpan={15}
                       role="alert"
                       className="p-10 text-center text-xs text-destructive"
                     >
@@ -915,7 +947,7 @@ function BenchCandidatesPage() {
                 {!list.isLoading && !list.isError && rows.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={14}
+                      colSpan={15}
                       className="p-10 text-center text-xs text-muted-foreground"
                     >
                       No candidates found.

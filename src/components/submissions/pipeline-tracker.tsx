@@ -64,6 +64,7 @@ export function PipelineTracker({ candidateId }: { candidateId?: string }) {
   const rows = submissionsQuery.data?.rows ?? [];
   const total = submissionsQuery.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const columnCount = candidateId ? 7 : 8;
 
   return (
     <div className="space-y-5">
@@ -77,7 +78,7 @@ export function PipelineTracker({ candidateId }: { candidateId?: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Candidate</TableHead>
+                {!candidateId && <TableHead>Candidate</TableHead>}
                 <TableHead>Requirements</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Vendor</TableHead>
@@ -90,32 +91,41 @@ export function PipelineTracker({ candidateId }: { candidateId?: string }) {
             <TableBody>
               {submissionsQuery.isLoading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center">
+                  <TableCell colSpan={columnCount} className="h-32 text-center">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
                   </TableCell>
                 </TableRow>
               )}
               {submissionsQuery.isError && (
                 <TableRow>
-                  <TableCell colSpan={8} role="alert" className="h-32 text-center text-destructive">
+                  <TableCell
+                    colSpan={columnCount}
+                    role="alert"
+                    className="h-32 text-center text-destructive"
+                  >
                     Submission data could not be loaded.
                   </TableCell>
                 </TableRow>
               )}
               {!submissionsQuery.isLoading && !submissionsQuery.isError && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={columnCount}
+                    className="h-32 text-center text-muted-foreground"
+                  >
                     No submissions recorded.
                   </TableCell>
                 </TableRow>
               )}
               {rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="font-medium">
-                    {[row.candidate?.first_name, row.candidate?.last_name]
-                      .filter(Boolean)
-                      .join(" ") || "Not recorded"}
-                  </TableCell>
+                  {!candidateId && (
+                    <TableCell className="font-medium">
+                      {[row.candidate?.first_name, row.candidate?.last_name]
+                        .filter(Boolean)
+                        .join(" ") || "Not recorded"}
+                    </TableCell>
+                  )}
                   <TableCell>{row.requirement?.title || "Not recorded"}</TableCell>
                   <TableCell>{row.client?.name || "Not recorded"}</TableCell>
                   <TableCell>{row.vendor?.name || "Not recorded"}</TableCell>

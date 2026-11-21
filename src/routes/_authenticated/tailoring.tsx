@@ -28,18 +28,28 @@ import {
   ResumeDownloads,
 } from "@/components/candidates/tailoring-tools";
 import { TailoringEditor } from "@/components/candidates/tailoring-editor";
+import { TailoringTargetPicker } from "@/components/candidates/tailoring-target-picker";
+import { isValidTailoringTarget } from "@/lib/tailoring-targets";
 import {
   approveFactPreservingResume,
   generateFactPreservingResume,
   verifyCandidateResume,
 } from "@/lib/tailoring.functions";
 
-type TailoringSearch = { reqId?: string; candidateId?: string; tab?: string };
+type TailoringSearch = {
+  reqId?: string;
+  candidateId?: string;
+  technology?: string;
+  domain?: string;
+  tab?: string;
+};
 
 export const Route = createFileRoute("/_authenticated/tailoring")({
   validateSearch: (search: Record<string, unknown>): TailoringSearch => ({
     reqId: typeof search.reqId === "string" ? search.reqId : undefined,
     candidateId: typeof search.candidateId === "string" ? search.candidateId : undefined,
+    technology: typeof search.technology === "string" ? search.technology : undefined,
+    domain: typeof search.domain === "string" ? search.domain : undefined,
     tab: typeof search.tab === "string" ? search.tab : undefined,
   }),
   head: () => ({ meta: [{ title: "Resume Tailoring — Staffinix" }] }),
@@ -47,8 +57,10 @@ export const Route = createFileRoute("/_authenticated/tailoring")({
 });
 
 function TailoringPage() {
-  const { reqId, candidateId } = Route.useSearch();
+  const { reqId, candidateId, technology, domain } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const hasTarget = Boolean(reqId) || isValidTailoringTarget(technology, domain);
+  const targetKey = reqId ?? `${technology ?? "none"}:${domain ?? "none"}`;
   return (
     <>
       <AppTopbar title="Resume Tailoring" />
@@ -61,15 +73,12 @@ function TailoringPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: "/matching", search: { candidateId } })}
-            >
+            <Button variant="outline" onClick={() => navigate({ search: {} })}>
               New tailoring
             </Button>
             <Button
               variant="outline"
-              disabled={!reqId || !candidateId}
+              disabled={!hasTarget || !candidateId}
               onClick={() =>
                 document.getElementById("tailoring-history")?.scrollIntoView({ block: "start" })
               }
@@ -78,14 +87,25 @@ function TailoringPage() {
             </Button>
           </div>
         </div>
+        <TailoringTargetPicker
+          key={`picker:${candidateId ?? "none"}:${targetKey}`}
+          initial={{
+            candidateId,
+            reqId,
+            technology: isValidTailoringTarget(technology, domain) ? technology : undefined,
+            domain: isValidTailoringTarget(technology, domain) ? domain : undefined,
+          }}
+          onStart={(selection) => navigate({ search: selection })}
+        />
       </section>
-      <TailoringWorkspace key={`${candidateId ?? "none"}:${reqId ?? "none"}`} />
+      <TailoringWorkspace key={`${candidateId ?? "none"}:${targetKey}`} />
     </>
   );
 }
 
 function TailoringWorkspace() {
-  const { reqId, candidateId } = Route.useSearch();
+  const { reqId, candidateId, technology, domain } = Route.useSearch();
+  const catalogTarget = !reqId && isValidTailoringTarget(technology, domain);
   const queryClient = useQueryClient();
   const [sourceConfirmed, setSourceConfirmed] = useState(false);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
@@ -132,7 +152,13 @@ function TailoringWorkspace() {
   const generateMutation = useMutation({
     mutationFn: () =>
       generateResumeFn({
-        data: { candidate_id: candidateId!, requirement_id: reqId!, source_resume_id: resumeId },
+        data: {
+          candidate_id: candidateId!,
+          source_resume_id: resumeId,
+          ...(reqId
+            ? { requirement_id: reqId }
+            : { target_technology: technology, target_domain: domain }),
+        },
       }),
     onSuccess: async () => {
       setHistoryId(undefined);
@@ -161,14 +187,8 @@ function TailoringWorkspace() {
       ),
   });
 
-  if (!reqId || !candidateId) {
-    return (
-      <TailoringState
-        title="Select a candidate and requirements"
-        message="Open Matching to choose a candidate and requirement, then start resume tailoring."
-      />
-    );
-  }
+  // The picker above is the empty state until a candidate and target are chosen.
+  if (!candidateId || (!reqId && !catalogTarget)) return null;
 
   if (candidateQuery.isLoading || requirementQuery.isLoading) {
     return (
@@ -184,7 +204,7 @@ function TailoringWorkspace() {
     candidateQuery.isError ||
     requirementQuery.isError ||
     !candidateQuery.data ||
-    !requirementQuery.data
+    (reqId && !requirementQuery.data)
   ) {
     return (
       <TailoringState
@@ -196,7 +216,12 @@ function TailoringWorkspace() {
   }
 
   const candidate = candidateQuery.data;
-  const requirement = requirementQuery.data;
+  const requirement = reqId ? requirementQuery.data : undefined;
+  const targetTitle = requirement?.title ?? `${domain} (${technology})`;
+  const matchesTarget = (item: (typeof candidate.versions)[number]) =>
+    reqId
+      ? item.requirement_id === reqId
+      : item.target_technology === technology && item.target_domain === domain;
   const candidateName = `${candidate.first_name} ${candidate.last_name}`;
   const reviewableResume = resumeId
     ? candidate.resumes.find((resume) => resume.id === resumeId)
@@ -207,14 +232,10 @@ function TailoringWorkspace() {
     reviewableResume?.verification_status === "verified" && reviewableResume.extracted_text?.trim()
       ? reviewableResume
       : undefined;
-  const savedVersion = candidate.versions.find(
-    (version) => version.requirement_id === requirement.id,
-  );
+  const savedVersion = candidate.versions.find(matchesTarget);
   const version =
     (historyId
-      ? candidate.versions.find(
-          (item) => item.id === historyId && item.requirement_id === requirement.id,
-        )
+      ? candidate.versions.find((item) => item.id === historyId && matchesTarget(item))
       : undefined) ??
     approveMutation.data ??
     generateMutation.data ??
@@ -225,17 +246,19 @@ function TailoringWorkspace() {
   return (
     <>
       <main className="flex-1 space-y-6 p-6 md:p-8">
-        <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-          <Link to="/matching" search={{ reqId: requirement.id, candidateId: candidate.id }}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to matching
-          </Link>
-        </Button>
+        {requirement && (
+          <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
+            <Link to="/matching" search={{ reqId: requirement.id, candidateId: candidate.id }}>
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to matching
+            </Link>
+          </Button>
+        )}
 
         <PageHeader
           title={`Resume tailoring: ${candidateName}`}
-          description={`Target requirements: ${requirement.title}`}
+          description={`${requirement ? "Target requirements" : "Target domain"}: ${targetTitle}`}
         />
-        <TailoringAnalysis candidate={candidate} requirement={requirement} />
+        {requirement && <TailoringAnalysis candidate={candidate} requirement={requirement} />}
         <TailoringUpload candidateId={candidate.id} />
         {candidate.resumes.length > 0 && (
           <label className="block space-y-2 text-sm">
@@ -278,26 +301,22 @@ function TailoringWorkspace() {
             >
               Latest draft
             </Button>
-            {candidate.versions
-              .filter((item) => item.requirement_id === requirement.id)
-              .map((item) => (
-                <Button
-                  key={item.id}
-                  size="sm"
-                  variant={version?.id === item.id ? "default" : "outline"}
-                  onClick={() => {
-                    setHistoryId(item.id);
-                    setApprovalConfirmed(false);
-                  }}
-                >
-                  Version {item.version_no} · {item.status} ·{" "}
-                  {new Date(item.created_at).toLocaleDateString()}
-                </Button>
-              ))}
+            {candidate.versions.filter(matchesTarget).map((item) => (
+              <Button
+                key={item.id}
+                size="sm"
+                variant={version?.id === item.id ? "default" : "outline"}
+                onClick={() => {
+                  setHistoryId(item.id);
+                  setApprovalConfirmed(false);
+                }}
+              >
+                Version {item.version_no} · {item.status} ·{" "}
+                {new Date(item.created_at).toLocaleDateString()}
+              </Button>
+            ))}
             {!savedVersion && (
-              <p className="text-sm text-muted-foreground">
-                No versions for these requirements yet.
-              </p>
+              <p className="text-sm text-muted-foreground">No versions for this target yet.</p>
             )}
           </CardContent>
         </Card>
@@ -315,9 +334,7 @@ function TailoringWorkspace() {
               >
                 <option value="">Choose an earlier version</option>
                 {candidate.versions
-                  .filter(
-                    (item) => item.requirement_id === requirement.id && item.id !== version.id,
-                  )
+                  .filter((item) => matchesTarget(item) && item.id !== version.id)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
                       Version {item.version_no} · {item.status}
@@ -369,24 +386,37 @@ function TailoringWorkspace() {
 
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-sm">Requirements record</CardTitle>
+              <CardTitle className="text-sm">
+                {requirement ? "Requirements record" : "Target domain"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <p className="font-semibold">{requirement.title}</p>
-              <p className="text-muted-foreground">
-                {[requirement.client_name, requirement.location].filter(Boolean).join(" · ") ||
-                  "No client or location recorded"}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {requirement.skills.map((item) => (
-                  <Badge key={item.id} variant={item.is_mandatory ? "default" : "outline"}>
-                    {item.skill}
-                  </Badge>
-                ))}
-                {requirement.skills.length === 0 && (
-                  <span className="text-muted-foreground">No required skills recorded.</span>
-                )}
-              </div>
+              {requirement ? (
+                <>
+                  <p className="font-semibold">{requirement.title}</p>
+                  <p className="text-muted-foreground">
+                    {[requirement.client_name, requirement.location].filter(Boolean).join(" · ") ||
+                      "No client or location recorded"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {requirement.skills.map((item) => (
+                      <Badge key={item.id} variant={item.is_mandatory ? "default" : "outline"}>
+                        {item.skill}
+                      </Badge>
+                    ))}
+                    {requirement.skills.length === 0 && (
+                      <span className="text-muted-foreground">No required skills recorded.</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">{domain}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{technology}</Badge>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -543,10 +573,13 @@ function TailoringWorkspace() {
             <CardContent className="space-y-4 text-sm">
               {version.status === "approved" ? (
                 <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4">
-                  <p className="font-semibold text-emerald-700">Approved for submission use</p>
+                  <p className="font-semibold text-emerald-700">
+                    {requirement ? "Approved for submission use" : "Approved for this domain"}
+                  </p>
                   <p className="text-muted-foreground">
-                    The source snapshot and rendered claims are immutable. Changed source facts
-                    require a new version.
+                    {requirement
+                      ? "The source snapshot and rendered claims are immutable. Changed source facts require a new version."
+                      : "You can download this resume. To submit to a job, tailor it against that requirement."}
                   </p>
                 </div>
               ) : version.status === "draft" ? (
@@ -558,8 +591,8 @@ function TailoringWorkspace() {
                       checked={approvalConfirmed}
                       onChange={(event) => setApprovalConfirmed(event.target.checked)}
                     />
-                    I reviewed the rendered resume and approve every claim for use in this
-                    requirements.
+                    I reviewed the rendered resume and approve every claim for use in this{" "}
+                    {requirement ? "requirements" : "domain"}.
                   </label>
                   <Button
                     disabled={!approvalConfirmed || approveMutation.isPending}

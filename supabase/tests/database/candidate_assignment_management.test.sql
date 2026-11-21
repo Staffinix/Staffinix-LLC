@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
-SELECT plan(40);
+SELECT plan(47);
 
 INSERT INTO public.tenants (id, name, slug) VALUES
   ('ca000000-0000-0000-0000-000000000001', 'Candidate Assignment A', 'candidate-assignment-a'),
@@ -174,7 +174,7 @@ SELECT lives_ok(
       '2000-01-01T00:00:00Z',
       'ca110000-0000-0000-0000-000000000001'
     )$$,
-  'L4 can submit only a candidate currently assigned to them'
+  'L4 can submit a candidate assigned to them'
 ); -- 15
 SELECT is(
   (SELECT submitted_by FROM public.submissions WHERE id = 'ca140000-0000-0000-0000-000000000004'),
@@ -229,13 +229,44 @@ SELECT is(
 
 SET LOCAL "request.jwt.claim.sub" = 'ca300000-0000-0000-0000-000000000003';
 SELECT results_eq(
-  'SELECT count(*) FROM public.candidates', ARRAY[0::bigint],
-  'another L4 cannot view candidates assigned to a peer'
+  'SELECT count(*) FROM public.candidates', ARRAY[2::bigint],
+  'every L4 can view candidates assigned to a peer in their company'
 ); -- 19
 SELECT results_eq(
-  'SELECT count(*) FROM public.submissions', ARRAY[0::bigint],
-  'another L4 cannot view a peer candidate submission'
+  'SELECT count(*) FROM public.submissions', ARRAY[2::bigint],
+  'every L4 can view submissions for company candidates'
 ); -- 20
+SELECT is(
+  public.candidate_assignment_kpis() #>> '{assigned}',
+  '0',
+  'L4 dashboard counts stay limited to their own assigned candidates'
+);
+SELECT lives_ok(
+  $$SELECT public.update_candidate_graph(
+    'ca120000-0000-0000-0000-000000000002',
+    '{"current_title":"Updated by peer L4"}'::jsonb,
+    '{"skills":[{"skill":"Peer Skill"}]}'::jsonb
+  )$$,
+  'an L4 can edit a candidate assigned to a peer'
+);
+SELECT is(
+  (SELECT current_title FROM public.candidates WHERE id = 'ca120000-0000-0000-0000-000000000002'),
+  'Updated by peer L4',
+  'the peer edit is saved'
+);
+SELECT throws_ok(
+  $$UPDATE public.candidates SET assigned_to = 'ca300000-0000-0000-0000-000000000003'
+    WHERE id = 'ca120000-0000-0000-0000-000000000002'$$,
+  '42501', 'permission denied for table candidates',
+  'an L4 cannot take over a peer candidate by changing the assignment'
+);
+SELECT results_eq(
+  $$WITH deleted AS (
+    DELETE FROM public.candidates WHERE id = 'ca120000-0000-0000-0000-000000000002' RETURNING id
+  ) SELECT count(*) FROM deleted$$,
+  ARRAY[0::bigint],
+  'an L4 cannot delete a peer candidate'
+);
 SELECT throws_ok(
   $$SELECT public.assign_candidates_to_recruiter(
     ARRAY['ca110000-0000-0000-0000-000000000001'::uuid],
@@ -302,24 +333,24 @@ SET LOCAL "request.jwt.claim.sub" = 'ca200000-0000-0000-0000-000000000002';
 SELECT results_eq(
   $$SELECT count(*) FROM public.candidates
     WHERE id = 'ca110000-0000-0000-0000-000000000001'$$,
-  ARRAY[0::bigint],
-  'previous recruiter loses candidate visibility immediately'
+  ARRAY[1::bigint],
+  'previous recruiter keeps company candidate visibility after reassignment'
 ); -- 29
 SELECT results_eq(
   $$SELECT count(*) FROM public.submissions
     WHERE id = 'ca140000-0000-0000-0000-000000000004'$$,
-  ARRAY[0::bigint],
-  'previous recruiter loses related submission visibility immediately'
+  ARRAY[1::bigint],
+  'previous recruiter keeps related submission visibility after reassignment'
 ); -- 30
 
 SET LOCAL "request.jwt.claim.sub" = 'ca300000-0000-0000-0000-000000000003';
 SELECT results_eq(
-  'SELECT count(*) FROM public.candidates', ARRAY[1::bigint],
-  'new recruiter gains candidate visibility immediately'
+  'SELECT count(*) FROM public.candidates', ARRAY[2::bigint],
+  'new recruiter sees all company candidates'
 ); -- 31
 SELECT results_eq(
-  'SELECT count(*) FROM public.submissions', ARRAY[1::bigint],
-  'new recruiter gains related submission visibility immediately'
+  'SELECT count(*) FROM public.submissions', ARRAY[2::bigint],
+  'new recruiter sees all company submissions'
 ); -- 32
 SELECT results_eq(
   $$SELECT count(*) FROM public.candidate_status_history
@@ -327,6 +358,17 @@ SELECT results_eq(
   ARRAY[1::bigint],
   'new recruiter can view status history for their assigned candidate'
 ); -- 33
+SELECT is(
+  public.candidate_assignment_kpis() #>> '{assigned}',
+  '1',
+  'dashboard count follows the new assignment'
+);
+
+SET LOCAL "request.jwt.claim.sub" = 'cb200000-0000-0000-0000-000000000002';
+SELECT results_eq(
+  'SELECT count(*) FROM public.candidates', ARRAY[0::bigint],
+  'an L4 in another company cannot see these candidates'
+);
 
 SET LOCAL "request.jwt.claim.sub" = 'ca100000-0000-0000-0000-000000000001';
 SELECT throws_ok(

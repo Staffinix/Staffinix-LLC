@@ -260,7 +260,10 @@ function CandidateDetailPage() {
 
         <Card className="border-border bg-card">
           <CardContent className="grid gap-4 p-6 md:grid-cols-3">
-            <Detail label="Current role" value={candidate.current_title} />
+            <div className="space-y-4">
+              <Detail label="Current role" value={candidate.current_title} />
+              <Detail label="Created by" value={candidate.created_by_name} />
+            </div>
             <div className="space-y-1 text-xs">
               <p className="font-semibold uppercase tracking-wider text-muted-foreground">
                 Contact
@@ -297,11 +300,6 @@ function CandidateDetailPage() {
             </div>
           </CardContent>
         </Card>
-
-        <section aria-label="Candidate pipeline tracker" className="space-y-4">
-          <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
-          <PipelineTracker key={id} candidateId={id} />
-        </section>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="border-border bg-card">
@@ -538,6 +536,11 @@ function CandidateDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        <section aria-label="Candidate pipeline tracker" className="space-y-4">
+          <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
+          <PipelineTracker key={id} candidateId={id} />
+        </section>
 
         <Dialog open={assignmentOpen} onOpenChange={setAssignmentOpen}>
           <DialogContent className="sm:max-w-md">
