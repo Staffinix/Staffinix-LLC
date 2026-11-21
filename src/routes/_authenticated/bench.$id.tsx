@@ -22,7 +22,7 @@ import {
   Mail,
   MapPin,
   Phone,
-  Sparkles,
+  ScanText,
   UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -182,7 +182,7 @@ function BenchConsultantPage() {
           <Card className="border-border bg-card">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-1.5 text-sm">
-                <Sparkles className="h-3.5 w-3.5 text-primary" /> AI notes
+                <ScanText className="h-3.5 w-3.5 text-primary" /> AI notes
               </CardTitle>
             </CardHeader>
             <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
@@ -246,7 +246,7 @@ function BenchConsultantPage() {
             ))}
             {cand.versions.length > 0 && (
               <div>
-                <h3 className="mb-2 mt-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                <h3 className="mb-2 mt-4 text-xs font-medium text-muted-foreground">
                   Tailored versions
                 </h3>
                 <div className="space-y-2">
@@ -312,7 +312,7 @@ function BenchConsultantPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {s.match_score != null && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-[11px]">
                           Match {Math.round(s.match_score)}
                         </Badge>
                       )}
@@ -342,7 +342,7 @@ function BenchConsultantPage() {
                   <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-[11px]">
                           {ROUND_LABEL[round]}
                         </Badge>
                         {i.scheduled_at
@@ -400,7 +400,7 @@ function BenchConsultantPage() {
               <CardContent className="p-4">
                 <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Current availability</span>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-[11px]">
                     {availKey ? AVAILABILITY_LABEL[availKey] : "Unknown"}
                   </Badge>
                 </div>
@@ -551,7 +551,7 @@ function Info({
 }) {
   return (
     <div>
-      <div className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+      <div className="mb-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {Icon && <Icon className="h-3 w-3" />} {label}
       </div>
       <div className="text-sm">{value ?? "—"}</div>

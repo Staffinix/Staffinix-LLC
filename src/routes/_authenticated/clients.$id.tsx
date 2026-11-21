@@ -274,9 +274,7 @@ function ClientDetailPage() {
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <h4 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h4>
+      <h4 className="mb-3 text-xs font-medium text-muted-foreground">{title}</h4>
       <div className="space-y-2">{children}</div>
     </div>
   );

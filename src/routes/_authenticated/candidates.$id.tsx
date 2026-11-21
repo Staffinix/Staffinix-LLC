@@ -265,9 +265,7 @@ function CandidateDetailPage() {
               <Detail label="Created by" value={candidate.created_by_name} />
             </div>
             <div className="space-y-1 text-xs">
-              <p className="font-semibold uppercase tracking-wider text-muted-foreground">
-                Contact
-              </p>
+              <p className="font-semibold text-muted-foreground">Contact</p>
               <p className="flex items-center gap-1.5">
                 <Mail className="h-3.5 w-3.5 text-primary" /> {candidate.email || "Not recorded"}
               </p>
@@ -280,9 +278,7 @@ function CandidateDetailPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Status
-              </p>
+              <p className="text-xs font-semibold text-muted-foreground">Status</p>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">{candidate.status}</Badge>
                 {candidate.visa_status && (
@@ -618,9 +614,7 @@ function CandidateState({
 function Detail({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold">{value ?? "Not recorded"}</p>
     </div>
   );

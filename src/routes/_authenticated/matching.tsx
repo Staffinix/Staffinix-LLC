@@ -14,7 +14,7 @@ import {
   MapPin,
   RefreshCw,
   Search,
-  Sparkles,
+  ScanText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -412,7 +412,7 @@ function MatchingPage() {
                           </p>
                         </div>
                         <Badge className="text-sm">
-                          <Sparkles className="mr-1 h-3.5 w-3.5" /> {row.scores.overall}% match
+                          <ScanText className="mr-1 h-3.5 w-3.5" /> {row.scores.overall}% match
                         </Badge>
                         <Badge variant="outline">{matchLevelLabel(row.match_level)}</Badge>
                       </div>

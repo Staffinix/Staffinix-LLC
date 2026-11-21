@@ -376,7 +376,7 @@ function SmartEmailDashboard() {
                 </div>
                 <div className="flex items-center justify-between rounded-xl border p-4">
                   <span className="text-sm font-medium">Relevance</span>
-                  <span className="text-xl font-bold text-primary">
+                  <span className="text-xl font-semibold text-primary">
                     {Math.round(selected.relevance_score * 100)}%
                   </span>
                 </div>

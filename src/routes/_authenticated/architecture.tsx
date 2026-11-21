@@ -34,7 +34,6 @@ const LEVELS = [
     title: ROLE_LEVEL_LABELS.L1,
     icon: Crown,
     to: "/platform",
-    accent: "from-amber-500/20 to-transparent border-amber-500/30",
     who: "Authorized platform owners and administrators",
     capabilities: [
       "Provision and suspend tenant companies",
@@ -48,7 +47,6 @@ const LEVELS = [
     title: ROLE_LEVEL_LABELS.L2,
     icon: Building2,
     to: "/company",
-    accent: "from-sky-500/20 to-transparent border-sky-500/30",
     who: "Company owners, VPs, directors",
     capabilities: [
       "Company profile and branding",
@@ -62,7 +60,6 @@ const LEVELS = [
     title: ROLE_LEVEL_LABELS.L3,
     icon: Code2,
     to: "/developer",
-    accent: "from-violet-500/20 to-transparent border-violet-500/30",
     who: "Internal devs, client IT admins",
     capabilities: [
       "Scoped API keys with hashed secrets",
@@ -76,7 +73,6 @@ const LEVELS = [
     title: ROLE_LEVEL_LABELS.L4,
     icon: Users,
     to: "/overview",
-    accent: "from-emerald-500/20 to-transparent border-emerald-500/30",
     who: "Recruiters, bench sales, HR, account managers",
     capabilities: [
       "Requirements, candidates and bench",
@@ -123,9 +119,7 @@ function ArchitecturePage() {
           const Icon = l.icon;
           return (
             <Link key={l.level} to={l.to} className="group">
-              <Card
-                className={`h-full border bg-gradient-to-br ${l.accent} transition-colors hover:border-primary/40`}
-              >
+              <Card className="h-full transition-colors hover:border-border-strong">
                 <CardContent className="space-y-4 py-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -133,13 +127,11 @@ function ArchitecturePage() {
                         <Icon className="h-5 w-5 text-foreground" />
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                          {l.level}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{l.level}</p>
                         <h2 className="text-base font-semibold text-foreground">{l.title}</h2>
                       </div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform" />
                   </div>
                   <p className="text-sm text-muted-foreground">{l.who}</p>
                   <ul className="space-y-1.5">

@@ -7,7 +7,7 @@ import {
   Loader2,
   Plus,
   Save,
-  Sparkles,
+  ScanText,
   Trash2,
   User,
 } from "lucide-react";
@@ -480,7 +480,7 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
                   {isParsing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className="h-4 w-4" />
+                    <ScanText className="h-4 w-4" />
                   )}{" "}
                   {isParsing ? "Reading resume…" : "Auto-fill from resume"}
                 </Button>
@@ -684,7 +684,7 @@ export function CandidateForm({ mode, initialData, onSaved }: CandidateFormProps
                 ) : mode === "edit" ? (
                   <Save className="h-4 w-4" />
                 ) : (
-                  <Sparkles className="h-4 w-4" />
+                  <ScanText className="h-4 w-4" />
                 )}
                 {isSubmitting ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Candidate"}
               </Button>

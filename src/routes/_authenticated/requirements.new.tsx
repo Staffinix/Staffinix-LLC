@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   Loader2,
   FileText,
-  Sparkles,
+  ScanText,
   FileUp,
   ClipboardPaste,
   Wand2,
@@ -109,7 +109,7 @@ function PasteJDCard({ onParsed }: { onParsed: (v: Partial<RequirementFormValues
     <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4 text-primary" /> Paste a job description
+          <ScanText className="h-4 w-4 text-primary" /> Paste a job description
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -56,7 +56,7 @@ import {
   Mail,
   Phone,
   MapPin,
-  Sparkles,
+  ScanText,
   Send,
   ChevronDown,
   UsersRound,
@@ -393,7 +393,7 @@ function BenchCandidatesPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground">
                 Bench Availability
               </span>
               <div className="rounded p-1 text-emerald-600 bg-emerald-500/10">
@@ -401,7 +401,7 @@ function BenchCandidatesPage() {
               </div>
             </div>
             <div className="flex items-baseline gap-3">
-              <span className="text-2xl font-bold tracking-tight text-foreground">
+              <span className="text-2xl font-semibold tracking-tight text-foreground">
                 {totalBench}
               </span>
               <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
@@ -423,7 +423,7 @@ function BenchCandidatesPage() {
                   style={{ width: `${100 - immPct - twoWkPct}%` }}
                 />
               </div>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-0.5">
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" /> Immediate (
                   {immPct}%)
@@ -442,26 +442,26 @@ function BenchCandidatesPage() {
 
           <Card className="border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Visa Buckets
-              </span>
-              <div className="rounded p-1 text-purple-500 bg-purple-500/10">
+              <span className="text-xs font-semibold text-muted-foreground">Visa Buckets</span>
+              <div className="rounded p-1 text-chart-5 bg-chart-5/10">
                 <Globe className="h-4 w-4" />
               </div>
             </div>
             <div className="flex items-baseline gap-3">
-              <span className="text-2xl font-bold tracking-tight text-foreground">{h1bPct}%</span>
+              <span className="text-2xl font-semibold tracking-tight text-foreground">
+                {h1bPct}%
+              </span>
               <span className="text-xs text-muted-foreground font-medium">H1B on this page</span>
             </div>
             <div className="space-y-1.5 pt-1">
               <div className="h-2 rounded-full bg-muted overflow-hidden flex">
-                <div className="bg-purple-500 h-full" style={{ width: `${h1bPct}%` }} />
+                <div className="bg-chart-5 h-full" style={{ width: `${h1bPct}%` }} />
                 <div className="bg-blue-500 h-full" style={{ width: `${uscPct}%` }} />
                 <div className="bg-emerald-500 h-full" style={{ width: `${gcPct}%` }} />
               </div>
-              <div className="flex flex-wrap items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+              <div className="flex flex-wrap items-center justify-between text-[11px] text-muted-foreground pt-0.5">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-purple-500 inline-block" /> H1B ({h1bPct}
+                  <span className="h-2 w-2 rounded-full bg-chart-5 inline-block" /> H1B ({h1bPct}
                   %)
                 </span>
                 <span className="flex items-center gap-1">
@@ -477,15 +477,13 @@ function BenchCandidatesPage() {
 
           <Card className="border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Top Tech Stacks
-              </span>
+              <span className="text-xs font-semibold text-muted-foreground">Top Tech Stacks</span>
               <div className="rounded p-1 text-amber-500 bg-amber-500/10">
                 <Cpu className="h-4 w-4" />
               </div>
             </div>
             <div className="flex items-baseline gap-3">
-              <span className="text-2xl font-bold tracking-tight text-foreground">
+              <span className="text-2xl font-semibold tracking-tight text-foreground">
                 {uniqueTechCount}
               </span>
               <span className="text-xs text-muted-foreground font-medium">Tech Categories</span>
@@ -495,7 +493,7 @@ function BenchCandidatesPage() {
                 <Badge
                   key={technology}
                   variant="secondary"
-                  className="text-[10px] bg-primary/10 text-primary border-primary/20"
+                  className="text-[11px] bg-primary/10 text-primary border-primary/20"
                 >
                   {technology} ({count})
                 </Badge>
@@ -803,7 +801,7 @@ function BenchCandidatesPage() {
                             <Badge
                               key={s}
                               variant="secondary"
-                              className="bg-primary/10 text-[10px] text-primary border-0 font-normal px-1.5 py-0"
+                              className="bg-primary/10 text-[11px] text-primary border-0 font-normal px-1.5 py-0"
                             >
                               {s}
                             </Badge>
@@ -820,7 +818,7 @@ function BenchCandidatesPage() {
                         {r.location}
                       </TableCell>
                       <TableCell className="p-3 text-xs font-medium text-center">
-                        <Badge variant="outline" className="text-[10px] capitalize">
+                        <Badge variant="outline" className="text-[11px] capitalize">
                           {AVAILABILITY_LABEL[r.availability as keyof typeof AVAILABILITY_LABEL] ??
                             r.availability}
                         </Badge>
@@ -828,7 +826,7 @@ function BenchCandidatesPage() {
                       <TableCell className="p-3 text-center">
                         <Badge
                           className={cn(
-                            "text-[10px]",
+                            "text-[11px]",
                             CANDIDATE_STATUS_STYLES[
                               r.status as keyof typeof CANDIDATE_STATUS_STYLES
                             ],
@@ -891,10 +889,10 @@ function BenchCandidatesPage() {
                           asChild
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2.5 text-[11px] font-bold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                          className="h-7 px-2.5 text-[11px] font-semibold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
                         >
                           <Link to="/matching" search={{ candidateId: r.id }}>
-                            <Sparkles className="h-3 w-3 text-emerald-500" /> AI Matching
+                            <ScanText className="h-3 w-3 text-emerald-500" /> AI Matching
                           </Link>
                         </Button>
                       </TableCell>
@@ -991,7 +989,7 @@ function BenchCandidatesPage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       className={cn(
-                        "text-[10px]",
+                        "text-[11px]",
                         CANDIDATE_STATUS_STYLES[
                           profileCand.status as keyof typeof CANDIDATE_STATUS_STYLES
                         ],
@@ -1001,11 +999,11 @@ function BenchCandidatesPage() {
                         profileCand.status as keyof typeof CANDIDATE_STATUS_LABEL
                       ] ?? profileCand.status}
                     </Badge>
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-[11px]">
                       {profileCand.visa_status}
                     </Badge>
                   </div>
-                  <SheetTitle className="text-xl font-bold text-foreground">
+                  <SheetTitle className="text-xl font-semibold text-foreground">
                     {profileCand.first_name} {profileCand.last_name}
                   </SheetTitle>
                   <SheetDescription className="text-xs text-muted-foreground">
@@ -1059,7 +1057,7 @@ function BenchCandidatesPage() {
                 <div className="space-y-2">
                   <h4 className="text-xs font-semibold text-foreground">Resume Preview</h4>
                   <div className="rounded-md border border-border bg-card p-4 text-xs font-mono text-muted-foreground leading-normal space-y-1">
-                    <p className="font-bold text-foreground">
+                    <p className="font-semibold text-foreground">
                       {profileCand.first_name} {profileCand.last_name} — Resume
                     </p>
                     <p>
@@ -1133,7 +1131,7 @@ function BenchCandidatesPage() {
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-base font-bold">Add Bench Candidate</DialogTitle>
+              <DialogTitle className="text-base font-semibold">Add Bench Candidate</DialogTitle>
               <DialogDescription className="text-xs">
                 Fill in candidate details to add them directly to the bench.
               </DialogDescription>

@@ -151,7 +151,7 @@ function InterviewsPage() {
                       {i.submission?.requirement?.title ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[11px] uppercase text-primary">
                         {ROUND_LABEL[i.round as InterviewRound]}
                       </span>
                     </TableCell>

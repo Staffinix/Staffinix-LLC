@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+import { ScanText } from "lucide-react";
 
 export function PhasePlaceholder({
   topbar,
@@ -28,11 +28,11 @@ export function PhasePlaceholder({
           <CardContent className="p-8">
             <div className="flex items-start gap-4">
               <div className="rounded-md bg-primary/10 p-2 text-primary">
-                {icon ?? <Sparkles className="h-5 w-5" />}
+                {icon ?? <ScanText className="h-5 w-5" />}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[11px] uppercase text-primary">
                     {phase}
                   </span>
                   <p className="text-sm font-medium text-foreground">

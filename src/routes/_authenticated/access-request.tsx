@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Crown, ShieldCheck, CheckCircle2, XCircle, Mail, Sparkles } from "lucide-react";
+import { Crown, ShieldCheck, CheckCircle2, XCircle, Mail, ScanText } from "lucide-react";
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
@@ -181,7 +181,7 @@ function ApproverTable() {
                     <TableCell className="py-3">
                       <Badge
                         variant="outline"
-                        className="text-[10px] font-mono border-primary/30 text-primary"
+                        className="text-[11px] font-mono border-primary/30 text-primary"
                       >
                         {getAccessTierLabel(r.requested_tier)}
                       </Badge>
@@ -402,7 +402,7 @@ function RecruiterRequestForm() {
             className="text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
             onClick={() => setDraftGenerated(true)}
           >
-            <Sparkles className="h-3.5 w-3.5" /> Generate AI Email Draft
+            <ScanText className="h-3.5 w-3.5" /> Generate AI Email Draft
           </Button>
         )}
 
@@ -411,15 +411,15 @@ function RecruiterRequestForm() {
           <div className="rounded-md border border-primary/30 bg-primary/5 p-4 space-y-3 text-xs font-sans">
             <div className="flex items-center justify-between pb-2 border-b border-primary/20">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
+                <ScanText className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span className="text-[11px] font-semibold text-primary">
                   AI Email Draft Preview
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setDraftGenerated(false)}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 ✕ Dismiss
               </button>

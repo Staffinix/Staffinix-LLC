@@ -35,7 +35,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="safe-bottom glass-strong fixed inset-x-3 bottom-3 z-40 flex min-h-16 rounded-[1.35rem] px-1.5 pt-1.5 md:hidden"
+      className="safe-bottom surface-overlay fixed inset-x-3 bottom-3 z-40 flex min-h-16 rounded-[1.35rem] px-1.5 pt-1.5 md:hidden"
       aria-label="Mobile navigation"
     >
       {primary.slice(0, 4).map((item) => (
@@ -43,7 +43,7 @@ export function MobileNav() {
       ))}
       <Dialog>
         <DialogTrigger asChild>
-          <button className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground">
+          <button className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground">
             <Menu className="size-5" aria-hidden="true" />
             <span>More</span>
           </button>
@@ -91,7 +91,7 @@ function MobileNavLink({ item, pathname }: { item: NavItem; pathname: string }) 
     <Link
       to={item.to}
       className={cn(
-        "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-[10px] font-medium transition-colors",
+        "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-1.5 text-[11px] font-medium transition-colors",
         active
           ? "bg-primary/12 text-primary"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",

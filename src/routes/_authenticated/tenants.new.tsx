@@ -240,9 +240,7 @@ function NewTenantRegistrationPage() {
                             : "border-border bg-background/30 text-foreground hover:border-primary/50 hover:bg-muted/40",
                         )}
                       >
-                        <span className="block text-xs font-semibold uppercase tracking-wide">
-                          {option.label}
-                        </span>
+                        <span className="block text-xs font-semibold">{option.label}</span>
                         <span className="mt-1 block text-[11px] text-muted-foreground">
                           {option.seats} User Seats
                         </span>

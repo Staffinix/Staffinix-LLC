@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, ScanText } from "lucide-react";
 
 import { AppTopbar } from "@/components/app-shell/topbar";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -56,7 +56,7 @@ function RequirementDetailPage() {
             </Button>
             <Button asChild size="sm" className="gap-1.5 text-xs">
               <Link to="/matching" search={{ reqId: requirement.id }}>
-                <Sparkles className="h-3.5 w-3.5" /> Run matching
+                <ScanText className="h-3.5 w-3.5" /> Run matching
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
@@ -81,9 +81,7 @@ function RequirementDetailPage() {
             <Detail label="Created by" value={requirement.creator?.full_name ?? null} />
             {requirement.source_email_sender_address ? (
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Source
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground">Source</p>
                 <p className="mt-1 text-sm font-semibold">
                   From mail
                   {requirement.source_email_sender_name
@@ -184,9 +182,7 @@ function RequirementState({
 function Detail({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold capitalize">{value ?? "Not recorded"}</p>
     </div>
   );

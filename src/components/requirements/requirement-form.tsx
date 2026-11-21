@@ -566,9 +566,7 @@ export function RequirementForm({
                 )}
               >
                 {s.skill}
-                <span className="text-[9px] uppercase tracking-widest opacity-70">
-                  {s.is_mandatory ? "must" : "nice"}
-                </span>
+                <span className="text-[11px] opacity-70">{s.is_mandatory ? "must" : "nice"}</span>
                 <button
                   type="button"
                   className="rounded p-0.5 hover:bg-background/40"

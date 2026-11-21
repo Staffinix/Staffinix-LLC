@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, ExternalLink, Loader2, Send, Sparkles, Trash2, User } from "lucide-react";
+import { Bot, ExternalLink, Loader2, Send, ScanText, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -248,7 +248,7 @@ export function CopilotPanel({ compact = false }: { compact?: boolean }) {
                 </div>
                 {message.sources.length > 0 && (
                   <div className="mt-3 border-t border-border/70 pt-2.5">
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    <p className="mb-2 text-[11px] font-semibold text-muted-foreground">
                       Staffinix sources
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -323,7 +323,7 @@ export function CopilotPanel({ compact = false }: { compact?: boolean }) {
             <Send className="h-4 w-4" />
           </Button>
         </form>
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Enter to send · Shift + Enter for a new line · Qdrant retrieval is read-only and
           tenant-scoped
         </p>

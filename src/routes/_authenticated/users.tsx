@@ -260,7 +260,7 @@ function UserRow({
             <p className="text-sm font-medium text-foreground">
               {user.full_name ?? "—"}{" "}
               {isSelf && (
-                <span className="ml-1 text-[10px] font-normal text-muted-foreground">(you)</span>
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">(you)</span>
               )}
             </p>
             <p className="text-xs text-muted-foreground">{user.email}</p>

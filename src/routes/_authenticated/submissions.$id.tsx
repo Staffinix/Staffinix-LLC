@@ -32,7 +32,7 @@ import {
   ArrowLeft,
   Loader2,
   Send,
-  Sparkles,
+  ScanText,
   CalendarPlus,
   Trash2,
   Mail,
@@ -375,7 +375,7 @@ function SubmissionDetailPage() {
               <Card className="border-border bg-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-sm">
-                    <Sparkles className="h-4 w-4 text-primary" /> AI match
+                    <ScanText className="h-4 w-4 text-primary" /> AI match
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
@@ -759,7 +759,7 @@ function InterviewRow({
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+              <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[11px] uppercase text-primary">
                 {ROUND_LABEL[interview.round as InterviewRound]}
               </span>
               <Badge

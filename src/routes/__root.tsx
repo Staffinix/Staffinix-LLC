@@ -21,9 +21,7 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-          404 · Not found
-        </p>
+        <p className="font-mono text-xs text-muted-foreground">404 · Not found</p>
         <h1 className="mt-3 text-2xl font-semibold text-foreground">This page doesn't exist</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           It may have been moved or you followed a broken link.
@@ -53,7 +51,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <p className="text-xs font-mono uppercase tracking-widest text-destructive">Error</p>
+        <p className="font-mono text-xs text-destructive">Error</p>
         <h1 className="mt-3 text-2xl font-semibold text-foreground">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {normalizedError.message || "Please try again or return home."}
@@ -92,7 +90,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Staffinix is the AI-first recruitment operating system for US IT staffing companies. Requirements, candidates, matching, and submissions — automated, recruiter-approved.",
       },
       { name: "author", content: "Staffinix LLC" },
-      { name: "theme-color", content: "#181820" },
+      { name: "theme-color", content: "#141415" },
       { property: "og:title", content: "Staffinix — AI Recruitment OS" },
       {
         property: "og:description",

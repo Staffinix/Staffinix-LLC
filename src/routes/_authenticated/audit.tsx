@@ -140,7 +140,7 @@ function AuditPage() {
                           <div className="flex items-center gap-2">
                             <Badge
                               variant="outline"
-                              className="text-[10px] font-mono border-primary/30 text-primary"
+                              className="text-[11px] font-mono border-primary/30 text-primary"
                             >
                               {formatted.title}
                             </Badge>
@@ -155,7 +155,7 @@ function AuditPage() {
                           <p className="font-semibold text-foreground">
                             {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
                           </p>
-                          <p className="font-mono text-[10px]">
+                          <p className="font-mono text-[11px]">
                             {format(new Date(a.created_at), "MMM d, yyyy · HH:mm")}
                           </p>
                         </div>

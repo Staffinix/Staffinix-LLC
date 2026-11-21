@@ -3,17 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { canAccessPath, getDefaultAuthorizedPath } from "@/lib/feature-access";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Loader2,
-  Lock,
-  ShieldCheck,
-  UserRound,
-  Zap,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -222,52 +212,25 @@ function AuthPage() {
             Brand panel
             ----------------------------------------------------------------- */}
         <aside className="relative hidden overflow-hidden border-r border-border bg-surface p-10 lg:flex lg:flex-col">
-          <div className="bg-grid absolute inset-0 opacity-50" />
-
-          <div className="absolute -left-24 top-1/3 h-96 w-96 rounded-full bg-primary/20 blur-[110px]" />
-
           <div className="relative z-10 flex h-full flex-col">
             <Link to="/" aria-label="Staffinix home" className="w-fit">
               <StaffinixLogo size={32} />
             </Link>
 
             <div className="mt-auto">
-              <h2 className="text-3xl font-semibold leading-tight tracking-tight">
-                Welcome back to
-                <br />
-                <span className="text-brand-gradient">AI recruitment</span>
+              <h2 className="text-3xl font-medium leading-tight tracking-tight">
+                Your recruiting desk, from job email to approved resume
               </h2>
 
-              <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Automate candidate sourcing, match bench talent in seconds, and generate 100%
-                truthful tailored submissions.
-              </p>
-
-              <ul className="mt-8 space-y-3 text-sm">
-                {[
-                  {
-                    icon: Zap,
-                    text: "Instant 13-field JD parsing",
-                  },
-                  {
-                    icon: ShieldCheck,
-                    text: "3-layer anti-fabrication guarantee",
-                  },
-                  {
-                    icon: Lock,
-                    text: "Outlook & Gmail native drafts",
-                  },
-                ].map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-center gap-2.5 text-muted-foreground">
-                    <Icon className="h-4 w-4 text-primary" />
-                    {text}
-                  </li>
-                ))}
+              <ul className="mt-8 divide-y divide-border border-y border-border text-sm text-muted-foreground">
+                <li className="py-3">Reads requirements from Gmail and Outlook</li>
+                <li className="py-3">Tailors resumes from verified facts only</li>
+                <li className="py-3">A recruiter approves every version</li>
               </ul>
             </div>
 
             <p className="relative z-10 mt-10 border-t border-border pt-5 text-[11px] text-muted-foreground">
-              © {new Date().getFullYear()} Staffinix AI Platform · Enterprise Edition
+              © {new Date().getFullYear()} Staffinix LLC
             </p>
           </div>
         </aside>
@@ -282,11 +245,7 @@ function AuthPage() {
                 <StaffinixLogo size={32} />
               </Link>
 
-              <div className="mt-4 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <UserRound className="h-5 w-5" />
-              </div>
-
-              <h1 className="mt-4 text-xl font-semibold tracking-tight">Welcome to Staffinix</h1>
+              <h1 className="mt-4 text-xl font-medium">Sign in or create an account</h1>
 
               <p className="mt-1 text-xs text-muted-foreground">
                 Sign in to your Staffinix recruitment workspace
@@ -535,7 +494,7 @@ function SignInForm({ redirect }: { redirect: string }) {
           <span className="w-full border-t border-border" />
         </div>
 
-        <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+        <div className="relative flex justify-center text-[11px]">
           <span className="bg-card px-2 text-muted-foreground">or email sign in</span>
         </div>
       </div>
@@ -817,7 +776,7 @@ function SignUpForm({ redirect }: { redirect: string }) {
           <span className="w-full border-t border-border" />
         </div>
 
-        <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+        <div className="relative flex justify-center text-[11px]">
           <span className="bg-card px-2 text-muted-foreground">or email</span>
         </div>
       </div>

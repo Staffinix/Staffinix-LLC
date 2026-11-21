@@ -51,7 +51,7 @@ import {
   ChevronRight,
   Eye,
   Pencil,
-  Sparkles,
+  ScanText,
   ArrowUpDown,
   DollarSign,
   Building,
@@ -133,7 +133,7 @@ function RequisitionsListPage() {
           actions={
             <Button
               asChild
-              className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md transition-all duration-200"
+              className="gap-2 text-primary-foreground shadow-md transition-colors duration-200"
             >
               <Link to="/requirements/new">
                 <Plus className="h-4 w-4" /> Add Requirements
@@ -143,7 +143,7 @@ function RequisitionsListPage() {
         />
 
         {/* Global Toolbar Filters */}
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/60 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -263,7 +263,7 @@ function RequisitionsListPage() {
                           {r.primary_technology && (
                             <Badge
                               variant="secondary"
-                              className="text-[10px] px-1.5 py-0 font-normal bg-surface border border-border"
+                              className="text-[11px] px-1.5 py-0 font-normal bg-surface border border-border"
                             >
                               {r.primary_technology}
                             </Badge>
@@ -290,7 +290,7 @@ function RequisitionsListPage() {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className="text-[10px] bg-surface font-mono font-normal"
+                        className="text-[11px] bg-surface font-mono font-normal"
                       >
                         {r.visa_types?.join(", ") || "Any"}
                       </Badge>
@@ -303,7 +303,7 @@ function RequisitionsListPage() {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "font-normal capitalize text-[10px]",
+                          "font-normal capitalize text-[11px]",
                           getStatusStyle(r.status),
                         )}
                       >
@@ -314,7 +314,7 @@ function RequisitionsListPage() {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "font-normal capitalize text-[10px]",
+                          "font-normal capitalize text-[11px]",
                           getPriorityStyle(r.priority),
                         )}
                       >
@@ -324,7 +324,7 @@ function RequisitionsListPage() {
                     <TableCell className="max-w-[200px] text-xs">
                       {r.source_email_sender_address ? (
                         <>
-                          <Badge variant="secondary" className="text-[10px] font-normal">
+                          <Badge variant="secondary" className="text-[11px] font-normal">
                             From mail
                           </Badge>
                           {r.source_email_sender_name && (
@@ -358,7 +358,7 @@ function RequisitionsListPage() {
                             className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
                           >
                             <Link to="/matching" search={{ reqId: r.id }}>
-                              <Sparkles className="h-3.5 w-3.5" />
+                              <ScanText className="h-3.5 w-3.5" />
                               AI Matching
                             </Link>
                           </Button>
@@ -393,18 +393,18 @@ function RequisitionsListPage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className={cn("text-[10px]", getStatusStyle(reviewReq.status))}
+                      className={cn("text-[11px]", getStatusStyle(reviewReq.status))}
                     >
                       {getStatusLabel(reviewReq.status)}
                     </Badge>
                     <Badge
                       variant="outline"
-                      className={cn("text-[10px]", getPriorityStyle(reviewReq.priority))}
+                      className={cn("text-[11px]", getPriorityStyle(reviewReq.priority))}
                     >
                       {getPriorityLabel(reviewReq.priority)} Priority
                     </Badge>
                   </div>
-                  <SheetTitle className="text-xl font-bold text-foreground">
+                  <SheetTitle className="text-xl font-semibold text-foreground">
                     {reviewReq.title}
                   </SheetTitle>
                   <SheetDescription className="text-xs text-muted-foreground">
@@ -503,7 +503,7 @@ function RequisitionsListPage() {
                       navigate({ to: "/matching" });
                     }}
                   >
-                    <Sparkles className="h-4 w-4" /> Go To AI Matching
+                    <ScanText className="h-4 w-4" /> Go To AI Matching
                   </Button>
                 </SheetFooter>
               </>

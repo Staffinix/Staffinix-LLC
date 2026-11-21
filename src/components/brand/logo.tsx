@@ -19,14 +19,10 @@ export function StaffinixLogo({
         src={logoSrc}
         alt="Staffinix logo"
         style={{ height: size, width: "auto" }}
-        className="shrink-0 object-contain drop-shadow-sm"
+        className="shrink-0 object-contain"
         draggable={false}
       />
-      {showWordmark && (
-        <span className="text-base font-semibold tracking-tight text-foreground">
-          Staffinix <span className="text-primary">AI</span>
-        </span>
-      )}
+      {showWordmark && <span className="text-base font-medium text-foreground">Staffinix AI</span>}
     </div>
   );
 }

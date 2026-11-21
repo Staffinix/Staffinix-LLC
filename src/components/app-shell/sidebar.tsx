@@ -1,6 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { motion } from "motion/react";
-import { Crown, ShieldCheck, UserRound } from "lucide-react";
+import { Crown, UserRound } from "lucide-react";
 import { StaffinixLogo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/use-profile";
@@ -29,12 +28,12 @@ export function AppSidebar() {
   const isUnprovisioned = identity.roles.length === 0 && !identity.platformRole;
 
   return (
-    <aside className="glass-strong hidden h-full w-64 shrink-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 text-sidebar-foreground md:flex">
+    <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
         <StaffinixLogo />
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-y-contain px-3 py-5">
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-3 py-4">
         {currentNavGroups.map((group) => (
           <NavGroup
             key={group.section}
@@ -63,35 +62,20 @@ export function AppSidebar() {
         <Link
           to="/settings/profile"
           className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            "flex h-9 items-center gap-2 rounded-lg px-3 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             pathname.startsWith("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground",
           )}
         >
-          <UserRound className="h-4 w-4" />
+          <UserRound className="h-4 w-4 text-muted-foreground" />
           Profile
         </Link>
-        {tenancy?.tenant && (
-          <div className="truncate rounded-xl border border-sidebar-border bg-sidebar-accent/20 px-3 py-2 text-xs text-sidebar-foreground/70">
-            {tenancy.tenant.name}
-            <span className="ml-1 capitalize text-sidebar-foreground/40">
-              · {tenancy.tenant.plan}
-            </span>
-          </div>
-        )}
-
-        <div className="rounded-xl border border-sidebar-border/80 bg-sidebar-accent/30 p-2.5 shadow-inner">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-sidebar-foreground">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              <span>Assigned Access</span>
-            </div>
-            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-              {level ?? "Pending"}
-            </span>
-          </div>
-          <div className="mt-1.5 text-center text-[9px] text-sidebar-foreground/60 font-mono">
-            {data?.roleTitle ?? "Awaiting role assignment"}
-          </div>
+        <div className="px-3 pb-1 text-xs leading-5 text-muted-foreground">
+          {tenancy?.tenant && (
+            <p className="truncate">
+              {tenancy.tenant.name} · <span className="capitalize">{tenancy.tenant.plan}</span>
+            </p>
+          )}
+          <p className="truncate">{data?.roleTitle ?? "Awaiting role assignment"}</p>
         </div>
       </div>
     </aside>
@@ -110,10 +94,8 @@ function NavGroup({
   if (items.length === 0) return null;
   return (
     <div>
-      <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/40">
-        {title}
-      </p>
-      <div className="mt-1 space-y-0.5">
+      <p className="px-3 text-xs text-muted-foreground">{title}</p>
+      <div className="mt-2 space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
           const active =
@@ -122,22 +104,21 @@ function NavGroup({
             <Link
               key={item.to}
               to={item.to}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2.5 overflow-hidden rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                "flex h-9 items-center gap-2 rounded-lg px-3 text-sm transition-colors",
                 active
-                  ? "text-sidebar-accent-foreground font-semibold"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                  : "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
               )}
             >
-              {active && (
-                <motion.span
-                  layoutId="sidebar-active-item"
-                  className="absolute inset-0 rounded-xl border border-primary/15 bg-sidebar-accent shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_8%,transparent)]"
-                  transition={{ type: "spring", stiffness: 430, damping: 34 }}
-                />
-              )}
-              <Icon className={cn("relative h-4 w-4 shrink-0", active && "text-primary")} />
-              <span className="relative">{item.label}</span>
+              <Icon
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}

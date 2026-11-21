@@ -75,7 +75,7 @@ function domainLabel(website: string | null, slug: string) {
 function Detail({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className="text-sm">{value || "Not recorded"}</p>
     </div>
   );

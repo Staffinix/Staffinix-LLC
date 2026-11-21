@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 import { CopilotDrawer } from "@/components/ai/copilot-drawer";
 import { getAssignedRoleLabel } from "@/lib/role-presentation";
@@ -76,18 +75,15 @@ export function AppTopbar({ title }: { title: string }) {
   const hasAssignedRole = !!data?.level;
 
   return (
-    <header className="sticky top-0 z-30 flex h-20 shrink-0 items-center bg-background px-3 md:px-5">
-      <div className="glass-strong flex h-13 w-full items-center justify-between rounded-2xl px-3.5 md:px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_12px_var(--primary-glow)]" />
-          <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">{title}</h1>
-        </div>
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center border-b border-border bg-background px-4 sm:px-6 md:px-8">
+      <div className="flex w-full items-center justify-between">
+        <p className="min-w-0 truncate text-sm font-medium text-foreground">{title}</p>
 
         <div className="flex items-center gap-1 md:gap-2">
           {hasAssignedRole && (
-            <Badge variant="outline" className="hidden text-[10px] md:inline-flex">
+            <span className="hidden text-xs text-muted-foreground md:inline">
               {getAssignedRoleLabel(data?.roles ?? [], data?.platformRole ?? null)}
-            </Badge>
+            </span>
           )}
 
           <CopilotDrawer />
@@ -96,14 +92,14 @@ export function AppTopbar({ title }: { title: string }) {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="glass" className="h-9 gap-2 px-1.5 md:px-2.5">
+              <Button variant="ghost" className="h-9 gap-2 px-1.5 md:px-2">
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={avatarSrc} />
-                  <AvatarFallback className="bg-primary/20 text-xs font-bold text-primary">
+                  <AvatarFallback className="bg-muted text-xs font-medium text-foreground">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-xs font-semibold text-foreground md:inline-block">
+                <span className="hidden text-sm font-normal text-foreground md:inline-block">
                   {cleanName}
                 </span>
               </Button>

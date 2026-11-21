@@ -186,7 +186,7 @@ function ProfileSettingsPage() {
               <div className="flex items-center gap-4 border-b border-border/70 pb-5">
                 <Avatar className="h-16 w-16 border-2 border-primary/20 shrink-0 shadow-xs">
                   <AvatarImage src={avatarUrl || undefined} alt={displayName} />
-                  <AvatarFallback className="bg-primary/20 text-lg font-bold text-primary">
+                  <AvatarFallback className="bg-primary/20 text-lg font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -197,7 +197,7 @@ function ProfileSettingsPage() {
                     </h3>
                     <Badge
                       variant="outline"
-                      className="text-[10px] bg-primary/10 text-primary border-primary/20"
+                      className="text-[11px] bg-primary/10 text-primary border-primary/20"
                     >
                       {level ? `${level} Active` : "Access pending"}
                     </Badge>
@@ -233,7 +233,7 @@ function ProfileSettingsPage() {
                       )}
                       {avatarMutation.isPending ? "Uploading…" : "Update photo"}
                     </Button>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       JPEG, PNG or WebP · max 5 MB
                     </span>
                   </div>
@@ -300,7 +300,7 @@ function ProfileSettingsPage() {
                       <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                       Company Email ID
                     </Label>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-0.5">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-0.5">
                       <CheckCircle2 className="h-3 w-3" /> Verified
                     </span>
                   </div>
@@ -309,7 +309,7 @@ function ProfileSettingsPage() {
                     disabled
                     className="bg-muted/60 cursor-not-allowed text-xs font-medium text-foreground"
                   />
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     Connected to your authenticated login identity.
                   </p>
                 </div>
@@ -324,7 +324,7 @@ function ProfileSettingsPage() {
                   </Label>
                   <span className="text-[11px] font-mono text-muted-foreground">
                     Security Level:{" "}
-                    <span className="font-bold text-primary">{level ?? "Pending"}</span>
+                    <span className="font-semibold text-primary">{level ?? "Pending"}</span>
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -335,7 +335,7 @@ function ProfileSettingsPage() {
                         className="flex flex-col rounded-lg border border-border bg-surface/70 px-3 py-2 text-xs shadow-2xs"
                       >
                         <span className="font-semibold text-foreground">{getRoleLabel(r)}</span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           {ROLE_DESCRIPTIONS[r] ??
                             "Contact an administrator to confirm your access"}
                         </span>
@@ -353,7 +353,7 @@ function ProfileSettingsPage() {
                       <span className="font-semibold text-foreground">
                         {getRoleLabel(data.platformRole)}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {ROLE_DESCRIPTIONS[data.platformRole] ?? "Authorized platform membership"}
                       </span>
                     </div>
